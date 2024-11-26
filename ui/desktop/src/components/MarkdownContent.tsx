@@ -66,7 +66,7 @@ export default function MarkdownContent({ content, className = '' }: MarkdownCon
   return (
     <div className="w-full overflow-x-hidden">
       <ReactMarkdown
-        className={`prose prose-xs w-full max-w-full break-words
+        className={`prose prose-xs dark:prose-invert w-full max-w-full break-words
           prose-pre:p-0 prose-pre:m-0
           prose-code:break-all prose-code:whitespace-pre-wrap
           prose-pre:bg-transparent

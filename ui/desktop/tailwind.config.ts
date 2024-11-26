@@ -55,11 +55,11 @@ export default {
       },
       backgroundImage: {
         'prev-goose-gradient': 'linear-gradient(89deg, rgba(85, 95, 231, 0.04) 0.16%, rgba(85, 95, 231, 0.20) 99.77%)',
-        'dark-prev-goose-gradient': 'linear-gradient(89deg, rgba(55, 65, 81, 0.04) 0.16%, rgba(55, 65, 81, 0.20) 99.77%)',
+        'dark-prev-goose-gradient': 'linear-gradient(89deg, rgb(147 149 151 / 4%) 0.16%, rgb(55 65 81 / 35%) 99.77%)',
         'card-gradient': 'linear-gradient(359deg, rgba(255, 255, 255, 0.90) 9.96%, rgba(226, 245, 251, 0.90) 95.35%)',
         'dark-card-gradient': 'linear-gradient(359deg, rgba(31, 41, 55, 0.90) 9.96%, rgba(17, 24, 39, 0.90) 95.35%)',
         'window-gradient': 'linear-gradient(90deg, rgba(255, 255, 255, 0.55) 0%, rgba(246, 247, 255, 0.55) 100%)',
-        'dark-window-gradient': 'linear-gradient(90deg, rgba(31, 41, 55, 0.55) 0%, rgba(17, 24, 39, 0.55) 100%)'
+        'dark-window-gradient': 'linear-gradient(90deg, rgba(50, 50, 50, 0.55) 0%, rgba(89, 89, 89, 0.55) 100%)'
       },
       fontSize: {
         14: '14px'
@@ -87,15 +87,25 @@ export default {
           dark: 'rgba(31, 41, 55, 0.95)'
         },
 
-        'bottom-menu': 'rgba(0, 0, 0, 0.35)',
-
+        'bottom-menu':{
+          DEFAULT: 'rgba(0, 0, 0, 0.35)',
+          dark: 'rgba(255, 255, 255, 0.35)'
+        },
+        'bottom-menu-background': {
+            DEFAULT: 'rgba(255, 255, 255, 0.90)',
+            dark: 'rgba(31, 41, 55, 0.35)'
+        },
         'tool-bold': {
           DEFAULT: 'rgba(0, 0, 0, 0.85)',
           dark: 'rgba(255, 255, 255, 0.65)'
         },
         'tool': {
           DEFAULT: 'rgba(0, 0, 0, 0.75)',
-        'tool-dim': 'rgba(0, 0, 0, 0.6)',
+          dark: 'rgba(255, 255, 255, 0.50)'
+        },
+
+        'tool-dim': {
+          DEFAULT: 'rgba(0, 0, 0, 0.6)',
           dark: 'rgba(255, 255, 255, 0.50)'
         },
 
@@ -130,7 +140,11 @@ export default {
       'goose-text': {
           DEFAULT: '#000000',
           dark: '#9d9d9d',
-          }
+          },
+        'goose-text-light': {
+                  DEFAULT: '#FFFFFF',
+                  dark: '#2F2F2F',
+                  }
       },
       borderRadius: {
         lg: 'var(--radius)',
