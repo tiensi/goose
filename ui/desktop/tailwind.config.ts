@@ -7,7 +7,7 @@ export default {
   ],
   plugins: [
     require("tailwindcss-animate"),
-    require('@tailwindcss/typography')
+    require('@tailwindcss/typography'),
   ],
   theme: {
     extend: {
@@ -55,8 +55,11 @@ export default {
       },
       backgroundImage: {
         'prev-goose-gradient': 'linear-gradient(89deg, rgba(85, 95, 231, 0.04) 0.16%, rgba(85, 95, 231, 0.20) 99.77%)',
+        'dark-prev-goose-gradient': 'linear-gradient(89deg, rgba(55, 65, 81, 0.04) 0.16%, rgba(55, 65, 81, 0.20) 99.77%)',
         'card-gradient': 'linear-gradient(359deg, rgba(255, 255, 255, 0.90) 9.96%, rgba(226, 245, 251, 0.90) 95.35%)',
-        'window-gradient': 'linear-gradient(90deg, rgba(255, 255, 255, 0.55) 0%, rgba(246, 247, 255, 0.55) 100%)'
+        'dark-card-gradient': 'linear-gradient(359deg, rgba(31, 41, 55, 0.90) 9.96%, rgba(17, 24, 39, 0.90) 95.35%)',
+        'window-gradient': 'linear-gradient(90deg, rgba(255, 255, 255, 0.55) 0%, rgba(246, 247, 255, 0.55) 100%)',
+        'dark-window-gradient': 'linear-gradient(90deg, rgba(31, 41, 55, 0.55) 0%, rgba(17, 24, 39, 0.55) 100%)'
       },
       fontSize: {
         14: '14px'
@@ -65,24 +68,61 @@ export default {
         background: 'var(--background)',
         foreground: 'var(--foreground)',
 
-        'splash-pills': 'rgba(255, 255, 255, 0.60)',
-        'splash-pills-text': 'rgba(0, 0, 0, 0.60)',
+        'splash-pills': {
+          DEFAULT: 'rgba(255, 255, 255, 0.60)',
+          dark: 'rgba(31, 41, 55, 0.60)'
+        },
+        'splash-pills-text': {
+          DEFAULT: 'rgba(0, 0, 0, 0.60)',
+          dark: 'rgba(255, 255, 255, 0.60)'
+        },
 
-        'prev-goose-text': '#4E52C5',
+        'prev-goose-text': {
+          DEFAULT: '#4E52C5',
+          dark: '#9CA3AF'
+        },
 
-        'more-menu': 'rgba(255, 255, 255, 0.95))',
+        'more-menu': {
+          DEFAULT: 'rgba(255, 255, 255, 0.95)',
+          dark: 'rgba(31, 41, 55, 0.95)'
+        },
 
         'bottom-menu': 'rgba(0, 0, 0, 0.35)',
 
-        'tool-bold': 'rgba(0, 0, 0, 0.85)',
-        'tool': 'rgba(0, 0, 0, 0.75)',
+        'tool-bold': {
+          DEFAULT: 'rgba(0, 0, 0, 0.85)',
+          dark: 'rgba(255, 255, 255, 0.65)'
+        },
+        'tool': {
+          DEFAULT: 'rgba(0, 0, 0, 0.75)',
         'tool-dim': 'rgba(0, 0, 0, 0.6)',
+          dark: 'rgba(255, 255, 255, 0.50)'
+        },
 
-        'tool-result-green': '#028E00',
-        'tool-card': 'rgba(255, 255, 255, 0.80)',
-        'link-preview': 'rgba(255, 255, 255, 0.80)',
-        'user-bubble': 'rgba(85, 95, 231, 0.90)',
-        'goose-bubble': 'rgba(0, 0, 0, 0.12)'
+        'tool-result-green': {
+          DEFAULT: '#028E00',
+          dark: '#10B981'
+        },
+        'tool-card': {
+          DEFAULT: 'rgba(255, 255, 255, 0.80)',
+          dark: 'rgba(31, 41, 55, 0.80)'
+        },
+        'link-preview': {
+          DEFAULT: 'rgba(255, 255, 255, 0.80)',
+          dark: 'rgba(31, 41, 55, 0.80)'
+        },
+        'user-bubble': {
+          DEFAULT: 'rgba(85, 95, 231, 0.90)',
+          dark: 'rgba(129, 140, 248, 0.90)'
+        },
+        'goose-bubble': {
+          DEFAULT: 'rgba(0, 0, 0, 0.12)',
+          dark: 'rgba(255, 255, 255, 0.12)',
+        },
+        'goose-text': {
+          DEFAULT: 'rgba(0, 0, 0, 0.60)',
+          dark: 'rgba(255, 255, 255, 0.60)'
+        }
       },
       borderRadius: {
         lg: 'var(--radius)',

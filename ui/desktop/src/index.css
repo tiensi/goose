@@ -15,6 +15,11 @@
     font-weight: 500;
     line-height: normal;
   }
+  
+  /* Dark mode styles */
+  .dark .inter-app-type {
+    color: rgba(255, 255, 255, 0.90);
+  }
 }
 
 @layer components {
@@ -40,6 +45,10 @@
     line-height: normal;
     letter-spacing: 1.6px;
   }
+  
+  .dark .ask-goose-type {
+    color: #fff;
+  }
 
   .tool-form-button {
     color: #7A7EFB;
@@ -49,7 +58,12 @@
     font-weight: 600;
     line-height: var(--Type-styles-Paragraph-leading-20, 22px);
     letter-spacing: var(--Type-styles-Paragraph-tracking-20, 0px);
-    background: var(--fill-40, rgba(0, 0, 0, 0.05))
+    background: var(--fill-40, rgba(0, 0, 0, 0.05));
+  }
+  
+  .dark .tool-form-button {
+    color: #7A7EFB;
+    background: var(--fill-40, rgba(255, 255, 255, 0.1));
   }
 
   .tab-type {
@@ -59,5 +73,18 @@
     font-weight: 500;
     line-height: normal;
   }
-}
+  
+  .dark .tab-type {
+    color: rgba(164, 164, 164, 0.80);
+  }
 
+  body {
+    background-color: white;
+    color: black;
+  }
+  
+  .dark body {
+    background-color: black;
+    color: white;
+  }
+}

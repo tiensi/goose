@@ -52,9 +52,9 @@ function ChatContent({
   setWorking: React.Dispatch<React.SetStateAction<Working>>;
 }) {
   const chat = chats.find((c: Chat) => c.id === selectedChatId);
-  const [messageMetadata, setMessageMetadata] = useState<Record<string, string[]>>({});  
+  const [messageMetadata, setMessageMetadata] = useState<Record<string, string[]>>({});
   const [hasMessages, setHasMessages] = useState(false);
-  
+
 
   const {
     messages,
@@ -172,11 +172,11 @@ function ChatContent({
           }
         }),
       };
-        
+
       const updatedMessages = [...messages.slice(0, -1), newLastMessage];
       setMessages(updatedMessages);
     }
-    
+
   };
 
   return (
@@ -184,7 +184,7 @@ function ChatContent({
       <div className="relative block h-[20px] w-screen">
         <MoreMenu />
       </div>
-      <Card className="flex flex-col flex-1 h-[calc(100vh-95px)] w-full bg-card-gradient mt-0 border-none rounded-2xl relative">
+      <Card className="flex flex-col flex-1 h-[calc(100vh-95px)] w-full bg-card-gradient dark:bg-dark-card-gradient mt-0 border-none rounded-2xl relative">
         {messages.length === 0 ? (
           <Splash append={append} />
         ) : (
@@ -357,9 +357,9 @@ export default function ChatWindow() {
               <Route path="*" element={<Navigate to="/chat/1" replace />} />
             </Routes>
           </div>
-                    
+
           <WingToWing onExpand={toggleMode} progressMessage={progressMessage} working={working} />
-          
+
         </>
       )}
     </div>
