@@ -7,7 +7,7 @@ export default {
   ],
   plugins: [
     require("tailwindcss-animate"),
-    require('@tailwindcss/typography'),
+    require('@tailwindcss/typography')
   ],
   theme: {
     extend: {
@@ -119,10 +119,18 @@ export default {
           DEFAULT: 'rgba(0, 0, 0, 0.12)',
           dark: 'rgba(255, 255, 255, 0.12)',
         },
-        'goose-text': {
-          DEFAULT: 'rgba(0, 0, 0, 0.60)',
-          dark: 'rgba(255, 255, 255, 0.60)'
-        }
+        'goose-bubble-text': {
+          DEFAULT: 'rgba(255, 255, 255, 1.00)',
+          dark: 'rgba(0, 0, 0, 1.00)',
+        },
+        'logo-primary': {
+          DEFAULT: '#000000',
+          dark: '#9d9d9d',
+        },
+      'goose-text': {
+          DEFAULT: '#000000',
+          dark: '#9d9d9d',
+          }
       },
       borderRadius: {
         lg: 'var(--radius)',
