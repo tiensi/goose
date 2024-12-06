@@ -82,6 +82,11 @@ export default {
           dark: '#9CA3AF'
         },
 
+        'inline-code': {
+            DEFAULT: 'rgba(255, 255, 255, 0.5)',
+            dark: 'rgba(57, 33, 0, 0.49)'
+        },
+
         'more-menu': {
           DEFAULT: 'rgba(255, 255, 255, 0.95)',
           dark: 'rgba(31, 41, 55, 0.95)'
