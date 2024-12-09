@@ -40,11 +40,11 @@ impl CliclackPrompt {
             input_mode: InputMode::Singleline,
             theme: std::env::var("GOOSE_CLI_THEME")
                 .ok()
-                .and_then(|val| {
+                .map(|val| {
                     if val.eq_ignore_ascii_case("light") {
-                        Some(Theme::Light)
+                        Theme::Light
                     } else {
-                        Some(Theme::Dark)
+                        Theme::Dark
                     }
                 })
                 .unwrap_or(Theme::Dark),
