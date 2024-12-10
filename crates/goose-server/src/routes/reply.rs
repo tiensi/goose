@@ -8,10 +8,13 @@ use axum::{
 };
 use bytes::Bytes;
 use futures::{stream::StreamExt, Stream};
-use goose::models::{
-    content::Content,
-    message::{Message, MessageContent},
-    role::Role,
+use goose::{
+    agent::ApprovalMonitor,
+    models::{
+        content::Content,
+        message::{Message, MessageContent},
+        role::Role,
+    },
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -276,10 +279,18 @@ async fn handler(
     // Get a lock on the shared agent
     let agent = state.agent.clone();
 
+    // Create a monitor for approvals. TODO: Implement this for gui
+    let (approval_tx, approval_rx) = mpsc::channel(1);
+    let (reject_tx, rejection_rx) = mpsc::channel(1);
+    let approval_monitor = ApprovalMonitor {
+        approval_rx,
+        rejection_rx,
+    };
+
     // Spawn task to handle streaming
     tokio::spawn(async move {
         let agent = agent.lock().await;
-        let mut stream = match agent.reply(&messages).await {
+        let mut stream = match agent.reply(&messages, approval_monitor).await {
             Ok(stream) => stream,
             Err(e) => {
                 tracing::error!("Failed to start reply stream: {}", e);
@@ -347,9 +358,16 @@ async fn ask_handler(
     // Create a single message for the prompt
     let messages = vec![Message::user().with_text(request.prompt)];
 
+    let (approval_tx, approval_rx) = mpsc::channel(1);
+    let (reject_tx, rejection_rx) = mpsc::channel(1);
+    let approval_monitor = ApprovalMonitor {
+        approval_rx,
+        rejection_rx,
+    };
+
     // Get response from agent
     let mut response_text = String::new();
-    let mut stream = match agent.reply(&messages).await {
+    let mut stream = match agent.reply(&messages, approval_monitor).await {
         Ok(stream) => stream,
         Err(e) => {
             tracing::error!("Failed to start reply stream: {}", e);

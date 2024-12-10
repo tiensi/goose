@@ -1,6 +1,7 @@
 use anyhow::Result;
 use core::panic;
 use futures::StreamExt;
+use goose::agent::ApprovalMonitor;
 use serde_json;
 use std::fs::{self, File};
 use std::io::{self, BufRead, Write};
@@ -9,7 +10,7 @@ use std::path::PathBuf;
 use crate::agents::agent::Agent;
 use crate::prompt::{InputType, Prompt};
 use goose::developer::DeveloperSystem;
-use goose::models::message::{Message, MessageContent};
+use goose::models::message::{ApprovalRequest, Message, MessageContent};
 use goose::models::role::Role;
 use goose::systems::goose_hints::GooseHintsSystem;
 
@@ -140,7 +141,13 @@ impl<'a> Session<'a> {
     }
 
     async fn agent_process_messages(&mut self) {
-        let mut stream = match self.agent.reply(&self.messages).await {
+        let (approval_tx, approval_rx) = tokio::sync::mpsc::channel(1);
+        let (rejection_tx, rejection_rx) = tokio::sync::mpsc::channel(1);
+        let approval_monitor = ApprovalMonitor {
+            approval_rx: approval_rx,
+            rejection_rx: rejection_rx,
+        };
+        let mut stream = match self.agent.reply(&self.messages, approval_monitor).await {
             Ok(stream) => stream,
             Err(e) => {
                 eprintln!("Error starting reply stream: {}", e);
@@ -156,6 +163,39 @@ impl<'a> Session<'a> {
                             persist_messages(&self.session_file, &self.messages).unwrap_or_else(|e| eprintln!("Failed to persist messages: {}", e));
                             self.prompt.hide_busy();
                             self.prompt.render(Box::new(message.clone()));
+
+                            let mut abandon_tools = false;
+                            // Handle any tool requests that require approval
+                            for approval in pending_approvals(message).iter() {
+                                if abandon_tools {
+                                    // If we've already abandoned tools, reject any new requests
+                                    if let Err(e) = rejection_tx.send(approval.id.clone()).await {
+                                        eprintln!("Failed to handle approval: {}", e);
+                                    }
+                                    continue;
+                                }
+                                // TODO: Auto-approve some tool requests based on external configuration.
+                                match self.prompt.handle_approval_request(approval.clone()) {
+                                    Ok(approval_result) => {
+                                        if approval_result {
+                                            if let Err(e) = approval_tx.send(approval.id.clone()).await {
+                                                eprintln!("Failed to send approval: {}", e);
+                                            }
+                                        } else {
+                                            if let Err(e) = rejection_tx.send(approval.id.clone()).await {
+                                                eprintln!("Failed to send rejection: {}", e);
+                                            }
+                                        }
+                                    },
+                                    Err(e) => {
+                                        abandon_tools = true;
+                                        eprintln!("Failed to handle approval: {}", e);
+                                        if let Err(e) = rejection_tx.send(approval.id.clone()).await {
+                                            eprintln!("Failed to send rejection: {}", e);
+                                        }
+                                    }
+                                }
+                            }
                             self.prompt.show_busy();
                         }
                         Some(Err(e)) => {
@@ -295,6 +335,20 @@ We've removed the conversation up to the most recent user message
         ));
         self.prompt.close();
     }
+}
+
+fn pending_approvals(message: Message) -> Vec<ApprovalRequest> {
+    message
+        .content
+        .iter()
+        .filter_map(|content| {
+            if let MessageContent::ToolRequest(req) = content {
+                req.approval_request.clone()
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 fn raw_message(content: &str) -> Box<Message> {

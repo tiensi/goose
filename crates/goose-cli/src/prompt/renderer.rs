@@ -3,7 +3,7 @@ use std::io::{self, Write};
 
 use bat::WrappingMode;
 use console::style;
-use goose::models::message::{Message, MessageContent, ToolRequest, ToolResponse};
+use goose::models::message::{ApprovalRequest, Message, MessageContent, ToolRequest, ToolResponse};
 use goose::models::role::Role;
 use goose::models::{content::Content, tool::ToolCall};
 use serde_json::Value;
@@ -57,6 +57,7 @@ impl ToolRenderer for DefaultRenderer {
 
                 // Format and print the parameters
                 print_params(&call.arguments, 0);
+                render_approval_required(tool_request.approval_request.clone());
                 print_newline();
             }
             Err(e) => print_markdown(&e.to_string(), theme),
@@ -87,6 +88,7 @@ impl ToolRenderer for BashDeveloperSystemRenderer {
                     }
                     _ => print_params(&call.arguments, 0),
                 }
+                render_approval_required(tool_request.approval_request.clone());
                 print_newline();
             }
             Err(e) => print_markdown(&e.to_string(), theme),
@@ -184,6 +186,24 @@ pub fn default_print_request_header(call: &ToolCall) {
     );
     print_newline();
     println!("{}", tool_header);
+}
+
+pub fn render_approval_required(approval_request: Option<ApprovalRequest>) {
+    if let Some(approval_request) = approval_request {
+        println!(
+            "{}",
+            style("────────────────────────────────────────────────────────").red()
+        );
+        println!(
+            "{} Approval request id: {}",
+            style("|").red(),
+            approval_request.id
+        );
+        println!(
+            "{}",
+            style("────────────────────────────────────────────────────────").red()
+        );
+    }
 }
 
 pub fn print_markdown(content: &str, theme: &str) {

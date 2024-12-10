@@ -8,6 +8,26 @@ use chrono::Utc;
 pub struct ToolRequest {
     pub id: String,
     pub tool_call: AgentResult<ToolCall>,
+    pub approval_request: Option<ApprovalRequest>,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ApprovalRequest {
+    pub id: String,
+    pub approval_type: ApprovalType,
+}
+impl ApprovalRequest {
+    pub fn internal() -> Self {
+        ApprovalRequest {
+            id: uuid::Uuid::new_v4().to_string(),
+            approval_type: ApprovalType::Internal,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum ApprovalType {
+    Internal, // Send an approval response to goose with the approval request id.
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -47,6 +67,19 @@ impl MessageContent {
         MessageContent::ToolRequest(ToolRequest {
             id: id.into(),
             tool_call,
+            approval_request: None,
+        })
+    }
+
+    pub fn tool_request_with_approval<S: Into<String>>(
+        id: S,
+        tool_call: AgentResult<ToolCall>,
+        approval_request: Option<ApprovalRequest>,
+    ) -> Self {
+        MessageContent::ToolRequest(ToolRequest {
+            id: id.into(),
+            tool_call,
+            approval_request: approval_request,
         })
     }
 
@@ -133,6 +166,19 @@ impl Message {
         tool_call: AgentResult<ToolCall>,
     ) -> Self {
         self.with_content(MessageContent::tool_request(id, tool_call))
+    }
+
+    pub fn with_tool_request_and_approval<S: Into<String>>(
+        self,
+        id: S,
+        tool_call: AgentResult<ToolCall>,
+        approval_request: Option<ApprovalRequest>,
+    ) -> Self {
+        self.with_content(MessageContent::tool_request_with_approval(
+            id,
+            tool_call,
+            approval_request,
+        ))
     }
 
     /// Add a tool response to the message

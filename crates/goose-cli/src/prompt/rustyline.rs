@@ -8,7 +8,7 @@ use super::{
 
 use anyhow::Result;
 use cliclack::spinner;
-use goose::models::message::Message;
+use goose::models::message::{ApprovalRequest, Message};
 
 const PROMPT: &str = "\x1b[1m\x1b[38;5;30m( O)> \x1b[0m";
 
@@ -127,5 +127,35 @@ impl Prompt for RustylinePrompt {
     #[cfg(test)]
     fn as_any(&self) -> &dyn std::any::Any {
         panic!("Not implemented");
+    }
+
+    // TODO: Return a richer result type
+    fn handle_approval_request(&mut self, approval_request: ApprovalRequest) -> Result<bool> {
+        let message = format!(
+            "Approve tool request {} ? (y/n) [Default: y] ",
+            approval_request.id
+        );
+        loop {
+            let mut editor = rustyline::DefaultEditor::new()?;
+            let response = editor.readline(&message);
+            let response = match response {
+                Ok(text) => text,
+                Err(e) => {
+                    match e {
+                        rustyline::error::ReadlineError::Interrupted => (),
+                        _ => eprintln!("Input error: {}", e),
+                    }
+                    return Err(anyhow::anyhow!("Approval request interrupted"));
+                }
+            };
+
+            if response.eq_ignore_ascii_case("y") || response.is_empty() {
+                return Ok(true);
+            } else if response.eq_ignore_ascii_case("n") {
+                return Ok(false);
+            } else {
+                println!("Invalid response. Please enter 'y' or 'n'.");
+            }
+        }
     }
 }

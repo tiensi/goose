@@ -1,5 +1,5 @@
 use anyhow::Result;
-use goose::models::message::Message;
+use goose::models::message::{ApprovalRequest, Message};
 
 pub mod cliclack;
 pub mod renderer;
@@ -9,6 +9,9 @@ pub mod thinking;
 pub trait Prompt {
     fn render(&mut self, message: Box<Message>);
     fn get_input(&mut self) -> Result<Input>;
+    fn handle_approval_request(&mut self, approval_request: ApprovalRequest) -> Result<bool> {
+        Err(anyhow::anyhow!("Not implemented"))
+    }
     fn show_busy(&mut self);
     fn hide_busy(&self);
     fn close(&self);
