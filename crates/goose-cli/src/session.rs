@@ -338,7 +338,7 @@ mod tests {
 
     use crate::agents::mock_agent::MockAgent;
     use crate::prompt::{self, Input};
-    use crate::test_helpers::run_with_test_dir;
+    use crate::test_helpers::run_with_tmp_dir;
 
     use super::*;
     use goose::models::content::Content;
@@ -765,7 +765,7 @@ mod tests {
         use std::time::Duration;
 
         // Create a temporary directory for testing
-        run_with_test_dir(|| {
+        run_with_tmp_dir(|| {
             let session_dir = ensure_session_dir()?;
 
             // Create test session files with different timestamps

@@ -1,5 +1,5 @@
 #[cfg(test)]
-pub fn run_with_test_dir<F: FnOnce() -> T, T>(func: F) -> T {
+pub fn run_with_tmp_dir<F: FnOnce() -> T, T>(func: F) -> T {
     use std::fs;
     use tempfile::tempdir;
 

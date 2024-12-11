@@ -157,7 +157,7 @@ fn load_profile(profile_name: Option<String>) -> Box<Profile> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_helpers::run_with_test_dir;
+    use crate::test_helpers::run_with_tmp_dir;
     use std::fs;
     use std::thread;
     use std::time::Duration;
@@ -165,14 +165,14 @@ mod tests {
     #[test]
     #[should_panic(expected = "Cannot resume session: file")]
     fn test_resume_nonexistent_session_panics() {
-        run_with_test_dir(|| {
+        run_with_tmp_dir(|| {
             build_session(Some("nonexistent-session".to_string()), None, true);
         })
     }
 
     #[test]
     fn test_resume_most_recent_session() -> anyhow::Result<()> {
-        run_with_test_dir(|| {
+        run_with_tmp_dir(|| {
             let session_dir = ensure_session_dir()?;
             // Create test session files with different timestamps
             let file1_path = session_dir.join("session1.jsonl");
@@ -193,7 +193,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "No existing session files found")]
     fn test_resume_most_recent_session_no_files() {
-        run_with_test_dir(|| {
+        run_with_tmp_dir(|| {
             build_session(None, None, true);
         });
     }
