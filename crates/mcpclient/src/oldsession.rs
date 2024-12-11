@@ -1,6 +1,6 @@
-use crate::errors::McpError;
-use crate::transport::{ReadStream, WriteStream};
+use crate::stdio_client::StdioClient;
 use crate::types::*;
+use crate::errors::McpError;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -8,65 +8,65 @@ use std::sync::Arc;
 use tokio::sync::{oneshot, Mutex};
 
 pub struct Session {
-    read_stream: Arc<Mutex<ReadStream>>,
-    write_stream: WriteStream,
+    client: StdioClient,
     next_id: AtomicU64,
     pending: Arc<Mutex<HashMap<u64, oneshot::Sender<JsonRpcResponse>>>>,
 }
 
 impl Session {
-    pub async fn new(
-        read_stream: ReadStream,
-        write_stream: WriteStream,
-    ) -> Result<Self, Box<dyn std::error::Error + Send>> {
-        let read_stream = Arc::new(Mutex::new(read_stream));
-        let pending: Arc<Mutex<HashMap<u64, oneshot::Sender<JsonRpcResponse>>>> =
-            Arc::new(Mutex::new(HashMap::new()));
-        let pending_clone = pending.clone();
-        let read_stream_clone = read_stream.clone();
+    pub async fn new(command: &str, args: &[&str]) -> Result<Self, Box<dyn std::error::Error>> {
+        let client = StdioClient::new(command, args).await?;
+        let mut message_rx = client.message_receiver();
+        let pending = Arc::new(Mutex::new(HashMap::new()));
+
+        let session = Self {
+            client,
+            next_id: AtomicU64::new(1),
+            pending: pending.clone(),
+        };
 
         // Start the message handling task
+        let pending_clone = pending.clone();
         tokio::spawn(async move {
-            while let Some(message_result) = read_stream_clone.lock().await.recv().await {
-                match message_result {
-                    Ok(message) => {
-                        match message {
-                            JsonRpcMessage::Response(response) => {
-                                let mut pending = pending_clone.lock().await;
-                                if let Some(sender) =
-                                    pending.remove(&response.id.unwrap_or_default())
-                                {
-                                    let _ = sender.send(response);
-                                }
-                            }
-                            JsonRpcMessage::Notification(_) => {
-                                // Handle notifications if needed
-                            }
-                            _ => {
-                                println!("Unexpected message type: {:?}", message);
-                            }
-                        }
-                    }
+            while let Ok(line) = message_rx.recv().await {
+                println!("Received: {}", line);
+                let message: Value = match serde_json::from_str(&line) {
+                    Ok(msg) => msg,
                     Err(e) => {
-                        eprintln!("Error receiving message: {}", e);
+                        println!("Failed to parse JSON: {}", e);
+                        continue;
                     }
+                };
+
+                if let Some(id_value) = message.get("id") {
+                    if id_value.is_null() {
+                        // It's a notification
+                        // Handle notifications if needed
+                    } else if let Some(id) = id_value.as_u64() {
+                        let response: JsonRpcResponse = serde_json::from_value(message).unwrap();
+                        let mut pending = pending_clone.lock().await;
+                        if let Some(sender) = pending.remove(&id) {
+                            let _ = sender.send(response);
+                        } else {
+                            println!("Received response with unknown id: {}", id);
+                        }
+                    } else {
+                        println!("Invalid id in message: {:?}", id_value);
+                    }
+                } else {
+                    // Handle notifications if needed
                 }
             }
         });
 
-        Ok(Self {
-            read_stream,
-            write_stream,
-            next_id: AtomicU64::new(1),
-            pending,
-        })
+        Ok(session)
     }
 
     async fn send_request(
-        &self,
+        &mut self,
         method: &str,
         params: Option<Value>,
-    ) -> Result<JsonRpcResponse, Box<dyn std::error::Error + Send>> {
+    ) -> Result<JsonRpcResponse, Box<dyn std::error::Error>> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
 
         let request = JsonRpcRequest {
@@ -83,39 +83,28 @@ impl Session {
             pending.insert(id, sender);
         }
 
-        self.write_stream
-            .send(JsonRpcMessage::Request(request))
-            .await
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
+        self.client.send_request(&request).await?;
 
-        let response = receiver
-            .await
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
+        let response = receiver.await?;
         Ok(response)
     }
 
     async fn send_notification(
-        &self,
+        &mut self,
         method: &str,
         params: Option<Value>,
-    ) -> Result<(), Box<dyn std::error::Error + Send>> {
-        let notification = JsonRpcNotification {
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let notification = JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
+            id: None,
             method: method.to_string(),
             params,
         };
-
-        self.write_stream
-            .send(JsonRpcMessage::Notification(notification))
-            .await
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
-
+        self.client.send_notification(&notification).await?;
         Ok(())
     }
 
-    pub async fn initialize(
-        &mut self,
-    ) -> Result<InitializeResult, Box<dyn std::error::Error + Send>> {
+    pub async fn initialize(&mut self) -> Result<InitializeResult, Box<dyn std::error::Error>> {
         let params = json!({
             "protocolVersion": "2024-11-05",
             "capabilities": {
@@ -130,13 +119,11 @@ impl Session {
                 "version": "0.1.0"
             }
         });
-
         let response = self.send_request("initialize", Some(params)).await?;
         if let Some(error) = response.error {
             Err(Box::new(McpError::from(error)))
         } else if let Some(result) = response.result {
-            let init_result: InitializeResult = serde_json::from_value(result)
-                .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
+            let init_result: InitializeResult = serde_json::from_value(result)?;
             // Send initialized notification
             self.send_notification("notifications/initialized", None)
                 .await?;
@@ -151,16 +138,14 @@ impl Session {
     }
 
     pub async fn list_resources(
-        &self,
-    ) -> Result<ListResourcesResult, Box<dyn std::error::Error + Send>> {
+        &mut self,
+    ) -> Result<ListResourcesResult, Box<dyn std::error::Error>> {
         let params = json!({});
         let response = self.send_request("resources/list", Some(params)).await?;
-
         if let Some(error) = response.error {
             Err(Box::new(McpError::from(error)))
         } else if let Some(result) = response.result {
-            let resources_result: ListResourcesResult = serde_json::from_value(result)
-                .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
+            let resources_result: ListResourcesResult = serde_json::from_value(result)?;
             Ok(resources_result)
         } else {
             Err(Box::new(McpError::new(ErrorData {
@@ -172,19 +157,17 @@ impl Session {
     }
 
     pub async fn read_resource(
-        &self,
+        &mut self,
         uri: &str,
-    ) -> Result<ReadResourceResult, Box<dyn std::error::Error + Send>> {
+    ) -> Result<ReadResourceResult, Box<dyn std::error::Error>> {
         let params = json!({
             "uri": uri,
         });
         let response = self.send_request("resources/read", Some(params)).await?;
-
         if let Some(error) = response.error {
             Err(Box::new(McpError::from(error)))
         } else if let Some(result) = response.result {
-            let read_result: ReadResourceResult = serde_json::from_value(result)
-                .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
+            let read_result: ReadResourceResult = serde_json::from_value(result)?;
             Ok(read_result)
         } else {
             Err(Box::new(McpError::new(ErrorData {
@@ -195,15 +178,13 @@ impl Session {
         }
     }
 
-    pub async fn list_tools(&self) -> Result<ListToolsResult, Box<dyn std::error::Error + Send>> {
+    pub async fn list_tools(&mut self) -> Result<ListToolsResult, Box<dyn std::error::Error>> {
         let params = json!({});
         let response = self.send_request("tools/list", Some(params)).await?;
-
         if let Some(error) = response.error {
             Err(Box::new(McpError::from(error)))
         } else if let Some(result) = response.result {
-            let tools_result: ListToolsResult = serde_json::from_value(result)
-                .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
+            let tools_result: ListToolsResult = serde_json::from_value(result)?;
             Ok(tools_result)
         } else {
             Err(Box::new(McpError::new(ErrorData {
@@ -215,21 +196,19 @@ impl Session {
     }
 
     pub async fn call_tool(
-        &self,
+        &mut self,
         name: &str,
         arguments: Option<Value>,
-    ) -> Result<CallToolResult, Box<dyn std::error::Error + Send>> {
+    ) -> Result<CallToolResult, Box<dyn std::error::Error>> {
         let params = json!({
             "name": name,
             "arguments": arguments.unwrap_or_else(|| json!({})),
         });
         let response = self.send_request("tools/call", Some(params)).await?;
-
         if let Some(error) = response.error {
             Err(Box::new(McpError::from(error)))
         } else if let Some(result) = response.result {
-            let call_result: CallToolResult = serde_json::from_value(result)
-                .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
+            let call_result: CallToolResult = serde_json::from_value(result)?;
             Ok(call_result)
         } else {
             Err(Box::new(McpError::new(ErrorData {
@@ -238,5 +217,9 @@ impl Session {
                 data: None,
             })))
         }
+    }
+
+    pub async fn close(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        self.client.close().await
     }
 }

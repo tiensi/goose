@@ -1,4 +1,4 @@
-// Run it with `cargo run -p mcpclient --bin sse`
+// Run it with `cargo run -p mcpclient --bin sse2`
 use futures_util::StreamExt;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -7,8 +7,12 @@ use tokio::sync::mpsc;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // SSE endpoint
-    let sse_url = "http://localhost:8000/sse";
+    // endpoint
+    let url = "http://localhost:8000";
+
+    // hit base_url/sse to get the endpoint url - one shot channel
+    // open a stream to the endpoint url
+    // all messages are sent to the stream
 
     // Create an HTTP client
     let client = Client::builder().build()?;
@@ -19,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Spawn a task to handle SSE events
     let sse_client = client.clone();
     tokio::spawn(async move {
-        if let Err(e) = handle_sse_events(sse_client, sse_url, endpoint_sender).await {
+        if let Err(e) = handle_sse_events(sse_client, url, endpoint_sender).await {
             eprintln!("Error in SSE handler: {:?}", e);
         }
     });
@@ -32,7 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Received endpoint URL: {}", endpoint_url);
 
     // Construct the full endpoint URL
-    let base_url = reqwest::Url::parse(sse_url)?;
+    let base_url = reqwest::Url::parse(url)?;
     let full_endpoint_url = base_url.join(&endpoint_url)?.to_string();
     println!("Full endpoint URL: {}", full_endpoint_url);
 
@@ -119,13 +123,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn handle_sse_events(
     client: Client,
-    sse_url: &str,
+    url: &str,
     endpoint_sender: mpsc::Sender<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("handle_sse_events started");
 
     let response = client
-        .get(sse_url)
+        .get(url)
         .header("Accept", "text/event-stream")
         .send()
         .await?;

@@ -3,6 +3,45 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct JsonRpcRequest {
+    pub jsonrpc: String,
+    pub id: Option<u64>,
+    pub method: String,
+    pub params: Option<Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct JsonRpcResponse {
+    pub jsonrpc: String,
+    pub id: Option<u64>,
+    pub result: Option<Value>,
+    pub error: Option<ErrorData>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct JsonRpcNotification {
+    pub jsonrpc: String,
+    pub method: String,
+    pub params: Option<Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct JsonRpcError {
+    pub jsonrpc: String,
+    pub id: Option<u64>,
+    pub error: ErrorData,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum JsonRpcMessage {
+    Request(JsonRpcRequest),
+    Response(JsonRpcResponse),
+    Notification(JsonRpcNotification),
+    Error(JsonRpcError),
+}
+
 // Standard JSON-RPC error codes
 pub const PARSE_ERROR: i32 = -32700;
 pub const INVALID_REQUEST: i32 = -32600;
