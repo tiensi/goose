@@ -1,5 +1,6 @@
 #[cfg(test)]
 pub fn run_with_tmp_dir<F: FnOnce() -> T, T>(func: F) -> T {
+    use std::ffi::OsStr;
     use std::fs;
     use tempfile::tempdir;
 
@@ -31,5 +32,11 @@ pub fn run_with_tmp_dir<F: FnOnce() -> T, T>(func: F) -> T {
 }"#;
     fs::write(&profile_path, profile).unwrap();
 
-    temp_env::with_var("HOME", Some(temp_dir_path.as_os_str()), func)
+    temp_env::with_vars(
+        [
+            ("HOME", Some(temp_dir_path.as_os_str())),
+            ("DATABRICKS_HOST", Some(OsStr::new("tmp_host_url"))),
+        ],
+        func,
+    )
 }
