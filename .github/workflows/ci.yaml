@@ -40,6 +40,10 @@ jobs:
         toolchain: stable
         profile: minimal
         override: true
+        components: rustfmt  # Added rustfmt component
+
+    - name: Check formatting
+      run: cargo fmt --all -- --check
 
     - name: Cache Cargo registry
       uses: actions/cache@v3
