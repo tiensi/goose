@@ -383,6 +383,20 @@ impl DeveloperSystem {
 
     async fn text_editor_view(&self, path: &PathBuf) -> AgentResult<Vec<Content>> {
         if path.is_file() {
+            // Check file size first (2MB limit)
+            const MAX_FILE_SIZE: u64 = 2 * 1024 * 1024; // 2MB in bytes
+            let file_size = std::fs::metadata(path)
+                .map_err(|e| AgentError::ExecutionError(format!("Failed to get file metadata: {}", e)))?
+                .len();
+            
+            if file_size > MAX_FILE_SIZE {
+                return Err(AgentError::ExecutionError(format!(
+                    "File '{}' is too large ({:.2}MB). Maximum size is 2MB to prevent memory issues.",
+                    path.display(),
+                    file_size as f64 / 1024.0 / 1024.0
+                )));
+            }
+
             // Create a new resource and add it to active_resources
             let uri = Url::from_file_path(path)
                 .map_err(|_| AgentError::ExecutionError("Invalid file path".into()))?
