@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::types::ErrorData;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JsonRpcRequest {
     pub jsonrpc: String,
@@ -19,35 +21,33 @@ pub struct JsonRpcResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JsonRpcError {
-    pub code: i64,
-    pub message: String,
-    pub data: Option<Value>,
+    pub jsonrpc: String,
+    pub id: Option<u64>,
+    pub error: ErrorData,
 }
 
 impl From<JsonRpcError> for McpError {
     fn from(error: JsonRpcError) -> Self {
-        McpError::new(error.code, &error.message)
+        McpError::new(error.error)
     }
 }
 
 #[derive(Debug)]
 pub struct McpError {
-    pub code: i64,
-    pub message: String,
+    pub error: ErrorData,
 }
 
 impl McpError {
-    pub fn new(code: i64, message: &str) -> Self {
+    pub fn new(error: ErrorData) -> Self {
         Self {
-            code,
-            message: message.to_string(),
+            error,
         }
     }
 }
 
 impl std::fmt::Display for McpError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "McpError {}: {}", self.code, self.message)
+        write!(f, "McpError {}: {}", self.error.code, self.error.message)
     }
 }
 

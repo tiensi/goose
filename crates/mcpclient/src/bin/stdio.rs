@@ -1,4 +1,4 @@
-// Run it with `cargo run -p goose-mcpclient --bin stdio`
+// Run it with `cargo run -p mcpclient --bin stdio`
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::process::Stdio;

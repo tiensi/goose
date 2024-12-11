@@ -1,12 +1,12 @@
 [package]
-name = "goose-mcpclient"
+name = "mcpclient"
 edition.workspace = true
 version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
 description.workspace = true
-default-run="goose-mcpclient"
+default-run="mcpclient"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
