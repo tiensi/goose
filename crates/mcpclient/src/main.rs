@@ -1,5 +1,5 @@
 use clap::Parser;
-use goose_mcpclient::session::ClientSession;
+use mcpclient::session::ClientSession;
 use serde_json::json;
 
 #[derive(Parser)]

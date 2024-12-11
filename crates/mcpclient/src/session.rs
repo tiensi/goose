@@ -129,7 +129,11 @@ impl ClientSession {
                 .await?;
             Ok(init_result)
         } else {
-            Err(Box::new(McpError::new(-1, "No result in response")))
+            Err(Box::new(McpError::new(ErrorData {
+                code: -1,
+                message: "No result in response".to_string(),
+                data: None,
+            })))
         }
     }
 
@@ -144,7 +148,11 @@ impl ClientSession {
             let resources_result: ListResourcesResult = serde_json::from_value(result)?;
             Ok(resources_result)
         } else {
-            Err(Box::new(McpError::new(-1, "No result in response")))
+            Err(Box::new(McpError::new(ErrorData {
+                code: -1,
+                message: "No result in response".to_string(),
+                data: None,
+            })))
         }
     }
 
@@ -162,7 +170,11 @@ impl ClientSession {
             let read_result: ReadResourceResult = serde_json::from_value(result)?;
             Ok(read_result)
         } else {
-            Err(Box::new(McpError::new(-1, "No result in response")))
+            Err(Box::new(McpError::new(ErrorData {
+                code: -1,
+                message: "No result in response".to_string(),
+                data: None,
+            })))
         }
     }
 
@@ -175,7 +187,11 @@ impl ClientSession {
             let tools_result: ListToolsResult = serde_json::from_value(result)?;
             Ok(tools_result)
         } else {
-            Err(Box::new(McpError::new(-1, "No result in response")))
+            Err(Box::new(McpError::new(ErrorData {
+                code: -1,
+                message: "No result in response".to_string(),
+                data: None,
+            })))
         }
     }
 
@@ -195,7 +211,11 @@ impl ClientSession {
             let call_result: CallToolResult = serde_json::from_value(result)?;
             Ok(call_result)
         } else {
-            Err(Box::new(McpError::new(-1, "No result in response")))
+            Err(Box::new(McpError::new(ErrorData {
+                code: -1,
+                message: "No result in response".to_string(),
+                data: None,
+            })))
         }
     }
 

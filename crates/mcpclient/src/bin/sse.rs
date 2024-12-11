@@ -1,4 +1,4 @@
-// Run it with `cargo run -p goose-mcpclient --bin sse`
+// Run it with `cargo run -p mcpclient --bin sse`
 use futures_util::StreamExt;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
