@@ -3,7 +3,7 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
 use tokio::process::{Child, Command};
 use tokio::sync::broadcast;
 
-use crate::jsonrpc::JsonRpcRequest;
+use crate::types::JsonRpcRequest;
 
 pub struct StdioClient {
     process: Child,
