@@ -25,7 +25,7 @@ pub fn ensure_session_dir() -> Result<PathBuf> {
     Ok(config_dir)
 }
 
-pub fn get_most_recent_session() -> Result<Option<PathBuf>> {
+pub fn get_most_recent_session() -> Result<PathBuf> {
     let session_dir = ensure_session_dir()?;
     let mut entries = fs::read_dir(&session_dir)?
         .filter_map(|entry| entry.ok())
@@ -33,7 +33,7 @@ pub fn get_most_recent_session() -> Result<Option<PathBuf>> {
         .collect::<Vec<_>>();
 
     if entries.is_empty() {
-        return Ok(None);
+        return Err(anyhow::anyhow!("No session files found"));
     }
 
     // Sort by modification time, most recent first
@@ -48,7 +48,7 @@ pub fn get_most_recent_session() -> Result<Option<PathBuf>> {
             )
     });
 
-    Ok(Some(entries[0].path()))
+    Ok(entries[0].path())
 }
 
 pub fn readable_session_file(session_file: &PathBuf) -> Result<File> {
@@ -781,8 +781,7 @@ mod tests {
 
             // Test getting the most recent session
             let most_recent = get_most_recent_session()?;
-            assert!(most_recent.is_some());
-            assert_eq!(most_recent.unwrap(), file2_path);
+            assert_eq!(most_recent, file2_path);
 
             Ok(())
         })

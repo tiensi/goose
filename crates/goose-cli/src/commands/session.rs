@@ -19,11 +19,7 @@ pub fn build_session<'a>(
     let session_dir = ensure_session_dir().expect("Failed to create session directory");
     let session_file = if resume && session.is_none() {
         // When resuming without a specific session name, use the most recent session
-        get_most_recent_session()
-            .expect("Failed to get most recent session")
-            .unwrap_or_else(|| {
-                panic!("No existing session files found. Please provide a session name to resume.");
-            })
+        get_most_recent_session().expect("Failed to get most recent session")
     } else {
         session_path(session.clone(), &session_dir, session.is_none() && !resume)
     };
@@ -191,7 +187,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "No existing session files found")]
+    #[should_panic(expected = "No session files found")]
     fn test_resume_most_recent_session_no_files() {
         run_with_tmp_dir(|| {
             build_session(None, None, true);
