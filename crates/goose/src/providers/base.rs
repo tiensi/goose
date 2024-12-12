@@ -1,5 +1,6 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
 
 use crate::models::message::Message;
 use crate::models::tool::Tool;
@@ -52,26 +53,32 @@ pub trait Provider: Send + Sync {
 
 /// A simple struct to reuse for collecting usage statistics for provider implementations.
 pub struct ProviderUsageCollector {
-    pub usage: Usage,
+    usage: Mutex<Usage>,
 }
 
 impl ProviderUsageCollector {
     pub fn new() -> Self {
         Self {
-            usage: Usage::default(),
+            usage: Mutex::new(Usage::default()),
         }
     }
 
-    pub fn add_usage(&mut self, usage: Usage) {
-        if let Some(input_tokens) = usage.input_tokens {
-            self.usage.input_tokens = Some(self.usage.input_tokens.unwrap_or(0) + input_tokens);
+    pub fn add_usage(&self, usage: Usage) {
+        if let Ok(mut current) = self.usage.lock() {
+            if let Some(input_tokens) = usage.input_tokens {
+                current.input_tokens = Some(current.input_tokens.unwrap_or(0) + input_tokens);
+            }
+            if let Some(output_tokens) = usage.output_tokens {
+                current.output_tokens = Some(current.output_tokens.unwrap_or(0) + output_tokens);
+            }
+            if let Some(total_tokens) = usage.total_tokens {
+                current.total_tokens = Some(current.total_tokens.unwrap_or(0) + total_tokens);
+            }
         }
-        if let Some(output_tokens) = usage.output_tokens {
-            self.usage.output_tokens = Some(self.usage.output_tokens.unwrap_or(0) + output_tokens);
-        }
-        if let Some(total_tokens) = usage.total_tokens {
-            self.usage.total_tokens = Some(self.usage.total_tokens.unwrap_or(0) + total_tokens);
-        }
+    }
+
+    pub fn get_usage(&self) -> Usage {
+        self.usage.lock().map(|guard| guard.clone()).unwrap_or_default()
     }
 }
 
@@ -105,5 +112,24 @@ mod tests {
         assert_eq!(json_value["total_tokens"], json!(30));
 
         Ok(())
+    }
+
+    #[test]
+    fn test_usage_collector() {
+        let collector = ProviderUsageCollector::new();
+        
+        // Add first usage
+        collector.add_usage(Usage::new(Some(10), Some(20), Some(30)));
+        let usage1 = collector.get_usage();
+        assert_eq!(usage1.input_tokens, Some(10));
+        assert_eq!(usage1.output_tokens, Some(20));
+        assert_eq!(usage1.total_tokens, Some(30));
+
+        // Add second usage
+        collector.add_usage(Usage::new(Some(5), Some(10), Some(15)));
+        let usage2 = collector.get_usage();
+        assert_eq!(usage2.input_tokens, Some(15));
+        assert_eq!(usage2.output_tokens, Some(30));
+        assert_eq!(usage2.total_tokens, Some(45));
     }
 }

@@ -5,7 +5,7 @@ use reqwest::StatusCode;
 use serde_json::{json, Value};
 use std::time::Duration;
 
-use super::base::{Provider, Usage};
+use super::base::{Provider, ProviderUsageCollector, Usage};
 use super::configs::OpenAiProviderConfig;
 use super::utils::{
     check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message,
@@ -17,6 +17,7 @@ use crate::models::tool::Tool;
 pub struct OpenAiProvider {
     client: Client,
     config: OpenAiProviderConfig,
+    usage_collector: ProviderUsageCollector,
 }
 
 impl OpenAiProvider {
@@ -25,7 +26,11 @@ impl OpenAiProvider {
             .timeout(Duration::from_secs(600)) // 10 minutes timeout
             .build()?;
 
-        Ok(Self { client, config })
+        Ok(Self { 
+            client, 
+            config,
+            usage_collector: ProviderUsageCollector::new(),
+        })
     }
 
     fn get_usage(data: &Value) -> Result<Usage> {
@@ -150,8 +155,13 @@ impl Provider for OpenAiProvider {
         // Parse response
         let message = openai_response_to_message(response.clone())?;
         let usage = Self::get_usage(&response)?;
+        self.usage_collector.add_usage(usage.clone());
 
         Ok((message, usage))
+    }
+
+    fn total_usage(&self) -> Usage {
+        self.usage_collector.get_usage()
     }
 }
 
@@ -225,6 +235,12 @@ mod tests {
         assert_eq!(usage.input_tokens, Some(12));
         assert_eq!(usage.output_tokens, Some(15));
         assert_eq!(usage.total_tokens, Some(27));
+
+        // Check total usage
+        let total = provider.total_usage();
+        assert_eq!(total.input_tokens, Some(12));
+        assert_eq!(total.output_tokens, Some(15));
+        assert_eq!(total.total_tokens, Some(27));
 
         Ok(())
     }

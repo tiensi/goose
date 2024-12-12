@@ -1,4 +1,4 @@
-use super::base::{Provider, Usage};
+use super::base::{Provider, ProviderUsageCollector, Usage};
 use super::configs::OllamaProviderConfig;
 use super::utils::{
     messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec, ImageFormat,
@@ -18,6 +18,7 @@ pub const OLLAMA_MODEL: &str = "qwen2.5";
 pub struct OllamaProvider {
     client: Client,
     config: OllamaProviderConfig,
+    usage_collector: ProviderUsageCollector,
 }
 
 impl OllamaProvider {
@@ -26,7 +27,11 @@ impl OllamaProvider {
             .timeout(Duration::from_secs(600)) // 10 minutes timeout
             .build()?;
 
-        Ok(Self { client, config })
+        Ok(Self { 
+            client, 
+            config,
+            usage_collector: ProviderUsageCollector::new(),
+        })
     }
 
     fn get_usage(data: &Value) -> Result<Usage> {
@@ -126,8 +131,13 @@ impl Provider for OllamaProvider {
         // Parse response
         let message = openai_response_to_message(response.clone())?;
         let usage = Self::get_usage(&response)?;
+        self.usage_collector.add_usage(usage.clone());
 
         Ok((message, usage))
+    }
+
+    fn total_usage(&self) -> Usage {
+        self.usage_collector.get_usage()
     }
 }
 
@@ -201,6 +211,12 @@ mod tests {
         assert_eq!(usage.output_tokens, Some(15));
         assert_eq!(usage.total_tokens, Some(27));
 
+        // Check total usage
+        let total = provider.total_usage();
+        assert_eq!(total.input_tokens, Some(12));
+        assert_eq!(total.output_tokens, Some(15));
+        assert_eq!(total.total_tokens, Some(27));
+
         Ok(())
     }
 
@@ -271,6 +287,12 @@ mod tests {
         assert_eq!(usage.input_tokens, Some(63));
         assert_eq!(usage.output_tokens, Some(70));
         assert_eq!(usage.total_tokens, Some(133));
+
+        // Check total usage
+        let total = provider.total_usage();
+        assert_eq!(total.input_tokens, Some(63));
+        assert_eq!(total.output_tokens, Some(70));
+        assert_eq!(total.total_tokens, Some(133));
 
         Ok(())
     }

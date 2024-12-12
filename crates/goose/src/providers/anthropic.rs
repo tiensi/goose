@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::time::Duration;
 
-use super::base::{Provider, Usage};
+use super::base::{Provider, ProviderUsageCollector, Usage};
 use super::configs::AnthropicProviderConfig;
 use crate::models::content::{Content, TextContent};
 use crate::models::message::{Message, MessageContent};
@@ -16,6 +16,7 @@ use crate::models::tool::{Tool, ToolCall};
 pub struct AnthropicProvider {
     client: Client,
     config: AnthropicProviderConfig,
+    usage_collector: ProviderUsageCollector,
 }
 
 impl AnthropicProvider {
@@ -24,7 +25,11 @@ impl AnthropicProvider {
             .timeout(Duration::from_secs(600)) // 10 minutes timeout
             .build()?;
 
-        Ok(Self { client, config })
+        Ok(Self { 
+            client, 
+            config,
+            usage_collector: ProviderUsageCollector::new(),
+        })
     }
 
     fn get_usage(data: &Value) -> Result<Usage> {
@@ -260,8 +265,13 @@ impl Provider for AnthropicProvider {
         // Parse response
         let message = Self::parse_anthropic_response(response.clone())?;
         let usage = Self::get_usage(&response)?;
+        self.usage_collector.add_usage(usage.clone());
 
         Ok((message, usage))
+    }
+
+    fn total_usage(&self) -> Usage {
+        self.usage_collector.get_usage()
     }
 }
 
@@ -329,6 +339,12 @@ mod tests {
         assert_eq!(usage.input_tokens, Some(12));
         assert_eq!(usage.output_tokens, Some(15));
         assert_eq!(usage.total_tokens, Some(27));
+
+        // Check total usage
+        let total = provider.total_usage();
+        assert_eq!(total.input_tokens, Some(12));
+        assert_eq!(total.output_tokens, Some(15));
+        assert_eq!(total.total_tokens, Some(27));
 
         Ok(())
     }

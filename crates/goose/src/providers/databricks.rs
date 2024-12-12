@@ -4,7 +4,7 @@ use reqwest::{Client, StatusCode};
 use serde_json::{json, Value};
 use std::time::Duration;
 
-use super::base::{Provider, Usage};
+use super::base::{Provider, ProviderUsageCollector, Usage};
 use super::configs::{DatabricksAuth, DatabricksProviderConfig};
 use super::oauth;
 use super::utils::{
@@ -17,6 +17,7 @@ use crate::models::tool::Tool;
 pub struct DatabricksProvider {
     client: Client,
     config: DatabricksProviderConfig,
+    usage_collector: ProviderUsageCollector,
 }
 
 impl DatabricksProvider {
@@ -25,7 +26,11 @@ impl DatabricksProvider {
             .timeout(Duration::from_secs(600)) // 10 minutes timeout
             .build()?;
 
-        Ok(Self { client, config })
+        Ok(Self { 
+            client, 
+            config,
+            usage_collector: ProviderUsageCollector::new(),
+        })
     }
 
     async fn ensure_auth_header(&self) -> Result<String> {
@@ -162,8 +167,13 @@ impl Provider for DatabricksProvider {
         // Parse response
         let message = openai_response_to_message(response.clone())?;
         let usage = Self::get_usage(&response)?;
+        self.usage_collector.add_usage(usage.clone());
 
         Ok((message, usage))
+    }
+
+    fn total_usage(&self) -> Usage {
+        self.usage_collector.get_usage()
     }
 }
 
@@ -239,6 +249,12 @@ mod tests {
             panic!("Expected Text content");
         }
         assert_eq!(reply_usage.total_tokens, Some(35));
+
+        // Check total usage
+        let total = provider.total_usage();
+        assert_eq!(total.input_tokens, Some(10));
+        assert_eq!(total.output_tokens, Some(25));
+        assert_eq!(total.total_tokens, Some(35));
 
         Ok(())
     }

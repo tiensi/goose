@@ -415,6 +415,10 @@ mod tests {
                 goose::providers::base::Usage::default(),
             ))
         }
+
+        fn total_usage(&self) -> goose::providers::base::Usage {
+            goose::providers::base::Usage::default()
+        }
     }
 
     #[test]

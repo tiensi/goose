@@ -37,4 +37,8 @@ impl Provider for MockProvider {
             Ok((responses.remove(0), Usage::default()))
         }
     }
+
+    fn total_usage(&self) -> Usage {
+        Usage::default()
+    }
 }
