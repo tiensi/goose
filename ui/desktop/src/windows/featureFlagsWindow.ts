@@ -14,14 +14,16 @@ export const createFeatureFlagsWindow = () => {
   }
 
   featureFlagsWindow = new BrowserWindow({
-    width: 400,
-    height: 600,
+    width: 800,
+    height: 700,
     title: 'Feature Flags',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
     },
+    titleBarStyle: 'hidden',
+    trafficLightPosition: { x: 20, y: 20 },
   });
 
   const launcherParams = '?window=featureFlags';

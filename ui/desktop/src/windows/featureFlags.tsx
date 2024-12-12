@@ -1,5 +1,8 @@
 import React from 'react';
 import { featureFlags, type FeatureFlags } from '../featureFlags';
+import { Card } from '../components/ui/card';
+import { Input } from '../components/ui/input';
+import Box from '../components/ui/Box';
 
 export default function FeatureFlagsWindow() {
   const [flags, setFlags] = React.useState<FeatureFlags>(featureFlags.getFlags());
@@ -10,30 +13,78 @@ export default function FeatureFlagsWindow() {
   };
 
   return (
-    <div className="h-screen bg-white dark:bg-gray-900 text-black dark:text-white">
-      <div className="p-4">
-        <h1 className="text-xl font-bold mb-4">Feature Flags</h1>
+    <div className="h-screen flex flex-col">
+      {/* Draggable title bar */}
+      <div className="h-12 w-full draggable" style={{ WebkitAppRegion: 'drag' }} />
+      
+      <div className="flex-1 container max-w-2xl mx-auto py-4">
         <div className="space-y-4">
-          {Object.entries(flags).map(([key, value]) => (
-            <div key={key} className="flex flex-col">
-              <label className="text-sm font-medium mb-1">{key}</label>
-              <input
-                type={typeof value === 'string' ? 'text' : 'checkbox'}
-                value={typeof value === 'string' ? value : undefined}
-                checked={typeof value === 'boolean' ? value : undefined}
-                onChange={(e) => {
-                  const newValue = typeof value === 'boolean' ? e.target.checked : e.target.value;
-                  handleFlagChange(key as keyof FeatureFlags, newValue);
-                }}
-                className="border rounded p-2 dark:bg-gray-800 dark:border-gray-700"
-              />
+          <div className="flex items-center mb-2">
+            <Box size={16} />
+            <div className="ml-2">
+              <h1 className="text-lg font-semibold leading-none">Feature Flags</h1>
+              <p className="text-xs text-gray-500 mt-1">
+                Configure experimental features and settings
+              </p>
             </div>
-          ))}
+          </div>
+          
+          <Card className="p-4">
+            <div className="space-y-4">
+              {Object.entries(flags).map(([key, value]) => (
+                <div key={key} className="flex flex-col space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Box size={12} />
+                      <span className="ml-2 text-xs font-medium">
+                        {key.split(/(?=[A-Z])/).join(" ")}
+                      </span>
+                    </div>
+                    {typeof value === 'boolean' ? (
+                      <button
+                        onClick={() => handleFlagChange(key as keyof FeatureFlags, !value)}
+                        className={`px-3 py-1 rounded text-xs font-medium ${
+                          value 
+                            ? 'bg-green-100 text-green-800 hover:bg-green-200' 
+                            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                        }`}
+                      >
+                        {value ? 'Enabled' : 'Disabled'}
+                      </button>
+                    ) : (
+                      <Input
+                        value={value}
+                        onChange={(e) => handleFlagChange(key as keyof FeatureFlags, e.target.value)}
+                        className="max-w-[300px] h-7 text-xs"
+                      />
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 ml-6">
+                    {getFeatureFlagDescription(key)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card className="p-3 bg-gray-50">
+            <div className="flex items-center">
+              <Box size={12} />
+              <p className="text-xs text-gray-500 ml-2">
+                ⚡️ Tip: Open a new chat window to see your changes take effect
+              </p>
+            </div>
+          </Card>
         </div>
-      </div>
-      <div className="p-4">
-        Flag changes are saved immediately. Open a new chat window to use the changes.
       </div>
     </div>
   );
+}
+
+function getFeatureFlagDescription(key: string): string {
+  const descriptions: Record<string, string> = {
+    whatCanGooseDoText: "Customize the placeholder text shown in the chat input field",
+    expandedToolsByDefault: "Show tool outputs expanded by default instead of collapsed"
+  };
+  return descriptions[key] || "No description available";
 }
