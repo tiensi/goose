@@ -7,7 +7,7 @@ use mcpclient::{
     transport::Transport,
 };
 use serde_json::json;
-use tracing_subscriber::{fmt, EnvFilter};
+use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -21,9 +21,11 @@ struct Args {
 async fn main() -> Result<()> {
     // Initialize logging
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env()
-            .add_directive("mcpclient=debug".parse().unwrap())
-            .add_directive("reqwest_eventsource=debug".parse().unwrap()))
+        .with_env_filter(
+            EnvFilter::from_default_env()
+                .add_directive("mcpclient=debug".parse().unwrap())
+                .add_directive("reqwest_eventsource=debug".parse().unwrap()),
+        )
         .init();
 
     let args = Args::parse();
@@ -44,7 +46,7 @@ async fn main() -> Result<()> {
                 headers: None,
             },
         }),
-        _ => return Err(anyhow!("Invalid mode. Use 'git' or 'echo'"))
+        _ => return Err(anyhow!("Invalid mode. Use 'git' or 'echo'")),
     };
 
     let (read_stream, write_stream) = transport.connect().await?;
@@ -53,7 +55,7 @@ async fn main() -> Result<()> {
     // Initialize the connection
     let init_result = session.initialize().await?;
     println!("Initialized: {:?}", init_result);
-    
+
     // List tools
     let tools = session.list_tools().await?;
     println!("Tools: {:?}", tools);

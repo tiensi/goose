@@ -41,7 +41,7 @@ impl Transport for StdioTransport {
                 self.params
                     .env
                     .clone()
-                    .unwrap_or_else(|| Self::get_default_environment()),
+                    .unwrap_or_else(Self::get_default_environment),
             )
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -49,14 +49,8 @@ impl Transport for StdioTransport {
             .spawn()
             .context("Failed to spawn child process")?;
 
-        let stdin = child
-            .stdin
-            .take()
-            .context("Failed to get stdin handle")?;
-        let stdout = child
-            .stdout
-            .take()
-            .context("Failed to get stdout handle")?;
+        let stdin = child.stdin.take().context("Failed to get stdin handle")?;
+        let stdout = child.stdout.take().context("Failed to get stdout handle")?;
 
         let (tx_read, rx_read) = mpsc::channel(100);
         let (tx_write, mut rx_write) = mpsc::channel(100);
@@ -83,8 +77,7 @@ impl Transport for StdioTransport {
         let mut stdin = stdin;
         tokio::spawn(async move {
             while let Some(message) = rx_write.recv().await {
-                let json = serde_json::to_string(&message)
-                    .expect("Failed to serialize message");
+                let json = serde_json::to_string(&message).expect("Failed to serialize message");
                 if stdin
                     .write_all(format!("{}\n", json).as_bytes())
                     .await

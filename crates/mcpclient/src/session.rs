@@ -19,11 +19,11 @@ pub struct Session {
 impl Session {
     pub async fn new(read_stream: ReadStream, write_stream: WriteStream) -> Result<Self> {
         let (request_tx, mut request_rx) = mpsc::channel::<OutgoingMessage>(32);
-        
+
         tokio::spawn(async move {
             let mut pending_requests = Vec::new();
             let mut read_stream = read_stream;
-            let mut write_stream = write_stream;
+            let write_stream = write_stream;
 
             loop {
                 tokio::select! {
@@ -70,7 +70,7 @@ impl Session {
             }
         });
 
-        Ok(Self { 
+        Ok(Self {
             request_tx,
             id_counter: AtomicU64::new(1),
         })
@@ -78,7 +78,7 @@ impl Session {
 
     async fn send_message(&self, message: JsonRpcMessage) -> Result<Option<JsonRpcResponse>> {
         let (response_tx, mut response_rx) = mpsc::channel(1);
-        
+
         self.request_tx
             .send(OutgoingMessage {
                 message,
@@ -93,7 +93,11 @@ impl Session {
             .context("Failed to receive response")?
     }
 
-    async fn rpc_call<T: DeserializeOwned>(&self, method: &str, params: Option<Value>) -> Result<T> {
+    async fn rpc_call<T: DeserializeOwned>(
+        &self,
+        method: &str,
+        params: Option<Value>,
+    ) -> Result<T> {
         let id = self.id_counter.fetch_add(1, Ordering::SeqCst);
         let request = JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
@@ -102,13 +106,16 @@ impl Session {
             params,
         };
 
-        let response = self.send_message(JsonRpcMessage::Request(request))
+        let response = self
+            .send_message(JsonRpcMessage::Request(request))
             .await?
             .context("Expected response for request")?;
 
         match (response.error, response.result) {
             (Some(error), _) => Err(anyhow!("RPC Error {}: {}", error.code, error.message)),
-            (_, Some(result)) => serde_json::from_value(result).context("Failed to deserialize result"),
+            (_, Some(result)) => {
+                serde_json::from_value(result).context("Failed to deserialize result")
+            }
             (None, None) => Err(anyhow!("No result in response")),
         }
     }
@@ -122,7 +129,7 @@ impl Session {
 
         self.send_message(JsonRpcMessage::Notification(notification))
             .await?;
-        
+
         Ok(())
     }
 
@@ -143,7 +150,8 @@ impl Session {
         });
 
         let result: InitializeResult = self.rpc_call("initialize", Some(params)).await?;
-        self.send_notification("notifications/initialized", None).await?;
+        self.send_notification("notifications/initialized", None)
+            .await?;
         Ok(result)
     }
 
@@ -152,7 +160,8 @@ impl Session {
     }
 
     pub async fn read_resource(&self, uri: &str) -> Result<ReadResourceResult> {
-        self.rpc_call("resources/read", Some(json!({ "uri": uri }))).await
+        self.rpc_call("resources/read", Some(json!({ "uri": uri })))
+            .await
     }
 
     pub async fn list_tools(&self) -> Result<ListToolsResult> {
