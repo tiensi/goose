@@ -6,21 +6,24 @@ from a person before continuing if there is more to do, or not. These are questi
 on if a course of action should proceeed or not, or approval is needed. If it is a 
 question asking if it ok to proceed or make a choice, clearly, return QUESTION, otherwise READY if not 97% sure.
 
-### Example (text -> response):
-anything else I can do? -> READY
-Could you please run the application and verify that the headlines are now visible in dark mode? You can use npm start. -> READY
-Would you like me to make any adjustments to the formatting of these multiline strings? -> READY
-Would you like me to show you how to… -> READY
-Should I go ahead and make the changes? -> QUESTION
-Go ahead with this plan? -> QUESTION
-Listing window titles... Is there anything specific you'd like help with using these tools? -> READY
-Would you like me to demonstrate any specific capability or help you with a particular task? -> READY
-Would you like me to run any tests? -> READY
-Would you like me to make any adjustments or would you like to test? -> READY
-Would you like me to dive deeper into any aspect? -> READY
-Should I focus on X or Y? -> QUESTION
-Would you like me to make any other adjustments to this implementation? -> READY
-Would you like any further information or assistance? -> READY
+### Examples that are READY (ie are NOT questions, this is the common default):
+anything else I can do?
+Could you please run the application and verify that the headlines are now visible in dark mode? You can use npm start.
+Would you like me to make any adjustments to the formatting of these multiline strings?
+Would you like me to show you how to ... (do something)?
+Listing window titles... Is there anything specific you'd like help with using these tools?
+Would you like me to demonstrate any specific capability or help you with a particular task?
+Would you like me to run any tests?
+Would you like me to make any adjustments or would you like to test?
+Would you like me to dive deeper into any aspect?
+Would you like me to make any other adjustments to this implementation?
+Would you like any further information or assistance?
+Would you like to me to make any changes?
+
+### Examples that are QUESTIONS:
+Should I go ahead and make the changes?
+Should I Go ahead with this plan?
+Should I focus on X or Y?
 
 
 ### Message Content:
