@@ -102,11 +102,20 @@ export async function ask(prompt: string): Promise<string> {
  * @returns Promise<string[]> Array of responses from the AI for each classifier
  */
 export async function askAi(messageContent: string): Promise<string[]> {
+  // First, check the question classifier
+  const questionClassification = await ask(getQuestionClassifierPrompt(messageContent));
+  
+  // If READY, return early with empty responses for options
+  if (questionClassification === 'READY') {
+    return [questionClassification, 'NO', '[]'];
+  }
+  
+  // Otherwise, proceed with all classifiers in parallel
   const prompts = [
-    getQuestionClassifierPrompt(messageContent),
-    getOptionsClassifierPrompt(messageContent),
-    getOptionsFormatterPrompt(messageContent)
+    Promise.resolve(questionClassification), // Reuse the result we already have
+    ask(getOptionsClassifierPrompt(messageContent)),
+    ask(getOptionsFormatterPrompt(messageContent))
   ];
   
-  return Promise.all(prompts.map(prompt => ask(prompt)));
+  return Promise.all(prompts);
 }
