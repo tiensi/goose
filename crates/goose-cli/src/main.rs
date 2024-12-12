@@ -17,6 +17,9 @@ use commands::session::build_session;
 use commands::version::print_version;
 use profile::has_no_profiles;
 use std::io::{self, Read};
+use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
+use tracing_subscriber::util::SubscriberInitExt;  // Add this import
+use std::fs::File;
 
 #[cfg(test)]
 mod test_helpers;
@@ -191,8 +194,56 @@ enum CliProviderVariant {
     Ollama,
 }
 
+fn setup_logging() -> Result<()> {
+    // Create logs directory if it doesn't exist
+    let home_dir = dirs::home_dir().ok_or(anyhow::anyhow!("Could not determine home directory"))?;
+    let log_dir = home_dir.join(".config").join("goose").join("logs");
+    std::fs::create_dir_all(&log_dir)?;
+
+    // Create log file with timestamp
+    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+    let log_file = log_dir.join(format!("goose_{}.log", timestamp));
+    
+    // Create file logging layer with detailed information
+    let file_layer = fmt::layer()
+        .with_writer(move || -> Box<dyn std::io::Write> {
+            Box::new(
+                File::create(&log_file)
+                    .expect("Failed to create log file")
+            )
+        })
+        .with_target(true)
+        .with_thread_ids(true)
+        .with_line_number(true)
+        .with_file(true)
+        .with_ansi(false);
+
+    // Create console logging layer (more compact)
+    let stdout_layer = fmt::layer()
+        .with_target(false)
+        .compact();
+
+    // Set up the subscriber with both layers
+    tracing_subscriber::registry()
+        .with(
+            EnvFilter::from_default_env()
+                .add_directive(tracing::Level::INFO.into())
+                .add_directive("goose=debug".parse()?)
+        )
+        .with(file_layer)
+        .with(stdout_layer)
+        .init();  // Now this should work with the trait in scope
+
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Initialize logging
+    if let Err(e) = setup_logging() {
+        eprintln!("Failed to initialize logging: {}", e);
+    }
+
     let cli = Cli::parse();
 
     if cli.version {

@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use reqwest::{Client, StatusCode};
 use serde_json::{json, Value};
 use std::time::Duration;
+use tracing::{debug, info_span, Instrument};
 
 use super::base::{Provider, Usage};
 use super::configs::{DatabricksAuth, DatabricksProviderConfig};
@@ -78,27 +79,56 @@ impl DatabricksProvider {
             self.config.model
         );
 
-        let auth_header = self.ensure_auth_header().await?;
-        let response = self
-            .client
-            .post(&url)
-            .header("Authorization", auth_header)
-            .json(&payload)
-            .send()
-            .await?;
+        // Create a span for the Databricks API call
+        let span = info_span!(
+            "databricks_api_call",
+            model = self.config.model,
+            endpoint = "invocations",
+            input_tokens = payload.get("messages")
+                .and_then(|m| m.as_array())
+                .map(|m| m.len())
+                .unwrap_or(0),
+        );
 
-        match response.status() {
-            StatusCode::OK => Ok(response.json().await?),
-            status if status == StatusCode::TOO_MANY_REQUESTS || status.is_server_error() => {
-                // Implement retry logic here if needed
-                Err(anyhow!("Server error: {}", status))
+        async move {
+            debug!(payload = ?payload, "Sending request to Databricks API");
+            
+            let auth_header = self.ensure_auth_header().await?;
+            let response = self
+                .client
+                .post(&url)
+                .header("Authorization", auth_header)
+                .json(&payload)
+                .send()
+                .await?;
+
+            match response.status() {
+                StatusCode::OK => {
+                    let response_data: Value = response.json().await?;
+                    debug!(
+                        status = %StatusCode::OK,
+                        usage = ?response_data.get("usage"),
+                        "Received successful response from Databricks API"
+                    );
+                    Ok(response_data)
+                }
+                status if status == StatusCode::TOO_MANY_REQUESTS || status.is_server_error() => {
+                    // Implement retry logic here if needed
+                    debug!(status = %status, "Received error response from Databricks API");
+                    Err(anyhow!("Server error: {}", status))
+                }
+                _ => {
+                    let status = response.status();
+                    let err_text = response.text().await.unwrap_or_default();
+                    debug!(
+                        status = %status,
+                        error = %err_text,
+                        "Request failed"
+                    );
+                    Err(anyhow!("Request failed: {}: {}", status, err_text))
+                }
             }
-            _ => {
-                let status = response.status();
-                let err_text = response.text().await.unwrap_or_default();
-                Err(anyhow!("Request failed: {}: {}", status, err_text))
-            }
-        }
+        }.instrument(span).await
     }
 }
 
