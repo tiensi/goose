@@ -10,6 +10,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'src/main.ts'),
         index: resolve(__dirname, 'index.html'),
+        featureFlags: resolve(__dirname, 'src/windows/featureFlags.html'),
       },
     },
   },

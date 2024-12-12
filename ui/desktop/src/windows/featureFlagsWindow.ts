@@ -1,0 +1,49 @@
+import { BrowserWindow } from 'electron';
+import path from 'node:path';
+
+declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
+declare const MAIN_WINDOW_VITE_NAME: string;
+
+let featureFlagsWindow: BrowserWindow | null = null;
+
+export const createFeatureFlagsWindow = () => {
+  // Don't create multiple windows
+  if (featureFlagsWindow) {
+    featureFlagsWindow.focus();
+    return;
+  }
+
+  featureFlagsWindow = new BrowserWindow({
+    width: 400,
+    height: 600,
+    title: 'Feature Flags',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  // Open dev tools in development
+  if (process.env.NODE_ENV === 'development') {
+    featureFlagsWindow.webContents.openDevTools();
+  }
+
+  const launcherParams = '?window=featureFlags';
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    featureFlagsWindow.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}${launcherParams}`);
+  } else {
+    featureFlagsWindow.loadFile(
+      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html${launcherParams}`)
+    );
+  }
+
+  featureFlagsWindow.on('closed', () => {
+    featureFlagsWindow = null;
+  });
+
+  // Log any load failures
+  featureFlagsWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('Failed to load feature flags window:', errorCode, errorDescription);
+  });
+};
