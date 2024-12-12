@@ -83,7 +83,7 @@ export default function FeatureFlagsWindow() {
 
 function getFeatureFlagDescription(key: string): string {
   const descriptions: Record<string, string> = {
-    whatCanGooseDoText: "Customize the placeholder text shown in the chat input field",
+    whatCanGooseDoText: "Customize the splash screen button text",
     expandedToolsByDefault: "Show tool outputs expanded by default instead of collapsed"
   };
   return descriptions[key] || "No description available";
