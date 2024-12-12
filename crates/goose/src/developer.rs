@@ -420,11 +420,13 @@ impl DeveloperSystem {
             // Check file size first (2MB limit)
             const MAX_FILE_SIZE: u64 = 2 * 1024 * 1024; // 2MB in bytes
             const MAX_CHAR_COUNT: usize = 1 << 20; // 2^20 characters (1,048,576)
-            
+
             let file_size = std::fs::metadata(path)
-                .map_err(|e| AgentError::ExecutionError(format!("Failed to get file metadata: {}", e)))?
+                .map_err(|e| {
+                    AgentError::ExecutionError(format!("Failed to get file metadata: {}", e))
+                })?
                 .len();
-            
+
             if file_size > MAX_FILE_SIZE {
                 return Err(AgentError::ExecutionError(format!(
                     "File '{}' is too large ({:.2}MB). Maximum size is 2MB to prevent memory issues.",
@@ -432,7 +434,7 @@ impl DeveloperSystem {
                     file_size as f64 / 1024.0 / 1024.0
                 )));
             }
-            
+
             // Create a new resource and add it to active_resources
             let uri = Url::from_file_path(path)
                 .map_err(|_| AgentError::ExecutionError("Invalid file path".into()))?
@@ -441,7 +443,7 @@ impl DeveloperSystem {
             // Read the content once
             let content = std::fs::read_to_string(path)
                 .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?;
-            
+
             let char_count = content.chars().count();
             if char_count > MAX_CHAR_COUNT {
                 return Err(AgentError::ExecutionError(format!(
@@ -862,7 +864,7 @@ mod tests {
         {
             let large_file_path = temp_dir.path().join("large.txt");
             let large_file_str = large_file_path.to_str().unwrap();
-            
+
             // Create a file larger than 2MB
             let content = "x".repeat(3 * 1024 * 1024); // 3MB
             std::fs::write(&large_file_path, content).unwrap();
@@ -884,7 +886,7 @@ mod tests {
         {
             let many_chars_path = temp_dir.path().join("many_chars.txt");
             let many_chars_str = many_chars_path.to_str().unwrap();
-            
+
             // Create a file with more than 2^20 characters but less than 2MB
             let content = "x".repeat((1 << 20) + 1); // 2^20 + 1 characters
             std::fs::write(&many_chars_path, content).unwrap();
