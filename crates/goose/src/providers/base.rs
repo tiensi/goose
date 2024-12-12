@@ -45,6 +45,34 @@ pub trait Provider: Send + Sync {
         messages: &[Message],
         tools: &[Tool],
     ) -> Result<(Message, Usage)>;
+
+    /// Providers should implement this method to return their total usage statistics from provider.complete (or others)
+    fn total_usage(&self) -> Usage;
+}
+
+/// A simple struct to reuse for collecting usage statistics for provider implementations.
+pub struct ProviderUsageCollector {
+    pub usage: Usage,
+}
+
+impl ProviderUsageCollector {
+    pub fn new() -> Self {
+        Self {
+            usage: Usage::default(),
+        }
+    }
+
+    pub fn add_usage(&mut self, usage: Usage) {
+        if let Some(input_tokens) = usage.input_tokens {
+            self.usage.input_tokens = Some(self.usage.input_tokens.unwrap_or(0) + input_tokens);
+        }
+        if let Some(output_tokens) = usage.output_tokens {
+            self.usage.output_tokens = Some(self.usage.output_tokens.unwrap_or(0) + output_tokens);
+        }
+        if let Some(total_tokens) = usage.total_tokens {
+            self.usage.total_tokens = Some(self.usage.total_tokens.unwrap_or(0) + total_tokens);
+        }
+    }
 }
 
 #[cfg(test)]
