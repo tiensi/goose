@@ -20,14 +20,12 @@ contextBridge.exposeInMainWorld('electron', {
   reloadApp: () => ipcRenderer.send('reload-app'),
   selectFileOrDirectory: () => ipcRenderer.invoke('select-file-or-directory'),
   on: (channel, callback) => {
-    const validChannels = ['fatal-error', 'update-feature-flags'];
-    if (validChannels.includes(channel)) {
+    if (channel === 'fatal-error') {
       ipcRenderer.on(channel, callback);
     }
   },
   off: (channel, callback) => {
-    const validChannels = ['fatal-error', 'update-feature-flags'];
-    if (validChannels.includes(channel)) {
+    if (channel === 'fatal-error') {
       ipcRenderer.removeListener(channel, callback);
     }
   }

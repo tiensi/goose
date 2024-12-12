@@ -1,7 +1,6 @@
 interface FeatureFlags {
     whatCanGooseDoText: string;
     expandedToolsByDefault: boolean;
-    // Add more feature flags here as needed
 }
 
 class FeatureFlagsManager {
@@ -29,11 +28,6 @@ class FeatureFlagsManager {
                 this.flags[typedKey] = savedFlags[typedKey];
             }
         });
-
-        // Make feature flags available in the developer console
-        if (typeof window !== 'undefined') {
-            (window as any).featureFlags = this.flags;
-        }
     }
 
     private loadFlags(): Partial<FeatureFlags> {
