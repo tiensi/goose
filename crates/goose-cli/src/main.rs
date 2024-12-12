@@ -19,7 +19,8 @@ use profile::has_no_profiles;
 use std::io::{self, Read};
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 use tracing_subscriber::util::SubscriberInitExt;  // Add this import
-use std::fs::File;
+use std::fs::{OpenOptions};
+use chrono::Local;
 
 #[cfg(test)]
 mod test_helpers;
@@ -201,16 +202,20 @@ fn setup_logging() -> Result<()> {
     std::fs::create_dir_all(&log_dir)?;
 
     // Create log file with timestamp
-    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+    let timestamp = Local::now().format("%Y%m%d_%H%M%S");
     let log_file = log_dir.join(format!("goose_{}.log", timestamp));
-    
+
     // Create file logging layer with detailed information
     let file_layer = fmt::layer()
         .with_writer(move || -> Box<dyn std::io::Write> {
-            Box::new(
-                File::create(&log_file)
-                    .expect("Failed to create log file")
-            )
+            // Open the log file in append mode
+            let file = OpenOptions::new()
+                .write(true)
+                .append(true)
+                .create(true) // Create the file if it doesn't exist
+                .open(&log_file)
+                .expect("Failed to open log file");
+            Box::new(file)
         })
         .with_target(true)
         .with_thread_ids(true)
@@ -219,9 +224,9 @@ fn setup_logging() -> Result<()> {
         .with_ansi(false);
 
     // Create console logging layer (more compact)
-    let stdout_layer = fmt::layer()
-        .with_target(false)
-        .compact();
+    // let stdout_layer = fmt::layer()
+    //     .with_target(false)
+    //     .compact();
 
     // Set up the subscriber with both layers
     tracing_subscriber::registry()
@@ -231,8 +236,8 @@ fn setup_logging() -> Result<()> {
                 .add_directive("goose=debug".parse()?)
         )
         .with(file_layer)
-        .with(stdout_layer)
-        .init();  // Now this should work with the trait in scope
+        // .with(stdout_layer)
+        .init();
 
     Ok(())
 }

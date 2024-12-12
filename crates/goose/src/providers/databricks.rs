@@ -108,6 +108,7 @@ impl DatabricksProvider {
                     debug!(
                         status = %StatusCode::OK,
                         usage = ?response_data.get("usage"),
+                        response = ?response_data,
                         "Received successful response from Databricks API"
                     );
                     Ok(response_data)
