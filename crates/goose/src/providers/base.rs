@@ -78,7 +78,10 @@ impl ProviderUsageCollector {
     }
 
     pub fn get_usage(&self) -> Usage {
-        self.usage.lock().map(|guard| guard.clone()).unwrap_or_default()
+        self.usage
+            .lock()
+            .map(|guard| guard.clone())
+            .unwrap_or_default()
     }
 }
 
@@ -117,7 +120,7 @@ mod tests {
     #[test]
     fn test_usage_collector() {
         let collector = ProviderUsageCollector::new();
-        
+
         // Add first usage
         collector.add_usage(Usage::new(Some(10), Some(20), Some(30)));
         let usage1 = collector.get_usage();

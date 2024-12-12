@@ -26,8 +26,8 @@ impl OpenAiProvider {
             .timeout(Duration::from_secs(600)) // 10 minutes timeout
             .build()?;
 
-        Ok(Self { 
-            client, 
+        Ok(Self {
+            client,
             config,
             usage_collector: ProviderUsageCollector::new(),
         })
