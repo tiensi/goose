@@ -19,6 +19,9 @@ Would you like me to run any tests? -> READY
 Would you like me to make any adjustments or would you like to test? -> READY
 Would you like me to dive deeper into any aspect? -> READY
 Should I focus on X or Y? -> QUESTION
+Would you like me to make any other adjustments to this implementation? -> READY
+Would you like any further information or assistance? -> READY
+
 
 ### Message Content:
 ${messageContent}
