@@ -24,11 +24,6 @@ export const createFeatureFlagsWindow = () => {
     },
   });
 
-  // Open dev tools in development
-  if (process.env.NODE_ENV === 'development') {
-    featureFlagsWindow.webContents.openDevTools();
-  }
-
   const launcherParams = '?window=featureFlags';
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     featureFlagsWindow.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}${launcherParams}`);

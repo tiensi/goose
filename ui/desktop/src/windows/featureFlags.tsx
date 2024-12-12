@@ -31,6 +31,9 @@ export default function FeatureFlagsWindow() {
           ))}
         </div>
       </div>
+      <div className="p-4">
+        Flag changes are saved immediately. Open a new chat window to use the changes.
+      </div>
     </div>
   );
 }

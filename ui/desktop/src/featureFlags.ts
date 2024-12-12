@@ -1,5 +1,6 @@
 interface FeatureFlags {
     whatCanGooseDoText: string;
+    expandedToolsByDefault: boolean;
     // Add more feature flags here as needed
 }
 
@@ -13,6 +14,7 @@ class FeatureFlagsManager {
         const savedFlags = this.loadFlags();
         this.flags = {
             whatCanGooseDoText: "What can goose do?",
+            expandedToolsByDefault: false,
             ...savedFlags
         };
 
