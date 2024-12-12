@@ -1,11 +1,13 @@
+use anyhow::{anyhow, Result};
 use clap::Parser;
 use mcpclient::{
     session::Session,
-    sse_transport::{SSEServerParams, SSETransport},
+    sse_transport::{SseTransport, SseTransportParams},
     stdio_transport::{StdioServerParams, StdioTransport},
     transport::Transport,
 };
 use serde_json::json;
+use tracing_subscriber::{fmt, EnvFilter};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -16,7 +18,14 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<()> {
+    // Initialize logging
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env()
+            .add_directive("mcpclient=debug".parse().unwrap())
+            .add_directive("reqwest_eventsource=debug".parse().unwrap()))
+        .init();
+
     let args = Args::parse();
     println!("Args - mode: {}", args.mode);
 
@@ -29,93 +38,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 env: None,
             },
         }),
-        "echo" => Box::new(SSETransport::new(SSEServerParams {
-            url: reqwest::Url::parse("http://0.0.0.0:8000").unwrap(),
-            headers: None,
-            timeout: std::time::Duration::from_secs(30),
-            sse_read_timeout: std::time::Duration::from_secs(300),
-        })),
-        _ => {
-            return Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "Invalid mode. Use 'git' or 'echo'",
-            )) as Box<dyn std::error::Error>)
-        }
+        "echo" => Box::new(SseTransport {
+            params: SseTransportParams {
+                url: "http://localhost:8000/sse".into(),
+                headers: None,
+            },
+        }),
+        _ => return Err(anyhow!("Invalid mode. Use 'git' or 'echo'"))
     };
 
-    let (read_stream, write_stream) = transport.connect().await.map_err(|e| {
-        Box::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            e.to_string(),
-        ))
-    })?;
-    let mut session = Session::new(read_stream, write_stream).await.map_err(|e| {
-        Box::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            e.to_string(),
-        ))
-    })?;
+    let (read_stream, write_stream) = transport.connect().await?;
+    let mut session = Session::new(read_stream, write_stream).await?;
 
     // Initialize the connection
-    let init_result = session.initialize().await.map_err(|e| {
-        Box::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            e.to_string(),
-        ))
-    })?;
+    let init_result = session.initialize().await?;
     println!("Initialized: {:?}", init_result);
+    
     // List tools
-    let tools = session.list_tools().await.map_err(|e| {
-        Box::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            e.to_string(),
-        ))
-    })?;
+    let tools = session.list_tools().await?;
     println!("Tools: {:?}", tools);
 
     if args.mode == "echo" {
         // Call a tool (replace with actual tool name and arguments)
         let call_result = session
             .call_tool("echo_tool", Some(json!({"message": "Hello, world!"})))
-            .await
-            .map_err(|e| {
-                Box::new(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    e.to_string(),
-                ))
-            })?;
+            .await?;
         println!("Call tool result: {:?}", call_result);
 
         // List available resources
-        let resources = session.list_resources().await.map_err(|e| {
-            Box::new(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                e.to_string(),
-            ))
-        })?;
+        let resources = session.list_resources().await?;
         println!("Resources: {:?}", resources);
 
         // Read a resource (replace with actual URI)
         if let Some(resource) = resources.resources.first() {
-            let read_result = session.read_resource(&resource.uri).await.map_err(|e| {
-                Box::new(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    e.to_string(),
-                ))
-            })?;
+            let read_result = session.read_resource(&resource.uri).await?;
             println!("Read resource result: {:?}", read_result);
         }
     } else {
         // Call a tool (replace with actual tool name and arguments)
         let call_result = session
             .call_tool("git_status", Some(json!({"repo_path": "."})))
-            .await
-            .map_err(|e| {
-                Box::new(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    e.to_string(),
-                ))
-            })?;
+            .await?;
         println!("Call tool result: {:?}", call_result);
     }
 
