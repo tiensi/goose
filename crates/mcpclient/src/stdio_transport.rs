@@ -1,5 +1,6 @@
 use crate::transport::{ReadStream, Transport, WriteStream};
 use crate::types::JsonRpcMessage;
+use anyhow::{Context, Result};
 use async_trait::async_trait;
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -32,9 +33,7 @@ impl StdioTransport {
 
 #[async_trait]
 impl Transport for StdioTransport {
-    async fn connect(
-        &self,
-    ) -> Result<(ReadStream, WriteStream), Box<dyn std::error::Error + Send>> {
+    async fn connect(&self) -> Result<(ReadStream, WriteStream)> {
         let mut child = Command::new(&self.params.command)
             .args(&self.params.args)
             .env_clear()
@@ -48,10 +47,16 @@ impl Transport for StdioTransport {
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())
             .spawn()
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
+            .context("Failed to spawn child process")?;
 
-        let stdin = child.stdin.take().expect("Failed to get stdin");
-        let stdout = child.stdout.take().expect("Failed to get stdout");
+        let stdin = child
+            .stdin
+            .take()
+            .context("Failed to get stdin handle")?;
+        let stdout = child
+            .stdout
+            .take()
+            .context("Failed to get stdout handle")?;
 
         let (tx_read, rx_read) = mpsc::channel(100);
         let (tx_write, mut rx_write) = mpsc::channel(100);
@@ -68,9 +73,7 @@ impl Transport for StdioTransport {
                         }
                     }
                     Err(e) => {
-                        let _ = tx_read
-                            .send(Err(Box::new(e) as Box<dyn std::error::Error + Send>))
-                            .await;
+                        let _ = tx_read.send(Err(e.into())).await;
                     }
                 }
             }
@@ -80,7 +83,8 @@ impl Transport for StdioTransport {
         let mut stdin = stdin;
         tokio::spawn(async move {
             while let Some(message) = rx_write.recv().await {
-                let json = serde_json::to_string(&message).expect("Failed to serialize message");
+                let json = serde_json::to_string(&message)
+                    .expect("Failed to serialize message");
                 if stdin
                     .write_all(format!("{}\n", json).as_bytes())
                     .await
