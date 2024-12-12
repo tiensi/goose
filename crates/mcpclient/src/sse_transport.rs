@@ -3,13 +3,15 @@ use crate::types::JsonRpcMessage;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use futures_util::StreamExt;
-use reqwest::{Client, StatusCode, Url};
+use reqwest::{Client, Url};
 use reqwest_eventsource::{Event, EventSource};
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
-use tokio_retry::{Retry, strategy::{ExponentialBackoff, jitter}};
+use tokio_retry::{
+    strategy::{jitter, ExponentialBackoff},
+    Retry,
+};
 use tracing::{debug, error, info, warn};
-use std::time::Duration;
 
 pub struct SseTransportParams {
     pub url: String,
@@ -33,15 +35,12 @@ async fn send_with_retry(
         .take(3); // Maximum of 3 retries (4 attempts total)
 
     Retry::spawn(retry_strategy, || async {
-        let response = client
-            .post(endpoint)
-            .json(&json)
-            .send()
-            .await?;
+        let response = client.post(endpoint).json(&json).send().await?;
 
         // If we get a 5xx error or specific connection errors, we should retry
-        if response.status().is_server_error() || 
-           matches!(response.error_for_status_ref(), Err(e) if e.is_connect()) {
+        if response.status().is_server_error()
+            || matches!(response.error_for_status_ref(), Err(e) if e.is_connect())
+        {
             return Err(anyhow!("Server error: {}", response.status()));
         }
 
@@ -56,21 +55,21 @@ impl Transport for SseTransport {
         info!("Connecting to SSE endpoint: {}", self.params.url);
         let (tx_read, rx_read) = mpsc::channel(100);
         let (tx_write, mut rx_write) = mpsc::channel(100);
-        
+
         let client = Client::new();
         let base_url = Url::parse(&self.params.url).context("Failed to parse SSE URL")?;
-        
+
         // Create the event source request
         let mut request_builder = client.get(base_url.clone());
         if let Some(headers) = &self.params.headers {
-            request_builder = headers.iter().fold(request_builder, |req, (key, value)| {
-                req.header(key, value)
-            });
+            request_builder = headers
+                .iter()
+                .fold(request_builder, |req, (key, value)| req.header(key, value));
         }
 
         let event_source = EventSource::new(request_builder)?;
         let client_for_post = client.clone();
-        
+
         // Shared state for the endpoint URL
         let endpoint_url = Arc::new(Mutex::new(None::<String>));
         let endpoint_url_reader = endpoint_url.clone();
@@ -96,7 +95,7 @@ impl Transport for SseTransport {
                                     // Handle endpoint event
                                     let endpoint = message.data;
                                     info!("Received endpoint URL: {}", endpoint);
-                                    
+
                                     // Join with base URL if relative
                                     let endpoint_url_full = if endpoint.starts_with('/') {
                                         match base_url.join(&endpoint) {
@@ -117,19 +116,18 @@ impl Transport for SseTransport {
                                             }
                                         }
                                     };
-                                    
+
                                     // Validate endpoint URL has same origin (scheme and host)
-                                    if base_url.scheme() != endpoint_url_full.scheme() 
-                                        || base_url.host_str() != endpoint_url_full.host_str() 
-                                        || base_url.port() != endpoint_url_full.port() {
+                                    if base_url.scheme() != endpoint_url_full.scheme()
+                                        || base_url.host_str() != endpoint_url_full.host_str()
+                                        || base_url.port() != endpoint_url_full.port()
+                                    {
                                         let error = format!(
                                             "Endpoint origin does not match connection origin: {}",
                                             endpoint_url_full
                                         );
                                         error!("{}", error);
-                                        let _ = tx_read
-                                            .send(Err(anyhow!(error)))
-                                            .await;
+                                        let _ = tx_read.send(Err(anyhow!(error))).await;
                                         break;
                                     }
 
