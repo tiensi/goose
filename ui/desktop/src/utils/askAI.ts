@@ -6,19 +6,27 @@ from a person before continuing if there is more to do, or not. These are questi
 on if a course of action should proceeed or not, or approval is needed. If it is a 
 question asking if it ok to proceed or make a choice, clearly, return QUESTION, otherwise READY if not 97% sure.
 
-### Example (text -> response):
-anything else I can do? -> READY
-Could you please run the application and verify that the headlines are now visible in dark mode? You can use npm start. -> READY
-Would you like me to make any adjustments to the formatting of these multiline strings? -> READY
-Would you like me to show you how to… -> READY
-Should I go ahead and make the changes? -> QUESTION
-Go ahead with this plan? -> QUESTION
-Listing window titles... Is there anything specific you'd like help with using these tools? -> READY
-Would you like me to demonstrate any specific capability or help you with a particular task? -> READY
-Would you like me to run any tests? -> READY
-Would you like me to make any adjustments or would you like to test? -> READY
-Would you like me to dive deeper into any aspect? -> READY
-Should I focus on X or Y? -> QUESTION
+### Examples message content that is classified as READY:
+anything else I can do?
+Could you please run the application and verify that the headlines are now visible in dark mode? You can use npm start.
+Would you like me to make any adjustments to the formatting of these multiline strings?
+Would you like me to show you how to ... (do something)?
+Listing window titles... Is there anything specific you'd like help with using these tools?
+Would you like me to demonstrate any specific capability or help you with a particular task?
+Would you like me to run any tests?
+Would you like me to make any adjustments or would you like to test?
+Would you like me to dive deeper into any aspect?
+Would you like me to make any other adjustments to this implementation?
+Would you like any further information or assistance?
+Would you like to me to make any changes?
+Would you like me to make any adjustments to this implementation?
+Would you like me to show you how to…
+
+### Examples that are QUESTIONS:
+Should I go ahead and make the changes?
+Should I Go ahead with this plan?
+Should I focus on X or Y?
+
 
 ### Message Content:
 ${messageContent}
@@ -65,36 +73,49 @@ words, phrases, or explanations are allowed.
 
 Response:`;
 
-export const getPromptTemplates = (messageContent: string): string[] => [
-  getQuestionClassifierPrompt(messageContent),
-  getOptionsClassifierPrompt(messageContent),
-  getOptionsFormatterPrompt(messageContent)
-];
+/**
+ * Core function to ask the AI a single question and get a response
+ * @param prompt The prompt to send to the AI
+ * @returns Promise<string> The AI's response
+ */
+export async function ask(prompt: string): Promise<string> {
+  const response = await fetch(getApiUrl('/ask'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Secret-Key': getSecretKey(),
+    },
+    body: JSON.stringify({ prompt }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to get response');
+  }
+
+  const data = await response.json();
+  return data.response;
+}
 
 /**
- * Utility to ask the LLM any question to clarify without wider context.
+ * Utility to ask the LLM multiple questions to clarify without wider context.
+ * @param messageContent The content to analyze
+ * @returns Promise<string[]> Array of responses from the AI for each classifier
  */
-export async function askAi(promptTemplates: string[]) {
-  const responses = await Promise.all(
-    promptTemplates.map(async (template) => {
-      const response = await fetch(getApiUrl('/ask'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Secret-Key': getSecretKey(),
-        },
-        body: JSON.stringify({ prompt: template }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get response');
-      }
-
-      const data = await response.json();
-
-      return data.response;
-    })
-  );
-
-  return responses;
+export async function askAi(messageContent: string): Promise<string[]> {
+  // First, check the question classifier
+  const questionClassification = await ask(getQuestionClassifierPrompt(messageContent));
+  
+  // If READY, return early with empty responses for options
+  if (questionClassification === 'READY') {
+    return [questionClassification, 'NO', '[]'];
+  }
+  
+  // Otherwise, proceed with all classifiers in parallel
+  const prompts = [
+    Promise.resolve(questionClassification), // Reuse the result we already have
+    ask(getOptionsClassifierPrompt(messageContent)),
+    ask(getOptionsFormatterPrompt(messageContent))
+  ];
+  
+  return Promise.all(prompts);
 }

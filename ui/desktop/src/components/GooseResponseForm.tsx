@@ -48,6 +48,7 @@ export default function GooseResponseForm({ message, metadata, append }: GooseRe
       } catch (err) {
         console.error("Failed to parse options data:", err);
         options = [];
+        return null;
       }
     }
   }
@@ -71,7 +72,7 @@ export default function GooseResponseForm({ message, metadata, append }: GooseRe
 
   const handleAccept = () => {
     const message = {
-      content: "Yes - execute this plan",
+      content: "Yes - go ahead.",
       role: "user",
     };
     append(message);

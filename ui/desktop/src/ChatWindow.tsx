@@ -12,7 +12,7 @@ import MoreMenu from './components/MoreMenu';
 import BottomMenu from './components/BottomMenu';
 import LoadingGoose from './components/LoadingGoose';
 import { ApiKeyWarning } from './components/ApiKeyWarning';
-import { askAi, getPromptTemplates } from './utils/askAI';
+import { askAi } from './utils/askAI';
 import WingToWing, { Working } from './components/WingToWing';
 import { WelcomeScreen } from './components/WelcomeScreen';
 
@@ -82,9 +82,8 @@ function ChatContent({
     onFinish: async (message, options) => {
       setProgressMessage('Task finished. Click here to expand.');
       setWorking(Working.Idle);
-
-      const promptTemplates = getPromptTemplates(message.content);
-      const fetchResponses = await askAi(promptTemplates);
+      
+      const fetchResponses = await askAi(message.content);
       setMessageMetadata((prev) => ({ ...prev, [message.id]: fetchResponses }));
       
       // Only show notification if it's been more than a minute since last interaction
