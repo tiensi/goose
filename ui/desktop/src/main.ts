@@ -7,7 +7,7 @@ import started from "electron-squirrel-startup";
 import log from './utils/logger';
 import { exec } from 'child_process';
 import { addRecentDir, loadRecentDirs } from './utils/recentDirs';
-import { createFeatureFlagsWindow } from './windows/featureFlagsWindow';
+import { createFeatureFlagsWindow } from './FeatureFlagsWindow';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) app.quit();

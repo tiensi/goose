@@ -1,8 +1,8 @@
 import React from 'react';
 import { featureFlags, type FeatureFlags } from '../featureFlags';
-import { Card } from '../components/ui/card';
-import { Input } from '../components/ui/input';
-import Box from '../components/ui/Box';
+import { Card } from './ui/card';
+import { Input } from './ui/input';
+import Box from './ui/Box';
 
 export default function FeatureFlagsWindow() {
   const [flags, setFlags] = React.useState<FeatureFlags>(featureFlags.getFlags());

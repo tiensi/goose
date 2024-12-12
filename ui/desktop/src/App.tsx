@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import LauncherWindow from './LauncherWindow';
 import ChatWindow from './ChatWindow';
 import ErrorScreen from './components/ErrorScreen';
-import FeatureFlagsWindow from './windows/featureFlags';
+import FeatureFlagsWindow from './components/FeatureFlags';
 
 export default function App() {
   const [fatalError, setFatalError] = useState<string | null>(null);
