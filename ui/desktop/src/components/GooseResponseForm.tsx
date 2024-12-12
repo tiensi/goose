@@ -22,8 +22,6 @@ export default function GooseResponseForm({ message, metadata, append }: GooseRe
     window.electron.logInfo('metadata:'+ JSON.stringify(metadata, null, 2));
   }
 
-
-
   if (metadata) {
     isQuestion = metadata[0] === "QUESTION";
     isOptions = metadata[1] === "OPTIONS";
@@ -132,8 +130,8 @@ export default function GooseResponseForm({ message, metadata, append }: GooseRe
                   : "bg-tool-card dark:bg-tool-card-dark hover:bg-accent dark:hover:bg-dark-accent"
               )}
             >
-              <h3 className="font-semibold text-lg mb-2 dark:text-gray-800">{opt.optionTitle}</h3>
-              <div className="prose prose-xs max-w-none">
+              <h3 className="font-semibold text-lg mb-2 dark:text-gray-100">{opt.optionTitle}</h3>
+              <div className="prose prose-xs max-w-none dark:text-gray-100">
                 <ReactMarkdown>{opt.optionDescription}</ReactMarkdown>
               </div>
             </div>

@@ -1,13 +1,69 @@
 import { getApiUrl, getSecretKey } from '../config';
 
-const getQuestionClassifierPrompt = (messageContent: string): string => 
-  `You are a simple classifier that takes content and decides if it is asking for input from a person before continuing if there is more to do, or not. These are questions on if a course of action should proceeed or not, or approval is needed. If it is a question very clearly, return QUESTION, otherwise READY. If it of the form of 'anything else I can do?' sort of question, return READY as that is not the sort of question we are looking for. ### Message Content:\n${messageContent}\nYou must provide a response strictly limited to one of the following two words: QUESTION, READY. No other words, phrases, or explanations are allowed. Response:`;
+const getQuestionClassifierPrompt = (messageContent: string): string => `
+You are a simple classifier that takes content and decides if it is asking for input 
+from a person before continuing if there is more to do, or not. These are questions 
+on if a course of action should proceeed or not, or approval is needed. If it is a 
+question asking if it ok to proceed or make a choice, clearly, return QUESTION, otherwise READY if not 97% sure.
 
-const getOptionsClassifierPrompt = (messageContent: string): string => 
-  `You are a simple classifier that takes content and decides if it a list of options or plans to choose from, or not a list of options to choose from It is IMPORTANT that you really know this is a choice, just not numbered steps. If it is a list of options and you are 95% sure, return OPTIONS, otherwise return NO. ### Message Content:\n${messageContent}\nYou must provide a response strictly limited to one of the following two words:OPTIONS, NO. No other words, phrases, or explanations are allowed. Response:`;
+### Example (text -> response):
+anything else I can do? -> READY
+Could you please run the application and verify that the headlines are now visible in dark mode? You can use npm start. -> READY
+Would you like me to make any adjustments to the formatting of these multiline strings? -> READY
+Would you like me to show you how to… -> READY
+Should I go ahead and make the changes? -> QUESTION
+Go ahead with this plan? -> QUESTION
+Listing window titles... Is there anything specific you'd like help with using these tools? -> READY
+Would you like me to demonstrate any specific capability or help you with a particular task? -> READY
+Would you like me to run any tests? -> READY
+Would you like me to make any adjustments or would you like to test? -> READY
+Would you like me to dive deeper into any aspect? -> READY
+Should I focus on X or Y? -> QUESTION
 
-const getOptionsFormatterPrompt = (messageContent: string): string => 
-  `If the content is list of distinct options or plans of action to choose from, and not just a list of things, but clearly a list of things to choose one from, taking into account the Message Content alone, try to format it in a json array, like this JSON array of objects of the form optionTitle:string, optionDescription:string (markdown).\n If is not a list of options or plans to choose from, then return empty list.\n ### Message Content:\n${messageContent}\n\nYou must provide a response strictly as json in the format descriribed. No other words, phrases, or explanations are allowed. Response:`;
+### Message Content:
+${messageContent}
+
+You must provide a response strictly limited to one of the following two words: 
+QUESTION, READY. No other words, phrases, or explanations are allowed.
+
+Response:`;
+
+const getOptionsClassifierPrompt = (messageContent: string): string => `
+You are a simple classifier that takes content and decides if it a list of options 
+or plans to choose from, or not a list of options to choose from. It is IMPORTANT 
+that you really know this is a choice, just not numbered steps. If it is a list 
+of options and you are 95% sure, return OPTIONS, otherwise return NO.
+
+### Example (text -> response):
+Would you like me to proceed with creating this file? Please let me know if you want any changes before I write it. -> NO
+Here are some options for you to choose from: -> OPTIONS
+which one do you want to choose? -> OPTIONS
+Would you like me to dive deeper into any aspects of these components? -> NO
+Should I focus on X or Y? -> OPTIONS
+
+### Message Content:
+${messageContent}
+
+You must provide a response strictly limited to one of the following two words:
+OPTIONS, NO. No other words, phrases, or explanations are allowed.
+
+Response:`;
+
+const getOptionsFormatterPrompt = (messageContent: string): string => `
+If the content is list of distinct options or plans of action to choose from, and 
+not just a list of things, but clearly a list of things to choose one from, taking 
+into account the Message Content alone, try to format it in a json array, like this 
+JSON array of objects of the form optionTitle:string, optionDescription:string (markdown).
+
+If is not a list of options or plans to choose from, then return empty list.
+
+### Message Content:
+${messageContent}
+
+You must provide a response strictly as json in the format descriribed. No other 
+words, phrases, or explanations are allowed.
+
+Response:`;
 
 export const getPromptTemplates = (messageContent: string): string[] => [
   getQuestionClassifierPrompt(messageContent),
