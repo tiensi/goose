@@ -10,13 +10,25 @@ class FeatureFlagsManager {
     private readonly STORAGE_KEY = 'goose-feature-flags';
 
     private constructor() {
-        // Load flags from storage or use defaults
-        const savedFlags = this.loadFlags();
-        this.flags = {
+        // Define default flags
+        const defaultFlags: FeatureFlags = {
             whatCanGooseDoText: "What can goose do?",
             expandedToolsByDefault: false,
-            ...savedFlags
         };
+
+        // Load flags from storage
+        const savedFlags = this.loadFlags();
+        
+        // Create a new flags object starting with default values
+        this.flags = { ...defaultFlags };
+        
+        // Only override with saved values for keys that exist in default flags
+        Object.keys(defaultFlags).forEach((key) => {
+            const typedKey = key as keyof FeatureFlags;
+            if (savedFlags.hasOwnProperty(key)) {
+                this.flags[typedKey] = savedFlags[typedKey];
+            }
+        });
 
         // Make feature flags available in the developer console
         if (typeof window !== 'undefined') {
