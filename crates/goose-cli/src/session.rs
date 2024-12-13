@@ -41,11 +41,11 @@ pub fn get_most_recent_session() -> Result<PathBuf> {
     entries.sort_by(|a, b| {
         b.metadata()
             .and_then(|m| m.modified())
-            .unwrap_or_else(|_| std::time::SystemTime::UNIX_EPOCH)
+            .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
             .cmp(
                 &a.metadata()
                     .and_then(|m| m.modified())
-                    .unwrap_or_else(|_| std::time::SystemTime::UNIX_EPOCH),
+                    .unwrap_or(std::time::SystemTime::UNIX_EPOCH),
             )
     });
 

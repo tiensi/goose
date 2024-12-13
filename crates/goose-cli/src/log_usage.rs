@@ -72,7 +72,7 @@ mod tests {
 
             let log_content = std::fs::read_to_string(&log_file).unwrap();
             let log: SessionLog =
-                serde_json::from_str(&log_content.lines().last().unwrap()).unwrap();
+                serde_json::from_str(log_content.lines().last().unwrap()).unwrap();
 
             assert!(log.session_file.contains("path.txt"));
             assert_eq!(log.usage.input_tokens, Some(10));

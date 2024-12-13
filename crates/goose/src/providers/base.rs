@@ -56,6 +56,12 @@ pub struct ProviderUsageCollector {
     usage: Mutex<Usage>,
 }
 
+impl Default for ProviderUsageCollector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProviderUsageCollector {
     pub fn new() -> Self {
         Self {
