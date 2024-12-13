@@ -7,6 +7,7 @@ use std::io::{self, BufRead, Write};
 use std::path::PathBuf;
 
 use crate::agents::agent::Agent;
+use crate::log_usage::log_usage;
 use crate::prompt::{InputType, Prompt};
 use goose::developer::DeveloperSystem;
 use goose::models::message::{Message, MessageContent};
@@ -324,6 +325,15 @@ We've removed the conversation up to the most recent user message
 
     pub fn session_file(&self) -> PathBuf {
         self.session_file.clone()
+    }
+}
+
+impl<'a> Drop for Session<'a> {
+    fn drop(&mut self) {
+        log_usage(
+            self.session_file.to_string_lossy().to_string(),
+            self.agent.total_usage(),
+        );
     }
 }
 
@@ -782,6 +792,34 @@ mod tests {
             // Test getting the most recent session
             let most_recent = get_most_recent_session()?;
             assert_eq!(most_recent, file2_path);
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_session_logging() -> Result<()> {
+        run_with_tmp_dir(|| {
+            // Create a test session
+            let session = create_test_session();
+            let session_file = session.session_file.clone();
+            // Create a log directory
+            let home_dir = dirs::home_dir().unwrap();
+            let log_dir = home_dir.join(".config").join("goose").join("logs");
+            std::fs::create_dir_all(&log_dir)?;
+
+            // Drop the session to trigger logging
+            drop(session);
+
+            // Check if log file exists and contains the expected content
+            let log_file = log_dir.join("goose.log");
+            assert!(log_file.exists());
+
+            let log_content = std::fs::read_to_string(&log_file)?;
+            assert!(log_content.contains(session_file.to_str().unwrap()));
+            assert!(log_content.contains("input_tokens"));
+            assert!(log_content.contains("output_tokens"));
+            assert!(log_content.contains("total_tokens"));
 
             Ok(())
         })

@@ -385,6 +385,10 @@ impl Agent {
             }
         }))
     }
+
+    pub fn total_usage(&self) -> crate::providers::base::Usage {
+        self.provider.total_usage()
+    }
 }
 
 #[cfg(test)]

@@ -14,4 +14,8 @@ impl Agent for MockAgent {
     async fn reply(&self, _messages: &[Message]) -> Result<BoxStream<'_, Result<Message>>> {
         Ok(Box::pin(futures::stream::empty()))
     }
+
+    fn total_usage(&self) -> goose::providers::base::Usage {
+        goose::providers::base::Usage::default()
+    }
 }
