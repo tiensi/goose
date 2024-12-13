@@ -1,6 +1,5 @@
 use goose::providers::base::Usage;
 
-
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct SessionLog {
     session_file: String,
@@ -48,27 +47,33 @@ pub fn log_usage(session_file: String, usage: Usage) {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use goose::providers::base::Usage;
 
-    use crate::{log_usage::{log_usage, SessionLog}, test_helpers::run_with_tmp_dir};
+    use crate::{
+        log_usage::{log_usage, SessionLog},
+        test_helpers::run_with_tmp_dir,
+    };
     #[test]
     fn test_session_logging() {
         run_with_tmp_dir(|| {
             let home_dir = dirs::home_dir().unwrap();
             let log_dir = home_dir.join(".config").join("goose").join("logs");
 
-            log_usage("path.txt".to_string(), Usage::new(Some(10), Some(20), Some(30)));
+            log_usage(
+                "path.txt".to_string(),
+                Usage::new(Some(10), Some(20), Some(30)),
+            );
 
             // Check if log file exists and contains the expected content
             let log_file = log_dir.join("goose.log");
             assert!(log_file.exists());
 
             let log_content = std::fs::read_to_string(&log_file).unwrap();
-            let log: SessionLog = serde_json::from_str(&log_content.lines().last().unwrap()).unwrap();
-            
+            let log: SessionLog =
+                serde_json::from_str(&log_content.lines().last().unwrap()).unwrap();
+
             assert!(log.session_file.contains("path.txt"));
             assert_eq!(log.usage.input_tokens, Some(10));
             assert_eq!(log.usage.output_tokens, Some(20));
