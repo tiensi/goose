@@ -119,7 +119,7 @@ impl Transport for StdioTransport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::time::{sleep, timeout};
+    use tokio::time::timeout;
     use std::time::Duration;
 
     #[tokio::test]
@@ -131,11 +131,7 @@ mod tests {
                 env: None,
             },
         };
-
         let (mut rx, _tx) = transport.connect().await.unwrap();
-
-        // Wait longer than the sleep duration
-        sleep(Duration::from_millis(500)).await;
 
         // Try to receive a message - should get an error about process termination
         match timeout(Duration::from_secs(1), rx.recv()).await {
