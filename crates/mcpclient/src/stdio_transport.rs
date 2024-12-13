@@ -119,15 +119,15 @@ impl Transport for StdioTransport {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     use std::time::Duration;
     use tokio::time::timeout;
-    use serde_json::json;
 
     #[tokio::test]
     async fn test_stdio_transport() {
         let transport = StdioTransport {
             params: StdioServerParams {
-                command: "tee".to_string(),  // tee will echo back what it receives
+                command: "tee".to_string(), // tee will echo back what it receives
                 args: vec![],
                 env: None,
             },
@@ -195,5 +195,4 @@ mod tests {
             _ => panic!("Expected error, got a different message"),
         }
     }
-
 }
