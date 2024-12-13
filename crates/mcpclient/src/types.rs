@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct JsonRpcRequest {
     pub jsonrpc: String,
     pub id: Option<u64>,
@@ -11,7 +11,7 @@ pub struct JsonRpcRequest {
     pub params: Option<Value>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct JsonRpcResponse {
     pub jsonrpc: String,
     pub id: Option<u64>,
@@ -19,21 +19,21 @@ pub struct JsonRpcResponse {
     pub error: Option<ErrorData>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct JsonRpcNotification {
     pub jsonrpc: String,
     pub method: String,
     pub params: Option<Value>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct JsonRpcError {
     pub jsonrpc: String,
     pub id: Option<u64>,
     pub error: ErrorData,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum JsonRpcMessage {
     Request(JsonRpcRequest),
@@ -50,7 +50,7 @@ pub const INVALID_PARAMS: i32 = -32602;
 pub const INTERNAL_ERROR: i32 = -32603;
 
 /// Error information for JSON-RPC error responses.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ErrorData {
     /// The error type that occurred.
     pub code: i32,
@@ -168,5 +168,3 @@ pub enum Content {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EmptyResult {}
-
-// Add other types as needed...
