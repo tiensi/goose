@@ -8,7 +8,6 @@ struct SessionLog {
 }
 
 pub fn log_usage(session_file: String, usage: Usage) {
-    // Create log entry
     let log = SessionLog {
         session_file,
         usage,
@@ -26,7 +25,7 @@ pub fn log_usage(session_file: String, usage: Usage) {
         let serialized = match serde_json::to_string(&log) {
             Ok(s) => s,
             Err(e) => {
-                eprintln!("Failed to serialize log: {}", e);
+                eprintln!("Failed to serialize usage log: {}", e);
                 return;
             }
         };
@@ -42,8 +41,10 @@ pub fn log_usage(session_file: String, usage: Usage) {
                 Ok(())
             })
         {
-            eprintln!("Failed to write to log file: {}", e);
+            eprintln!("Failed to write to usage log file: {}", e);
         }
+    } else {
+        eprintln!("Failed to write to usage log file: Failed to determine home directory");
     }
 }
 
