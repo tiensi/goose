@@ -9,6 +9,7 @@ use super::{
 use anyhow::Result;
 use cliclack::spinner;
 use goose::models::message::Message;
+use rustyline::DefaultEditor;
 
 const PROMPT: &str = "\x1b[1m\x1b[38;5;30m( O)> \x1b[0m";
 
@@ -16,6 +17,7 @@ pub struct RustylinePrompt {
     spinner: cliclack::ProgressBar,
     theme: Theme,
     renderers: HashMap<String, Box<dyn ToolRenderer>>,
+    editor: DefaultEditor,
 }
 
 impl RustylinePrompt {
@@ -28,6 +30,8 @@ impl RustylinePrompt {
             bash_dev_system_renderer.tool_name(),
             Box::new(bash_dev_system_renderer),
         );
+
+        let editor = DefaultEditor::new().expect("Failed to create editor");
 
         RustylinePrompt {
             spinner: spinner(),
@@ -42,6 +46,7 @@ impl RustylinePrompt {
                 })
                 .unwrap_or(Theme::Dark),
             renderers,
+            editor,
         }
     }
 }
@@ -62,10 +67,15 @@ impl Prompt for RustylinePrompt {
     }
 
     fn get_input(&mut self) -> Result<Input> {
-        let mut editor = rustyline::DefaultEditor::new()?;
-        let input = editor.readline(PROMPT);
+        let input = self.editor.readline(PROMPT);
         let mut message_text = match input {
-            Ok(text) => text,
+            Ok(text) => {
+                // Add valid input to history
+                if let Err(e) = self.editor.add_history_entry(text.as_str()) {
+                    eprintln!("Failed to add to history: {}", e);
+                }
+                text
+            }
             Err(e) => {
                 match e {
                     rustyline::error::ReadlineError::Interrupted => (),
@@ -108,6 +118,7 @@ impl Prompt for RustylinePrompt {
             println!("/t - Toggle Light/Dark theme");
             println!("/? | /help - Display this help message");
             println!("Ctrl+C - Interrupt goose (resets the interaction to before the interrupted user request)");
+            println!("Use Up/Down arrow keys to navigate through command history");
             return Ok(Input {
                 input_type: InputType::AskAgain,
                 content: None,
