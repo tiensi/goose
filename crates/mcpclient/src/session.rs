@@ -281,13 +281,14 @@ mod tests {
         ReadError,
         WriteError,
         ProcessTermination,
+        Nil,
     }
 
     #[async_trait]
     impl Transport for MockTransport {
         async fn connect(&self) -> Result<(ReadStream, WriteStream)> {
             let (tx_read, rx_read) = mpsc::channel(100);
-            let (tx_write, rx_write) = mpsc::channel(100);
+            let (tx_write, mut rx_write) = mpsc::channel(100);
 
             let error_mode = self.error_mode.clone();
 
@@ -308,11 +309,90 @@ mod tests {
                         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
                         let _ = tx_read.send(Err(anyhow!("Child process terminated"))).await;
                     }
+                    ErrorMode::Nil => {
+                        // Test with initialize and then list_resources
+                        while let Some(message) = rx_write.recv().await {
+                            match message {
+                                JsonRpcMessage::Request(req) => {
+                                    // Send a successful response for initialization or other calls
+                                    if req.method == "initialize" {
+                                        let response = JsonRpcMessage::Response(JsonRpcResponse {
+                                            jsonrpc: "2.0".to_string(),
+                                            id: req.id,
+                                            result: Some(json!({
+                                                "protocolVersion": "2024-11-05",
+                                                "capabilities": { "resources": { "listChanged": false } },
+                                                "serverInfo": { "name": "MockServer", "version": "1.0.0" }
+                                            })),
+                                            error: None,
+                                        });
+                                        let _ = tx_read.send(Ok(response)).await;
+                                    } else if req.method == "resources/list" {
+                                        let response = JsonRpcMessage::Response(JsonRpcResponse {
+                                            jsonrpc: "2.0".to_string(),
+                                            id: req.id,
+                                            result: Some(
+                                                json!({ "resources": [{ "uri": "file://res1", "name": "res1" }, { "uri": "file://res2", "name": "res2" }] }),
+                                            ),
+                                            error: None,
+                                        });
+                                        let _ = tx_read.send(Ok(response)).await;
+                                    } else {
+                                        // Default success for other calls
+                                        let response = JsonRpcMessage::Response(JsonRpcResponse {
+                                            jsonrpc: "2.0".to_string(),
+                                            id: req.id,
+                                            result: Some(json!({ "ok": true })),
+                                            error: None,
+                                        });
+                                        let _ = tx_read.send(Ok(response)).await;
+                                    }
+                                }
+                                JsonRpcMessage::Notification(_notif) => {
+                                    // For notifications, no response is required.
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
                 }
             });
 
             Ok((rx_read, tx_write))
         }
+    }
+
+    #[tokio::test]
+    async fn test_session_can_initialize_and_list_resources() -> Result<()> {
+        let transport = MockTransport {
+            error_mode: ErrorMode::Nil,
+        };
+
+        let (read_stream, write_stream) = transport.connect().await?;
+        let mut session = Session::new(read_stream, write_stream).await?;
+
+        // Initialize the session
+        let init_result = session.initialize().await?;
+        assert_eq!(init_result.protocolVersion, "2024-11-05");
+        assert_eq!(
+            init_result.capabilities.resources.unwrap().listChanged,
+            Some(false)
+        );
+
+        // Now list resources
+        let list_result = session.list_resources().await?;
+        assert_eq!(
+            list_result
+                .resources
+                .iter()
+                .map(|r| &r.name)
+                .collect::<Vec<_>>(),
+            vec!["res1", "res2"]
+        );
+
+        // Make another call - just to verify multiple calls work fine
+        let _: serde_json::Value = session.rpc_call("someMethod", Some(json!({}))).await?;
+        Ok(())
     }
 
     #[tokio::test]

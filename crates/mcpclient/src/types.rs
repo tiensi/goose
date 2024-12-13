@@ -106,7 +106,7 @@ pub struct ListResourcesResult {
     pub resources: Vec<Resource>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Resource {
     pub uri: String,
     pub name: String,
