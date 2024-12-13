@@ -515,4 +515,27 @@ mod tests {
 
         assert!(timeout_result.is_ok(), "Background task did not complete");
     }
+
+    #[tokio::test]
+    async fn test_explicit_shutdown() -> Result<()> {
+        let transport = MockTransport {
+            error_mode: ErrorMode::Nil,
+        };
+
+        let (read_stream, write_stream) = transport.connect().await?;
+        let session = Session::new(read_stream, write_stream).await?;
+
+        // Verify we can make calls before shutdown
+        let _: serde_json::Value = session.rpc_call("someMethod", Some(json!({}))).await?;
+
+        // Shutdown the session
+        session.shutdown().await?;
+
+        // Verify calls fail after shutdown
+        let result = session.list_resources().await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Session is closed"));
+
+        Ok(())
+    }
 }

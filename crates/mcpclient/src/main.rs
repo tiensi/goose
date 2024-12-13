@@ -84,6 +84,7 @@ async fn main() -> Result<()> {
         println!("Call tool result: {:?}", call_result);
     }
 
+    session.shutdown().await?;
     println!("Done!");
 
     Ok(())
