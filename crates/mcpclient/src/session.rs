@@ -254,3 +254,174 @@ impl Session {
         .await
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::transport::{ReadStream, Transport, WriteStream};
+    use anyhow::{anyhow, Result};
+    use async_trait::async_trait;
+    use std::sync::atomic::Ordering;
+    use tokio::sync::mpsc;
+    use tokio::time::{sleep, timeout};
+    use std::time::Duration;
+
+    // Mock transport that simulates errors
+    struct MockTransport {
+        error_mode: ErrorMode,
+    }
+
+    #[derive(Clone)]
+    enum ErrorMode {
+        ReadError,
+        WriteError,
+        ProcessTermination,
+    }
+
+    #[async_trait]
+    impl Transport for MockTransport {
+        async fn connect(&self) -> Result<(ReadStream, WriteStream)> {
+            let (tx_read, rx_read) = mpsc::channel(100);
+            let (tx_write, mut rx_write) = mpsc::channel(100);
+
+            let error_mode = self.error_mode.clone();
+
+            // Spawn a task that simulates errors after a delay
+            tokio::spawn(async move {
+                sleep(Duration::from_millis(10)).await;
+                match error_mode {
+                    ErrorMode::ReadError => {
+                        // Now send the error
+                        let _ = tx_read.send(Err(anyhow!("Simulated read error"))).await;
+                    }
+                    ErrorMode::WriteError => {
+                        // The write error will be triggered when trying to write
+                    }
+                    ErrorMode::ProcessTermination => {
+                        let _ = tx_read
+                            .send(Err(anyhow!("Child process terminated")))
+                            .await;
+                    }
+                }
+            });
+
+            // For write errors, create a failing writer
+            if matches!(self.error_mode, ErrorMode::WriteError) {
+                tokio::spawn(async move {
+                    while let Some(_) = rx_write.recv().await {
+                        // Simulate write failure by doing nothing - the message is lost
+                    }
+                });
+            }
+
+            Ok((rx_read, tx_write))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_read_error_terminates_session() {
+        let transport = MockTransport {
+            error_mode: ErrorMode::ReadError,
+        };
+
+        let (read_stream, write_stream) = transport.connect().await.unwrap();
+        let session = Session::new(read_stream, write_stream).await.unwrap();
+
+        // Try to make an RPC call - should fail due to transport error
+        let result = session.list_resources().await;
+        assert!(result.is_err());
+
+        // Print the actual error message for debugging
+        let err = result.unwrap_err();
+        println!("Actual error: {}", err);
+        assert!(err.to_string().contains("Simulated read error"));
+
+        // Wait for the session to be marked as closed with timeout
+        let mut attempts = 0;
+        while !session.is_closed.load(Ordering::SeqCst) && attempts < 10 {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+            attempts += 1;
+        }
+
+        // Verify session is marked as closed
+        assert!(session.is_closed.load(Ordering::SeqCst), "Session did not close after error");
+
+        // Subsequent calls should fail immediately
+        let result = session.list_tools().await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Session is closed"));
+    }
+
+    #[tokio::test]
+    async fn test_write_error_terminates_session() {
+        let transport = MockTransport {
+            error_mode: ErrorMode::WriteError,
+        };
+
+        let (read_stream, write_stream) = transport.connect().await.unwrap();
+        let session = Session::new(read_stream, write_stream).await.unwrap();
+
+        // Try to make an RPC call - should fail due to transport error
+        let result = session.list_resources().await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Failed to receive response"));
+
+        // Verify session is marked as closed
+        assert!(session.is_closed.load(Ordering::SeqCst));
+
+        // Subsequent calls should fail immediately
+        let result = session.list_tools().await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Session is closed"));
+    }
+
+    #[tokio::test]
+    async fn test_process_termination_terminates_session() {
+        let transport = MockTransport {
+            error_mode: ErrorMode::ProcessTermination,
+        };
+
+        let (read_stream, write_stream) = transport.connect().await.unwrap();
+        let session = Session::new(read_stream, write_stream).await.unwrap();
+
+        // Try to make an RPC call - should fail due to process termination
+        let result = session.list_resources().await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Child process terminated"));
+
+        // Verify session is marked as closed
+        assert!(session.is_closed.load(Ordering::SeqCst));
+
+        // Subsequent calls should fail immediately
+        let result = session.list_tools().await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Session is closed"));
+    }
+
+    #[tokio::test]
+    async fn test_session_cleanup_on_drop() {
+        let transport = MockTransport {
+            error_mode: ErrorMode::ProcessTermination,
+        };
+
+        let (read_stream, write_stream) = transport.connect().await.unwrap();
+        let session = Session::new(read_stream, write_stream).await.unwrap();
+
+        // Get a clone of the background task handle
+        let background_task = session.background_task.clone();
+
+        // Drop the session
+        drop(session);
+
+        // Verify that the background task completes
+        let timeout_result = timeout(Duration::from_secs(1), async {
+            if let Some(task) = background_task.lock().await.take() {
+                task.await.unwrap();
+            }
+        })
+        .await;
+
+        assert!(timeout_result.is_ok(), "Background task did not complete");
+    }
+}
