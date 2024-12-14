@@ -1,12 +1,12 @@
 use anyhow::Result;
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use dotenv::dotenv;
+use mcp_core::{
+    content::Content,
+    tool::{Tool, ToolCall},
+};
 use goose::{
-    models::{
-        content::Content,
-        message::Message,
-        tool::{Tool, ToolCall},
-    },
+    message::Message,
     providers::{
         configs::{DatabricksProviderConfig, OpenAiProviderConfig, ProviderConfig},
         factory::get_provider,

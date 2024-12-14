@@ -343,7 +343,8 @@ mod tests {
     use super::*;
     use mcp_core::content::Content;
     use mcp_core::tool;
-    use goose::{errors::AgentResult, models::tool::ToolCall};
+    use goose::errors::AgentResult;
+    use mcp_core::tool::ToolCall;
     use tempfile::NamedTempFile;
 
     // Helper function to create a test session

@@ -2,11 +2,10 @@ use anyhow::Result;
 use dotenv::dotenv;
 use goose::providers::configs::OllamaProviderConfig;
 use goose::providers::ollama::{OLLAMA_HOST, OLLAMA_MODEL};
+use goose::message::{Message, MessageContent};
+use mcp_core::tool::Tool;
+
 use goose::{
-    models::{
-        message::{Message, MessageContent},
-        tool::Tool,
-    },
     providers::{
         base::Provider,
         configs::{DatabricksAuth, DatabricksProviderConfig, OpenAiProviderConfig, ProviderConfig},

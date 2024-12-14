@@ -392,9 +392,9 @@ pub fn routes(state: AppState) -> Router {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mcp_core::tool::Tool;
     use goose::{
         agent::Agent,
-        models::tool::Tool,
         providers::{base::Provider, configs::OpenAiProviderConfig},
     };
 

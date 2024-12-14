@@ -238,7 +238,8 @@ mod tests {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use crate::models::{message::MessageContent, role::Role};
+        use crate::message::MessageContent;
+        use mcp_core::role::Role;
         use serde_json::json;
 
         #[test]

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use dotenv::dotenv;
 use goose::{
-    models::message::Message,
+    message::Message,
     providers::{
         configs::{DatabricksProviderConfig, ProviderConfig},
         factory::get_provider,

@@ -277,7 +277,7 @@ pub fn check_bedrock_context_length_error(error: &Value) -> Option<ContextLength
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::content::Content;
+    use mcp_core::content::Content;
     use serde_json::json;
 
     const OPENAI_TOOL_USE_RESPONSE: &str = r#"{
