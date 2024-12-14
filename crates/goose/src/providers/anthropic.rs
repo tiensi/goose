@@ -8,8 +8,8 @@ use std::time::Duration;
 
 use super::base::{Provider, Usage};
 use super::configs::AnthropicProviderConfig;
-use mcp_core::content::Content;
 use crate::message::{Message, MessageContent};
+use mcp_core::content::Content;
 use mcp_core::role::Role;
 use mcp_core::tool::{Tool, ToolCall};
 

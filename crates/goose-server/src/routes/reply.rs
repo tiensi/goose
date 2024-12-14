@@ -9,10 +9,7 @@ use axum::{
 use bytes::Bytes;
 use futures::{stream::StreamExt, Stream};
 use goose::message::{Message, MessageContent};
-use mcp_core::{
-    content::Content,
-    role::Role,
-};
+use mcp_core::{content::Content, role::Role};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{
@@ -392,11 +389,11 @@ pub fn routes(state: AppState) -> Router {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mcp_core::tool::Tool;
     use goose::{
         agent::Agent,
         providers::{base::Provider, configs::OpenAiProviderConfig},
     };
+    use mcp_core::tool::Tool;
 
     // Mock Provider implementation for testing
     #[derive(Clone)]

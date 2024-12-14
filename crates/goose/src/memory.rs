@@ -1,10 +1,10 @@
 use crate::errors::{AgentError, AgentResult};
-use mcp_core::content::Content;
-use mcp_core::tool::{Tool, ToolCall};
 use crate::systems::System;
 use anyhow::Result as AnyhowResult;
 use async_trait::async_trait;
 use indoc::formatdoc;
+use mcp_core::content::Content;
+use mcp_core::tool::{Tool, ToolCall};
 use serde_json::json;
 use std::collections::HashMap;
 use std::fs;

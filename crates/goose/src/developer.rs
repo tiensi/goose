@@ -16,10 +16,10 @@ use url::Url;
 use xcap::{Monitor, Window};
 
 use crate::errors::{AgentError, AgentResult};
+use crate::systems::System;
 use mcp_core::content::Content;
 use mcp_core::role::Role;
 use mcp_core::tool::{Tool, ToolCall};
-use crate::systems::System;
 
 pub struct DeveloperSystem {
     tools: Vec<Tool>,
@@ -271,16 +271,12 @@ impl DeveloperSystem {
             active_resources: {
                 let mut resources = HashMap::new();
                 let cwd = std::env::current_dir().unwrap();
-                let uri: Option<String> = Some(format!("str:///{}", cwd.display()));
+                let uri = format!("str:///{}", cwd.display());
                 resources.insert(
-                    uri.clone().unwrap(),
-                    Resource::new(
-                        uri.unwrap(),
-                        Some("text".to_string()),
-                        Some("cwd".to_string()),
-                    )
-                    .unwrap()
-                    .with_priority(1000), // Set highest priority
+                    uri.clone(),
+                    Resource::new(uri, Some("text".to_string()), Some("cwd".to_string()))
+                        .unwrap()
+                        .with_priority(1000), // Set highest priority
                 );
                 Mutex::new(resources)
             },

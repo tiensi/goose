@@ -4,8 +4,8 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use crate::message::Message;
-use mcp_core::tool::Tool;
 use crate::providers::base::{Provider, Usage};
+use mcp_core::tool::Tool;
 
 /// A mock provider that returns pre-configured responses for testing
 pub struct MockProvider {

@@ -4,10 +4,10 @@ use std::fs;
 
 use super::Resource;
 use crate::errors::{AgentError, AgentResult};
+use crate::systems::System;
 use mcp_core::content::Content;
 use mcp_core::tool::Tool;
 use mcp_core::tool::ToolCall;
-use crate::systems::System;
 
 pub struct GooseHintsSystem {
     instructions: String,

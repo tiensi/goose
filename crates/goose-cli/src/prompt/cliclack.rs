@@ -55,7 +55,7 @@ impl CliclackPrompt {
 
 impl Prompt for CliclackPrompt {
     fn render(&mut self, message: Box<Message>) {
-        render(message, &self.theme, self.renderers.clone());
+        render(&message, &self.theme, self.renderers.clone());
     }
 
     fn show_busy(&mut self) {

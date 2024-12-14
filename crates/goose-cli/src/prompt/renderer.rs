@@ -98,11 +98,7 @@ impl ToolRenderer for BashDeveloperSystemRenderer {
     }
 }
 
-pub fn render(
-    message: Box<Message>,
-    theme: &Theme,
-    renderers: HashMap<String, Box<dyn ToolRenderer>>,
-) {
+pub fn render(message: &Message, theme: &Theme, renderers: HashMap<String, Box<dyn ToolRenderer>>) {
     let theme = match theme {
         Theme::Light => "GitHub",
         Theme::Dark => "zenburn",

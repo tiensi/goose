@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::errors::AgentError;
-use mcp_core::content::{Content, ImageContent};
 use crate::message::{Message, MessageContent};
+use mcp_core::content::{Content, ImageContent};
 use mcp_core::role::Role;
 use mcp_core::tool::{Tool, ToolCall};
 

@@ -4,9 +4,9 @@ use super::utils::{
     messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec, ImageFormat,
 };
 use crate::message::Message;
-use mcp_core::tool::Tool;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use mcp_core::tool::Tool;
 use reqwest::Client;
 use reqwest::StatusCode;
 use serde_json::{json, Value};

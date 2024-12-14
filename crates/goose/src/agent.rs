@@ -6,12 +6,12 @@ use std::collections::HashMap;
 
 use crate::errors::{AgentError, AgentResult};
 use crate::message::{Message, ToolRequest};
-use mcp_core::tool::{Tool, ToolCall};
-use mcp_core::content::Content;
 use crate::prompt_template::load_prompt_file;
 use crate::providers::base::Provider;
 use crate::systems::{Resource, System};
 use crate::token_counter::TokenCounter;
+use mcp_core::content::Content;
+use mcp_core::tool::{Tool, ToolCall};
 use serde::Serialize;
 
 const CONTEXT_LIMIT: usize = 200_000; // TODO: model's context limit should be in provider config
@@ -159,8 +159,8 @@ impl Agent {
     async fn prepare_inference(
         &self,
         system_prompt: &str,
-        tools: &Vec<Tool>,
-        messages: &Vec<Message>,
+        tools: &[Tool],
+        messages: &[Message],
         pending: &Vec<Message>,
         target_limit: usize,
     ) -> AgentResult<Vec<Message>> {
@@ -189,16 +189,16 @@ impl Agent {
 
         // Flatten all resource content into a vector of strings
         let mut resources = Vec::new();
-        for (_, system_resources) in &resource_content {
-            for (_, (_, content)) in system_resources {
+        for system_resources in resource_content.values() {
+            for (_, content) in system_resources.values() {
                 resources.push(content.clone());
             }
         }
 
         let approx_count = token_counter.count_everything(
-            &system_prompt,
-            &messages,
-            &tools,
+            system_prompt,
+            messages,
+            tools,
             &resources,
             Some("gpt-4"),
         );
@@ -215,7 +215,7 @@ impl Agent {
             for (system_name, resources) in &resource_content {
                 let mut resource_counts = HashMap::new();
                 for (uri, (_resource, content)) in resources {
-                    let token_count = token_counter.count_tokens(&content, Some("gpt-4")) as u32;
+                    let token_count = token_counter.count_tokens(content, Some("gpt-4")) as u32;
                     resource_counts.insert(uri.clone(), token_count);
                 }
                 system_token_counts.insert(system_name.clone(), resource_counts);
@@ -269,7 +269,7 @@ impl Agent {
             }
         } else {
             // Create status messages from all resources when no trimming needed
-            for (_system_name, resources) in &resource_content {
+            for resources in resource_content.values() {
                 for (resource, content) in resources.values() {
                     status_content.push(format!("{}\n```\n{}\n```\n", resource.name, content));
                 }
