@@ -1,6 +1,14 @@
-use super::content::{Content, ImageContent, TextContent};
-use super::role::Role;
-use super::tool::ToolCall;
+/// Messages which represent the content sent back and forth to LLM provider
+///
+/// We use these messages in the agent code, and interfaces which interact with
+/// the agent. That let's us reuse message histories across different interfaces.
+///
+/// The content of the messages uses MCP types to avoid additional conversions
+/// when interacting with MCP servers.
+
+use mcp_core::content::{Content, ImageContent, TextContent};
+use mcp_core::role::Role;
+use mcp_core::tool::ToolCall;
 use crate::errors::AgentResult;
 use chrono::Utc;
 
