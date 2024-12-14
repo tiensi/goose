@@ -4,7 +4,7 @@ use crate::profile::{
 use cliclack::spinner;
 use console::style;
 use goose::key_manager::{get_keyring_secret, save_to_keyring, KeyRetrievalStrategy};
-use goose::models::message::Message;
+use goose::message::Message;
 use goose::providers::factory;
 use goose::providers::ollama::OLLAMA_MODEL;
 use std::error::Error;

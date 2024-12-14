@@ -8,9 +8,9 @@ use axum::{
 };
 use bytes::Bytes;
 use futures::{stream::StreamExt, Stream};
-use goose::models::{
+use goose::message::{Message, MessageContent};
+use mcp_core::{
     content::Content,
-    message::{Message, MessageContent},
     role::Role,
 };
 use serde::Deserialize;
@@ -101,7 +101,7 @@ fn convert_messages(incoming: Vec<IncomingMessage>) -> Vec<Message> {
                 for tool in msg.tool_invocations {
                     if tool.state == "result" {
                         // Add the original tool request from assistant
-                        let tool_call = goose::models::tool::ToolCall {
+                        let tool_call = mcp_core::tool::ToolCall {
                             name: tool.tool_name,
                             arguments: tool.args,
                         };

@@ -9,8 +9,8 @@ use std::path::PathBuf;
 use crate::agents::agent::Agent;
 use crate::prompt::{InputType, Prompt};
 use goose::developer::DeveloperSystem;
-use goose::models::message::{Message, MessageContent};
-use goose::models::role::Role;
+use goose::message::{Message, MessageContent};
+use mcp_core::role::Role;
 use goose::systems::goose_hints::GooseHintsSystem;
 
 // File management functions
@@ -341,8 +341,8 @@ mod tests {
     use crate::test_helpers::run_with_tmp_dir;
 
     use super::*;
-    use goose::models::content::Content;
-    use goose::models::tool;
+    use mcp_core::content::Content;
+    use mcp_core::tool;
     use goose::{errors::AgentResult, models::tool::ToolCall};
     use tempfile::NamedTempFile;
 

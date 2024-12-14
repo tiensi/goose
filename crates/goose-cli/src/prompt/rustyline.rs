@@ -8,7 +8,7 @@ use super::{
 
 use anyhow::Result;
 use cliclack::spinner;
-use goose::models::message::Message;
+use goose::message::Message;
 use rustyline::DefaultEditor;
 
 const PROMPT: &str = "\x1b[1m\x1b[38;5;30m( O)> \x1b[0m";
