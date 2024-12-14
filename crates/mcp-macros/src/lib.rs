@@ -1,12 +1,10 @@
 use proc_macro::TokenStream;
-use quote::{quote, format_ident};
-use syn::{
-    parse_macro_input, ItemFn, 
-    Meta, FnArg, PatType,
-    parse::Parse, parse::ParseStream,
-    punctuated::Punctuated, Token, Lit, Expr, ExprLit, Pat,
-};
+use quote::{format_ident, quote};
 use std::collections::HashMap;
+use syn::{
+    parse::Parse, parse::ParseStream, parse_macro_input, punctuated::Punctuated, Expr, ExprLit,
+    FnArg, ItemFn, Lit, Meta, Pat, PatType, Token,
+};
 
 struct MacroArgs {
     name: Option<String>,
@@ -21,12 +19,16 @@ impl Parse for MacroArgs {
         let mut param_descriptions = HashMap::new();
 
         let meta_list: Punctuated<Meta, Token![,]> = Punctuated::parse_terminated(input)?;
-        
+
         for meta in meta_list {
             match meta {
                 Meta::NameValue(nv) => {
                     let ident = nv.path.get_ident().unwrap().to_string();
-                    if let Expr::Lit(ExprLit { lit: Lit::Str(lit_str), .. }) = nv.value {
+                    if let Expr::Lit(ExprLit {
+                        lit: Lit::Str(lit_str),
+                        ..
+                    }) = nv.value
+                    {
                         match ident.as_str() {
                             "name" => name = Some(lit_str.value()),
                             "description" => description = Some(lit_str.value()),
@@ -35,12 +37,16 @@ impl Parse for MacroArgs {
                     }
                 }
                 Meta::List(list) if list.path.is_ident("params") => {
-                    let nested: Punctuated<Meta, Token![,]> = list.parse_args_with(
-                        Punctuated::parse_terminated)?;
-                    
+                    let nested: Punctuated<Meta, Token![,]> =
+                        list.parse_args_with(Punctuated::parse_terminated)?;
+
                     for meta in nested {
                         if let Meta::NameValue(nv) = meta {
-                            if let Expr::Lit(ExprLit { lit: Lit::Str(lit_str), .. }) = nv.value {
+                            if let Expr::Lit(ExprLit {
+                                lit: Lit::Str(lit_str),
+                                ..
+                            }) = nv.value
+                            {
                                 let param_name = nv.path.get_ident().unwrap().to_string();
                                 param_descriptions.insert(param_name, lit_str.value());
                             }
@@ -51,7 +57,11 @@ impl Parse for MacroArgs {
             }
         }
 
-        Ok(MacroArgs { name, description, param_descriptions })
+        Ok(MacroArgs {
+            name,
+            description,
+            param_descriptions,
+        })
     }
 }
 
@@ -63,7 +73,7 @@ pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
     // Extract function details
     let fn_name = &input_fn.sig.ident;
     let fn_name_str = fn_name.to_string();
-    
+
     // Generate PascalCase struct name from the function name
     let struct_name = format_ident!("{}", {
         let mut s = fn_name_str.clone();
@@ -72,7 +82,7 @@ pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
         }
         s
     });
-    
+
     // Use provided name or function name as default
     let tool_name = args.name.unwrap_or(fn_name_str);
     let tool_description = args.description.unwrap_or_default();
@@ -80,16 +90,18 @@ pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
     // Extract parameter names, types, and descriptions
     let mut param_defs = Vec::new();
     let mut param_names = Vec::new();
-    
+
     for arg in input_fn.sig.inputs.iter() {
         if let FnArg::Typed(PatType { pat, ty, .. }) = arg {
             if let Pat::Ident(param_ident) = &**pat {
                 let param_name = &param_ident.ident;
                 let param_name_str = param_name.to_string();
-                let description = args.param_descriptions.get(&param_name_str)
+                let description = args
+                    .param_descriptions
+                    .get(&param_name_str)
                     .map(|s| s.as_str())
                     .unwrap_or("");
-                
+
                 param_names.push(param_name);
                 param_defs.push(quote! {
                     #[schemars(description = #description)]
@@ -130,11 +142,11 @@ pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
             async fn call(&self, params: serde_json::Value) -> mcp_core::Result<serde_json::Value> {
                 let params: #params_struct_name = serde_json::from_value(params)
                     .map_err(|e| mcp_core::ToolError::InvalidParameters(e.to_string()))?;
-                
+
                 // Extract parameters and call the function
                 let result = #fn_name(#(params.#param_names,)*).await
                     .map_err(|e| mcp_core::ToolError::ExecutionError(e.to_string()))?;
-                
+
                 serde_json::to_value(result)
                     .map_err(mcp_core::ToolError::SerializationError)
             }

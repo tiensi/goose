@@ -534,7 +534,10 @@ mod tests {
         // Verify calls fail after shutdown
         let result = session.list_resources().await;
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Session is closed"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Session is closed"));
 
         Ok(())
     }

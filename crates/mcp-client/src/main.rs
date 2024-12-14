@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use clap::Parser;
-use mcpclient::{
+use mcp_client::{
     session::Session,
     sse_transport::{SseTransport, SseTransportParams},
     stdio_transport::{StdioServerParams, StdioTransport},
@@ -23,7 +23,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::from_default_env()
-                .add_directive("mcpclient=debug".parse().unwrap())
+                .add_directive("mcp_client=debug".parse().unwrap())
                 .add_directive("reqwest_eventsource=debug".parse().unwrap()),
         )
         .init();

@@ -1,12 +1,11 @@
 [package]
-name = "mcpclient"
+name = "mcp-client"
 edition.workspace = true
 version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
 description.workspace = true
-default-run="mcpclient"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }

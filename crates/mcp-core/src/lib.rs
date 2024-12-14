@@ -1,7 +1,7 @@
 use async_trait::async_trait;
+use schemars::JsonSchema;
 use serde_json::Value;
 use thiserror::Error;
-use schemars::JsonSchema;
 
 #[derive(Error, Debug)]
 pub enum ToolError {
@@ -49,6 +49,5 @@ pub trait Resource: Send + Sync + 'static {
 /// Helper function to generate JSON schema for a type
 pub fn generate_schema<T: JsonSchema>() -> Result<Value> {
     let schema = schemars::schema_for!(T);
-    serde_json::to_value(schema)
-        .map_err(|e| ToolError::SchemaError(e.to_string()))
+    serde_json::to_value(schema).map_err(|e| ToolError::SchemaError(e.to_string()))
 }
