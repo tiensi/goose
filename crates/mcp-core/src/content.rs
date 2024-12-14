@@ -1,4 +1,5 @@
 use super::role::Role;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -8,6 +9,24 @@ pub struct Annotations {
     pub audience: Option<Vec<Role>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub priority: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timestamp: Option<DateTime<Utc>>,
+}
+
+impl Annotations {
+    /// Creates a new Annotations instance specifically for resources
+    /// optional priority, and a timestamp (defaults to now if None)
+    pub fn for_resource(priority: f32, timestamp: DateTime<Utc>) -> Self {
+        assert!(
+            (0.0..=1.0).contains(&priority),
+            "Priority {priority} must be between 0.0 and 1.0"
+        );
+        Annotations {
+            priority: Some(priority),
+            timestamp: Some(timestamp),
+            audience: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -81,6 +100,7 @@ impl Content {
             None => Annotations {
                 audience: Some(audience),
                 priority: None,
+                timestamp: None,
             },
         });
         self
@@ -105,6 +125,7 @@ impl Content {
             None => Annotations {
                 audience: None,
                 priority: Some(priority),
+                timestamp: None,
             },
         });
         self

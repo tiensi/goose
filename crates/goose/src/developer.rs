@@ -1,6 +1,5 @@
 mod lang;
 
-use crate::systems::Resource;
 use anyhow::Result as AnyhowResult;
 use async_trait::async_trait;
 use base64::Engine;
@@ -17,9 +16,7 @@ use xcap::{Monitor, Window};
 
 use crate::errors::{AgentError, AgentResult};
 use crate::systems::System;
-use mcp_core::content::Content;
-use mcp_core::role::Role;
-use mcp_core::tool::{Tool, ToolCall};
+use mcp_core::{Content, Resource, Role, Tool, ToolCall};
 
 pub struct DeveloperSystem {
     tools: Vec<Tool>,
@@ -172,7 +169,7 @@ impl DeveloperSystem {
                 You can capture either:
                 1. A full display (monitor) using the display parameter
                 2. A specific window by its title using the window_title parameter
-                
+
                 Only one of display or window_title should be specified.
             "#},
             json!({
@@ -276,7 +273,7 @@ impl DeveloperSystem {
                     uri.clone(),
                     Resource::new(uri, Some("text".to_string()), Some("cwd".to_string()))
                         .unwrap()
-                        .with_priority(1000), // Set highest priority
+                        .with_priority(1.0), // Set highest priority
                 );
                 Mutex::new(resources)
             },

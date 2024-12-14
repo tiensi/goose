@@ -1,6 +1,6 @@
-use crate::types::JsonRpcMessage;
 use anyhow::Result;
 use async_trait::async_trait;
+use mcp_core::types::JsonRpcMessage;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 // Stream types for consistent interface

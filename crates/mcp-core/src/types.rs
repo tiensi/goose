@@ -1,5 +1,4 @@
-#![allow(non_snake_case)]
-
+use crate::{content::Content, resource::Resource, resource::ResourceContents, tool::Tool};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -64,20 +63,21 @@ pub struct ErrorData {
     pub data: Option<Value>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct InitializeResult {
-    pub protocolVersion: String,
+    pub protocol_version: String,
     pub capabilities: ServerCapabilities,
-    pub serverInfo: Implementation,
+    pub server_info: Implementation,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Implementation {
     pub name: String,
     pub version: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ServerCapabilities {
     pub prompts: Option<PromptsCapability>,
     pub resources: Option<ResourcesCapability>,
@@ -85,85 +85,45 @@ pub struct ServerCapabilities {
     // Add other capabilities as needed
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct PromptsCapability {
-    pub listChanged: Option<bool>,
+    pub list_changed: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct ResourcesCapability {
     pub subscribe: Option<bool>,
-    pub listChanged: Option<bool>,
+    pub list_changed: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct ToolsCapability {
-    pub listChanged: Option<bool>,
+    pub list_changed: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ListResourcesResult {
     pub resources: Vec<Resource>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct Resource {
-    pub uri: String,
-    pub name: String,
-    pub description: Option<String>,
-    pub mimeType: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ReadResourceResult {
     pub contents: Vec<ResourceContents>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ResourceContents {
-    pub uri: String,
-    pub mimeType: Option<String>,
-    #[serde(flatten)]
-    pub content: ResourceContent,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum ResourceContent {
-    Text { text: String },
-    Blob { blob: String }, // Base64-encoded
-}
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ListToolsResult {
     pub tools: Vec<Tool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Tool {
-    pub name: String,
-    pub description: Option<String>,
-    pub inputSchema: Value,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CallToolResult {
     pub content: Vec<Content>,
-    pub isError: bool,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum Content {
-    #[serde(rename = "text")]
-    Text { text: String },
-    #[serde(rename = "image")]
-    Image {
-        data: String, // Base64-encoded image data
-        mimeType: String,
-    },
-    #[serde(rename = "resource")]
-    EmbeddedResource { resource: ResourceContents },
+    pub is_error: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

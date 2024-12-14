@@ -1,7 +1,7 @@
 use crate::transport::{ReadStream, Transport, WriteStream};
-use crate::types::*;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
+use mcp_core::types::*;
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};

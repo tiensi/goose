@@ -3,9 +3,8 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 
 use goose::errors::{AgentError, AgentResult};
-use goose::systems::{Resource, System};
-use mcp_core::content::Content;
-use mcp_core::tool::{Tool, ToolCall};
+use goose::systems::System;
+use mcp_core::{Content, Resource, Tool, ToolCall};
 
 /// A simple system that echoes input back to the caller
 pub struct EchoSystem {

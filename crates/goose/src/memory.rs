@@ -3,15 +3,12 @@ use crate::systems::System;
 use anyhow::Result as AnyhowResult;
 use async_trait::async_trait;
 use indoc::formatdoc;
-use mcp_core::content::Content;
-use mcp_core::tool::{Tool, ToolCall};
+use mcp_core::{Content, Resource, Tool, ToolCall};
 use serde_json::json;
 use std::collections::HashMap;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
-
-use crate::systems::Resource;
 
 #[derive(Debug, Default)]
 pub struct MemoryManager {
@@ -406,7 +403,7 @@ impl System for MemorySystem {
                 Resource::with_uri(
                     format!("str:///{}.txt", memories.join(" ")),
                     format!("{}.txt", category),
-                    0,
+                    0.0,
                     Some("text".to_string()),
                 )
                 .ok()

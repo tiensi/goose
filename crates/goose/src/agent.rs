@@ -8,15 +8,19 @@ use crate::errors::{AgentError, AgentResult};
 use crate::message::{Message, ToolRequest};
 use crate::prompt_template::load_prompt_file;
 use crate::providers::base::Provider;
-use crate::systems::{Resource, System};
+use crate::systems::System;
 use crate::token_counter::TokenCounter;
 use mcp_core::content::Content;
+use mcp_core::resource::Resource;
 use mcp_core::tool::{Tool, ToolCall};
 use serde::Serialize;
 
 const CONTEXT_LIMIT: usize = 200_000; // TODO: model's context limit should be in provider config
 const ESTIMATE_FACTOR: f32 = 0.8;
 const ESTIMATED_TOKEN_LIMIT: usize = (CONTEXT_LIMIT as f32 * ESTIMATE_FACTOR) as usize;
+
+// used to sort resources by priority within error margin
+const PRIORITY_EPSILON: f32 = 0.001;
 
 #[derive(Clone, Debug, Serialize)]
 struct SystemInfo {
@@ -239,12 +243,17 @@ impl Agent {
             }
 
             // Sort by priority (high to low) and timestamp (newest to oldest)
+            // since priority is float, we need to sort by priority within error margin - PRIORITY_EPSILON
             all_resources.sort_by(|a, b| {
-                let priority_cmp = b.2.priority.cmp(&a.2.priority);
-                if priority_cmp == std::cmp::Ordering::Equal {
-                    b.2.timestamp.cmp(&a.2.timestamp)
+                // Compare priorities with epsilon
+                if (b.2.priority() - a.2.priority()).abs() < PRIORITY_EPSILON {
+                    // Priorities are "equal" within epsilon, use timestamp as tiebreaker
+                    b.2.timestamp().cmp(&a.2.timestamp())
                 } else {
-                    priority_cmp
+                    // Priorities are different enough, use priority ordering
+                    b.2.priority()
+                        .partial_cmp(&a.2.priority())
+                        .unwrap_or(std::cmp::Ordering::Equal)
                 }
             });
 
@@ -392,9 +401,11 @@ mod tests {
     use super::*;
     use crate::message::MessageContent;
     use crate::providers::mock::MockProvider;
-    use crate::systems::Resource;
     use async_trait::async_trait;
+    use chrono::Utc;
     use futures::TryStreamExt;
+    use mcp_core::resource::Resource;
+    use mcp_core::Annotations;
     use serde_json::json;
 
     // Mock system for testing
@@ -419,13 +430,12 @@ mod tests {
             }
         }
 
-        fn add_resource(&mut self, name: &str, content: &str, priority: i32) {
+        fn add_resource(&mut self, name: &str, content: &str, priority: f32) {
             let uri = format!("file://{}", name);
             let resource = Resource {
                 name: name.to_string(),
                 uri: uri.clone(),
-                priority,
-                timestamp: chrono::Utc::now(),
+                annotations: Some(Annotations::for_resource(priority, Utc::now())),
                 description: Some("A mock resource".to_string()),
                 mime_type: "text/plain".to_string(),
             };
@@ -602,8 +612,8 @@ mod tests {
 
         // Add two resources with different priorities
         let string_10toks = "hello ".repeat(10);
-        system.add_resource("high_priority", &string_10toks, 4);
-        system.add_resource("low_priority", &string_10toks, 1);
+        system.add_resource("high_priority", &string_10toks, 0.8);
+        system.add_resource("low_priority", &string_10toks, 0.1);
 
         agent.add_system(Box::new(system));
 

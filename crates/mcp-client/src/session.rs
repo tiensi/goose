@@ -1,6 +1,6 @@
 use crate::transport::{ReadStream, WriteStream};
-use crate::types::*;
 use anyhow::{anyhow, Context, Result};
+use mcp_core::types::*;
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -373,9 +373,9 @@ mod tests {
 
         // Initialize the session
         let init_result = session.initialize().await?;
-        assert_eq!(init_result.protocolVersion, "2024-11-05");
+        assert_eq!(init_result.protocol_version, "2024-11-05");
         assert_eq!(
-            init_result.capabilities.resources.unwrap().listChanged,
+            init_result.capabilities.resources.unwrap().list_changed,
             Some(false)
         );
 
