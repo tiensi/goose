@@ -153,12 +153,64 @@ mod tests {
     }
 
     #[test]
-    fn test_content_annotations() {
+    fn test_content_annotations_basic() {
         let content = Content::text("hello")
             .with_audience(vec![Role::User])
             .with_priority(0.5);
         assert_eq!(content.audience(), Some(&vec![Role::User]));
         assert_eq!(content.priority(), Some(0.5));
+    }
+
+    #[test]
+    fn test_content_annotations_order_independence() {
+        let content1 = Content::text("hello")
+            .with_audience(vec![Role::User])
+            .with_priority(0.5);
+        let content2 = Content::text("hello")
+            .with_priority(0.5)
+            .with_audience(vec![Role::User]);
+
+        assert_eq!(content1.audience(), content2.audience());
+        assert_eq!(content1.priority(), content2.priority());
+    }
+
+    #[test]
+    fn test_content_annotations_overwrite() {
+        let content = Content::text("hello")
+            .with_audience(vec![Role::User])
+            .with_priority(0.5)
+            .with_audience(vec![Role::Assistant])
+            .with_priority(0.8);
+
+        assert_eq!(content.audience(), Some(&vec![Role::Assistant]));
+        assert_eq!(content.priority(), Some(0.8));
+    }
+
+    #[test]
+    fn test_content_annotations_image() {
+        let content = Content::image("data", "image/png")
+            .with_audience(vec![Role::User])
+            .with_priority(0.5);
+
+        assert_eq!(content.audience(), Some(&vec![Role::User]));
+        assert_eq!(content.priority(), Some(0.5));
+    }
+
+    #[test]
+    fn test_content_annotations_preservation() {
+        let text_content = Content::text("hello")
+            .with_audience(vec![Role::User])
+            .with_priority(0.5);
+
+        match &text_content {
+            Content::Text(TextContent { annotations, .. }) => {
+                assert!(annotations.is_some());
+                let ann = annotations.as_ref().unwrap();
+                assert_eq!(ann.audience, Some(vec![Role::User]));
+                assert_eq!(ann.priority, Some(0.5));
+            }
+            _ => panic!("Expected Text content"),
+        }
     }
 
     #[test]
@@ -175,5 +227,16 @@ mod tests {
         let unannotated = content.unannotated();
         assert_eq!(unannotated.audience(), None);
         assert_eq!(unannotated.priority(), None);
+    }
+
+    #[test]
+    fn test_partial_annotations() {
+        let content = Content::text("hello").with_priority(0.5);
+        assert_eq!(content.audience(), None);
+        assert_eq!(content.priority(), Some(0.5));
+
+        let content = Content::text("hello").with_audience(vec![Role::User]);
+        assert_eq!(content.audience(), Some(&vec![Role::User]));
+        assert_eq!(content.priority(), None);
     }
 }
