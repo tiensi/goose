@@ -37,8 +37,7 @@ impl MessageContent {
     pub fn text<S: Into<String>>(text: S) -> Self {
         MessageContent::Text(TextContent {
             text: text.into(),
-            audience: None,
-            priority: None,
+            annotations: None,
         })
     }
 
@@ -46,8 +45,7 @@ impl MessageContent {
         MessageContent::Image(ImageContent {
             data: data.into(),
             mime_type: mime_type.into(),
-            audience: None,
-            priority: None,
+            annotations: None,
         })
     }
 

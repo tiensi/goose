@@ -1,5 +1,5 @@
-use crate::models::message::Message;
-use crate::models::tool::Tool;
+use crate::message::Message;
+use mcp_core::tool::Tool;
 use include_dir::{include_dir, Dir};
 use std::collections::HashMap;
 use tokenizers::tokenizer::Tokenizer;

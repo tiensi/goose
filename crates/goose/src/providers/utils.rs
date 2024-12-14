@@ -4,10 +4,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::errors::AgentError;
-use crate::models::content::{Content, ImageContent};
-use crate::models::message::{Message, MessageContent};
-use crate::models::role::Role;
-use crate::models::tool::{Tool, ToolCall};
+use mcp_core::content::{Content, ImageContent};
+use crate::message::{Message, MessageContent};
+use mcp_core::role::Role;
+use mcp_core::tool::{Tool, ToolCall};
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum ImageFormat {

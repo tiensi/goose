@@ -13,7 +13,6 @@ pub struct Annotations {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TextContent {
-    pub r#type: String,
     pub text: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<Annotations>,
@@ -22,7 +21,6 @@ pub struct TextContent {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImageContent {
-    pub r#type: String,
     pub data: String,
     pub mime_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -40,7 +38,6 @@ pub enum Content {
 impl Content {
     pub fn text<S: Into<String>>(text: S) -> Self {
         Content::Text(TextContent {
-            r#type: "text".to_string(),
             text: text.into(),
             annotations: None,
         })
@@ -48,7 +45,6 @@ impl Content {
 
     pub fn image<S: Into<String>, T: Into<String>>(data: S, mime_type: T) -> Self {
         Content::Image(ImageContent {
-            r#type: "image".to_string(),
             data: data.into(),
             mime_type: mime_type.into(),
             annotations: None,

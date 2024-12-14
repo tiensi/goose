@@ -5,9 +5,9 @@ use serde_json::json;
 use std::collections::HashMap;
 
 use crate::errors::{AgentError, AgentResult};
-use crate::models::content::Content;
-use crate::models::message::{Message, ToolRequest};
-use crate::models::tool::{Tool, ToolCall};
+use crate::message::{Message, ToolRequest};
+use mcp_core::tool::{Tool, ToolCall};
+use mcp_core::content::Content;
 use crate::prompt_template::load_prompt_file;
 use crate::providers::base::Provider;
 use crate::systems::{Resource, System};
@@ -390,7 +390,7 @@ impl Agent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::message::MessageContent;
+    use crate::message::MessageContent;
     use crate::providers::mock::MockProvider;
     use crate::systems::Resource;
     use async_trait::async_trait;

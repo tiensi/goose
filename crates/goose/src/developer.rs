@@ -16,9 +16,9 @@ use url::Url;
 use xcap::{Monitor, Window};
 
 use crate::errors::{AgentError, AgentResult};
-use crate::models::content::Content;
-use crate::models::role::Role;
-use crate::models::tool::{Tool, ToolCall};
+use mcp_core::content::Content;
+use mcp_core::role::Role;
+use mcp_core::tool::{Tool, ToolCall};
 use crate::systems::System;
 
 pub struct DeveloperSystem {
