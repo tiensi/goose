@@ -10,9 +10,7 @@ use crate::prompt_template::load_prompt_file;
 use crate::providers::base::Provider;
 use crate::systems::System;
 use crate::token_counter::TokenCounter;
-use mcp_core::content::Content;
-use mcp_core::resource::Resource;
-use mcp_core::tool::{Tool, ToolCall};
+use mcp_core::{Content, Resource, Tool, ToolCall};
 use serde::Serialize;
 
 const CONTEXT_LIMIT: usize = 200_000; // TODO: model's context limit should be in provider config
