@@ -1,3 +1,4 @@
+/// Resources that servers provide to clients
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -116,18 +117,14 @@ impl Resource {
         self
     }
 
-    /// Returns the priority of the resource
-    pub fn priority(&self) -> f32 {
-        self.annotations.as_ref().unwrap().priority.unwrap_or(0.0)
+    /// Returns the priority of the resource, if set
+    pub fn priority(&self) -> Option<f32> {
+        self.annotations.as_ref().and_then(|a| a.priority)
     }
 
-    /// Returns the timestamp of the resource
-    pub fn timestamp(&self) -> DateTime<Utc> {
-        self.annotations
-            .as_ref()
-            .unwrap()
-            .timestamp
-            .unwrap_or(Utc::now())
+    /// Returns the timestamp of the resource, if set
+    pub fn timestamp(&self) -> Option<DateTime<Utc>> {
+        self.annotations.as_ref().and_then(|a| a.timestamp)
     }
 
     /// Returns the scheme of the URI
@@ -170,7 +167,7 @@ mod tests {
 
         let resource = Resource::new(&uri, Some("text".to_string()), None)?;
         assert!(resource.uri.starts_with("file:///"));
-        assert_eq!(resource.priority(), 0.0);
+        assert_eq!(resource.priority(), Some(0.0));
         assert_eq!(resource.mime_type, "text");
         assert_eq!(resource.scheme()?, "file");
 
@@ -190,7 +187,7 @@ mod tests {
 
         assert_eq!(resource.uri, uri);
         assert_eq!(resource.name, "test.txt");
-        assert_eq!(resource.priority(), 0.5);
+        assert_eq!(resource.priority(), Some(0.5));
         assert_eq!(resource.mime_type, "text");
         assert_eq!(resource.scheme()?, "str");
 

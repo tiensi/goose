@@ -1,7 +1,7 @@
 use crate::transport::{ConnectError, ReadError, ReadStream, Transport, WriteError, WriteStream};
 use anyhow::Result;
 use async_trait::async_trait;
-use mcp_core::types::*;
+use mcp_core::protocol::*;
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
@@ -251,7 +251,8 @@ mod tests {
         match timeout(Duration::from_secs(1), rx.recv()).await {
             Ok(Some(Err(e))) => {
                 assert!(
-                    e.to_string().contains("Terminated normally") || e.to_string().contains("Transport connection was closed"),
+                    e.to_string().contains("Terminated normally")
+                        || e.to_string().contains("Transport connection was closed"),
                     "Expected process termination error, got: {}",
                     e
                 );

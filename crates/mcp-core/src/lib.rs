@@ -7,5 +7,4 @@ pub mod tool;
 pub use tool::{Tool, ToolCall};
 pub mod resource;
 pub use resource::{Resource, ResourceContents};
-pub mod types;
-pub use types::*;
+pub mod protocol;

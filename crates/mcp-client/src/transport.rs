@@ -1,8 +1,8 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use mcp_core::types::JsonRpcMessage;
-use tokio::sync::mpsc::{Receiver, Sender};
+use mcp_core::protocol::JsonRpcMessage;
 use thiserror::Error;
+use tokio::sync::mpsc::{Receiver, Sender};
 
 /// Errors related to reading from a transport
 #[derive(Debug, Error)]
@@ -39,11 +39,9 @@ pub enum ConnectError {
     Unknown(String),
 }
 
-
 // Stream types for consistent interface
 pub type ReadStream = Receiver<Result<JsonRpcMessage, ReadError>>;
 pub type WriteStream = Sender<Result<JsonRpcMessage, WriteError>>;
-
 
 // Common trait for transport implementations
 #[async_trait]

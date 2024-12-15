@@ -2,7 +2,7 @@
 // use anyhow::{anyhow, Context, Result};
 // use async_trait::async_trait;
 // use futures_util::StreamExt;
-// use mcp_core::types::JsonRpcMessage;
+// use mcp_core::protocol::JsonRpcMessage;
 // use reqwest::{Client, Url};
 // use reqwest_eventsource::{Event, EventSource};
 // use std::sync::Arc;

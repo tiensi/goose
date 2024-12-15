@@ -1,6 +1,6 @@
-use crate::transport::{ReadStream, WriteStream, ReadError, WriteError};
+use crate::transport::{ReadError, ReadStream, WriteError, WriteStream};
 use anyhow::{anyhow, Context, Result};
-use mcp_core::types::*;
+use mcp_core::protocol::*;
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -84,7 +84,10 @@ async fn handle_response_message(
     pending_requests: &mut Vec<(u64, mpsc::Sender<Result<Option<JsonRpcResponse>>>)>,
 ) {
     if let Some(id) = response.id {
-        if let Some(pos) = pending_requests.iter().position(|(req_id, _)| *req_id == id) {
+        if let Some(pos) = pending_requests
+            .iter()
+            .position(|(req_id, _)| *req_id == id)
+        {
             let (_, tx) = pending_requests.remove(pos);
             let _ = tx.send(Ok(Some(response))).await;
         }
@@ -185,7 +188,6 @@ impl Session {
             is_closed,
         })
     }
-
 
     pub async fn shutdown(&self) -> Result<()> {
         // Mark session as closed
@@ -363,10 +365,18 @@ mod tests {
 
                 match error_mode {
                     ErrorMode::ReadErrorInvalid => {
-                        let _ = tx_read.send(Err(ReadError::InvalidMessage("Simulated invalid read error".to_string()))).await;
+                        let _ = tx_read
+                            .send(Err(ReadError::InvalidMessage(
+                                "Simulated invalid read error".to_string(),
+                            )))
+                            .await;
                     }
                     ErrorMode::ProcessTermination => {
-                        let _ = tx_read.send(Err(ReadError::ChildTerminated("Child process terminated".to_string()))).await;
+                        let _ = tx_read
+                            .send(Err(ReadError::ChildTerminated(
+                                "Child process terminated".to_string(),
+                            )))
+                            .await;
                     }
                     ErrorMode::WriteErrorTransportClosed => {
                         // Just drop rx_write to simulate an immediate write error on first send
@@ -529,7 +539,8 @@ mod tests {
         // Check for either error message since timing can affect which one we see
         let error_msg = result.unwrap_err().to_string();
         assert!(
-            error_msg.contains("Child process terminated") || error_msg.contains("Failed to receive response"),
+            error_msg.contains("Child process terminated")
+                || error_msg.contains("Failed to receive response"),
             "Unexpected error message: {}",
             error_msg
         );
