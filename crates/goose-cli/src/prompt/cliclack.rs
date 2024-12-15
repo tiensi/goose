@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use cliclack::{input, set_theme, spinner, Theme as CliclackTheme, ThemeState};
-use goose::models::message::Message;
+use goose::message::Message;
 
 use super::{
     renderer::{render, BashDeveloperSystemRenderer, DefaultRenderer, ToolRenderer},
@@ -55,7 +55,7 @@ impl CliclackPrompt {
 
 impl Prompt for CliclackPrompt {
     fn render(&mut self, message: Box<Message>) {
-        render(message, &self.theme, self.renderers.clone());
+        render(&message, &self.theme, self.renderers.clone());
     }
 
     fn show_busy(&mut self) {

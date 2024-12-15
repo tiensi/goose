@@ -1,6 +1,6 @@
-use crate::models::message::Message;
-use crate::models::tool::Tool;
+use crate::message::Message;
 use include_dir::{include_dir, Dir};
+use mcp_core::tool::Tool;
 use std::collections::HashMap;
 use tokenizers::tokenizer::Tokenizer;
 
@@ -156,7 +156,7 @@ impl TokenCounter {
             for content in &message.content {
                 // content can either be text response or tool request
                 if let Some(content_text) = content.as_text() {
-                    num_tokens += self.count_tokens(&content_text, model_name);
+                    num_tokens += self.count_tokens(content_text, model_name);
                 } else if let Some(tool_request) = content.as_tool_request() {
                     // TODO: count tokens for tool request
                     let tool_call = tool_request.tool_call.as_ref().unwrap();
@@ -238,7 +238,8 @@ mod tests {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use crate::models::{message::MessageContent, role::Role};
+        use crate::message::MessageContent;
+        use mcp_core::role::Role;
         use serde_json::json;
 
         #[test]

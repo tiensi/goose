@@ -8,10 +8,10 @@ use std::time::Duration;
 
 use super::base::{Provider, ProviderUsageCollector, Usage};
 use super::configs::AnthropicProviderConfig;
-use crate::models::content::{Content, TextContent};
-use crate::models::message::{Message, MessageContent};
-use crate::models::role::Role;
-use crate::models::tool::{Tool, ToolCall};
+use crate::message::{Message, MessageContent};
+use mcp_core::content::Content;
+use mcp_core::role::Role;
+use mcp_core::tool::{Tool, ToolCall};
 
 pub struct AnthropicProvider {
     client: Client,
@@ -158,11 +158,7 @@ impl AnthropicProvider {
             match block.get("type").and_then(|t| t.as_str()) {
                 Some("text") => {
                     if let Some(text) = block.get("text").and_then(|t| t.as_str()) {
-                        message = message.with_content(MessageContent::Text(TextContent {
-                            text: text.to_string(),
-                            audience: None,
-                            priority: None,
-                        }));
+                        message = message.with_text(text.to_string());
                     }
                 }
                 Some("tool_use") => {

@@ -2,15 +2,15 @@ use anyhow::Result;
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use dotenv::dotenv;
 use goose::{
-    models::{
-        content::Content,
-        message::Message,
-        tool::{Tool, ToolCall},
-    },
+    message::Message,
     providers::{
         configs::{DatabricksProviderConfig, OpenAiProviderConfig, ProviderConfig},
         factory::get_provider,
     },
+};
+use mcp_core::{
+    content::Content,
+    tool::{Tool, ToolCall},
 };
 use serde_json::json;
 use std::fs;

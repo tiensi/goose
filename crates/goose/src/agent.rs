@@ -5,18 +5,20 @@ use serde_json::json;
 use std::collections::HashMap;
 
 use crate::errors::{AgentError, AgentResult};
-use crate::models::content::Content;
-use crate::models::message::{Message, ToolRequest};
-use crate::models::tool::{Tool, ToolCall};
+use crate::message::{Message, ToolRequest};
 use crate::prompt_template::load_prompt_file;
 use crate::providers::base::Provider;
-use crate::systems::{Resource, System};
+use crate::systems::System;
 use crate::token_counter::TokenCounter;
+use mcp_core::{Content, Resource, Tool, ToolCall};
 use serde::Serialize;
 
 const CONTEXT_LIMIT: usize = 200_000; // TODO: model's context limit should be in provider config
 const ESTIMATE_FACTOR: f32 = 0.8;
 const ESTIMATED_TOKEN_LIMIT: usize = (CONTEXT_LIMIT as f32 * ESTIMATE_FACTOR) as usize;
+
+// used to sort resources by priority within error margin
+const PRIORITY_EPSILON: f32 = 0.001;
 
 #[derive(Clone, Debug, Serialize)]
 struct SystemInfo {
@@ -159,8 +161,8 @@ impl Agent {
     async fn prepare_inference(
         &self,
         system_prompt: &str,
-        tools: &Vec<Tool>,
-        messages: &Vec<Message>,
+        tools: &[Tool],
+        messages: &[Message],
         pending: &Vec<Message>,
         target_limit: usize,
     ) -> AgentResult<Vec<Message>> {
@@ -189,16 +191,16 @@ impl Agent {
 
         // Flatten all resource content into a vector of strings
         let mut resources = Vec::new();
-        for (_, system_resources) in &resource_content {
-            for (_, (_, content)) in system_resources {
+        for system_resources in resource_content.values() {
+            for (_, content) in system_resources.values() {
                 resources.push(content.clone());
             }
         }
 
         let approx_count = token_counter.count_everything(
-            &system_prompt,
-            &messages,
-            &tools,
+            system_prompt,
+            messages,
+            tools,
             &resources,
             Some("gpt-4"),
         );
@@ -215,7 +217,7 @@ impl Agent {
             for (system_name, resources) in &resource_content {
                 let mut resource_counts = HashMap::new();
                 for (uri, (_resource, content)) in resources {
-                    let token_count = token_counter.count_tokens(&content, Some("gpt-4")) as u32;
+                    let token_count = token_counter.count_tokens(content, Some("gpt-4")) as u32;
                     resource_counts.insert(uri.clone(), token_count);
                 }
                 system_token_counts.insert(system_name.clone(), resource_counts);
@@ -239,12 +241,20 @@ impl Agent {
             }
 
             // Sort by priority (high to low) and timestamp (newest to oldest)
+            // since priority is float, we need to sort by priority within error margin - PRIORITY_EPSILON
             all_resources.sort_by(|a, b| {
-                let priority_cmp = b.2.priority.cmp(&a.2.priority);
-                if priority_cmp == std::cmp::Ordering::Equal {
-                    b.2.timestamp.cmp(&a.2.timestamp)
+                // Compare priorities with epsilon
+                // Compare priorities with Option handling - default to 0.0 if None
+                let a_priority = a.2.priority().unwrap_or(0.0);
+                let b_priority = b.2.priority().unwrap_or(0.0);
+                if (b_priority - a_priority).abs() < PRIORITY_EPSILON {
+                    // Priorities are "equal" within epsilon, use timestamp as tiebreaker
+                    b.2.timestamp().cmp(&a.2.timestamp())
                 } else {
-                    priority_cmp
+                    // Priorities are different enough, use priority ordering
+                    b.2.priority()
+                        .partial_cmp(&a.2.priority())
+                        .unwrap_or(std::cmp::Ordering::Equal)
                 }
             });
 
@@ -269,7 +279,7 @@ impl Agent {
             }
         } else {
             // Create status messages from all resources when no trimming needed
-            for (_system_name, resources) in &resource_content {
+            for resources in resource_content.values() {
                 for (resource, content) in resources.values() {
                     status_content.push(format!("{}\n```\n{}\n```\n", resource.name, content));
                 }
@@ -394,11 +404,13 @@ impl Agent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::message::MessageContent;
+    use crate::message::MessageContent;
     use crate::providers::mock::MockProvider;
-    use crate::systems::Resource;
     use async_trait::async_trait;
+    use chrono::Utc;
     use futures::TryStreamExt;
+    use mcp_core::resource::Resource;
+    use mcp_core::Annotations;
     use serde_json::json;
 
     // Mock system for testing
@@ -423,13 +435,12 @@ mod tests {
             }
         }
 
-        fn add_resource(&mut self, name: &str, content: &str, priority: i32) {
+        fn add_resource(&mut self, name: &str, content: &str, priority: f32) {
             let uri = format!("file://{}", name);
             let resource = Resource {
                 name: name.to_string(),
                 uri: uri.clone(),
-                priority,
-                timestamp: chrono::Utc::now(),
+                annotations: Some(Annotations::for_resource(priority, Utc::now())),
                 description: Some("A mock resource".to_string()),
                 mime_type: "text/plain".to_string(),
             };
@@ -606,8 +617,8 @@ mod tests {
 
         // Add two resources with different priorities
         let string_10toks = "hello ".repeat(10);
-        system.add_resource("high_priority", &string_10toks, 4);
-        system.add_resource("low_priority", &string_10toks, 1);
+        system.add_resource("high_priority", &string_10toks, 0.8);
+        system.add_resource("low_priority", &string_10toks, 0.1);
 
         agent.add_system(Box::new(system));
 

@@ -1,17 +1,14 @@
 use anyhow::Result;
 use dotenv::dotenv;
+use goose::message::{Message, MessageContent};
 use goose::providers::configs::OllamaProviderConfig;
 use goose::providers::ollama::{OLLAMA_HOST, OLLAMA_MODEL};
-use goose::{
-    models::{
-        message::{Message, MessageContent},
-        tool::Tool,
-    },
-    providers::{
-        base::Provider,
-        configs::{DatabricksAuth, DatabricksProviderConfig, OpenAiProviderConfig, ProviderConfig},
-        factory::get_provider,
-    },
+use mcp_core::tool::Tool;
+
+use goose::providers::{
+    base::Provider,
+    configs::{DatabricksAuth, DatabricksProviderConfig, OpenAiProviderConfig, ProviderConfig},
+    factory::get_provider,
 };
 
 /// Generic test harness for any Provider implementation

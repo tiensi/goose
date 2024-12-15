@@ -3,9 +3,9 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use crate::models::message::Message;
-use crate::models::tool::Tool;
+use crate::message::Message;
 use crate::providers::base::{Provider, Usage};
+use mcp_core::tool::Tool;
 
 /// A mock provider that returns pre-configured responses for testing
 pub struct MockProvider {

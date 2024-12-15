@@ -2,8 +2,8 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 
-use crate::models::message::Message;
-use crate::models::tool::Tool;
+use crate::message::Message;
+use mcp_core::tool::Tool;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Usage {

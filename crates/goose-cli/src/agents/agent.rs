@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use futures::stream::BoxStream;
 use goose::{
-    agent::Agent as GooseAgent, models::message::Message, providers::base::Usage, systems::System,
+    agent::Agent as GooseAgent, message::Message, providers::base::Usage, systems::System,
 };
 
 #[async_trait]

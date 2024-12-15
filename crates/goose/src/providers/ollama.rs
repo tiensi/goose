@@ -3,10 +3,10 @@ use super::configs::OllamaProviderConfig;
 use super::utils::{
     messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec, ImageFormat,
 };
-use crate::models::message::Message;
-use crate::models::tool::Tool;
+use crate::message::Message;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use mcp_core::tool::Tool;
 use reqwest::Client;
 use reqwest::StatusCode;
 use serde_json::{json, Value};
@@ -144,7 +144,7 @@ impl Provider for OllamaProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::message::MessageContent;
+    use crate::message::MessageContent;
     use serde_json::json;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};

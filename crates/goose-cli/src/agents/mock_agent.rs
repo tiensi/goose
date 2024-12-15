@@ -1,7 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use futures::stream::BoxStream;
-use goose::{models::message::Message, systems::System};
+use goose::{message::Message, systems::System};
 
 use crate::agents::agent::Agent;
 

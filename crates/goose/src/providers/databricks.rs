@@ -11,8 +11,8 @@ use super::utils::{
     check_bedrock_context_length_error, check_openai_context_length_error, messages_to_openai_spec,
     openai_response_to_message, tools_to_openai_spec,
 };
-use crate::models::message::Message;
-use crate::models::tool::Tool;
+use crate::message::Message;
+use mcp_core::tool::Tool;
 
 pub struct DatabricksProvider {
     client: Client,
@@ -180,7 +180,7 @@ impl Provider for DatabricksProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::message::MessageContent;
+    use crate::message::MessageContent;
     use wiremock::matchers::{body_json, header, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
