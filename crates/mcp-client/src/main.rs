@@ -2,11 +2,10 @@ use anyhow::{anyhow, Result};
 use clap::Parser;
 use mcp_client::{
     session::Session,
-    sse_transport::{SseTransport, SseTransportParams},
+    // sse_transport::{SseTransport, SseTransportParams},
     stdio_transport::{StdioServerParams, StdioTransport},
     transport::Transport,
 };
-use serde_json::json;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
@@ -40,12 +39,12 @@ async fn main() -> Result<()> {
                 env: None,
             },
         }),
-        "echo" => Box::new(SseTransport {
-            params: SseTransportParams {
-                url: "http://localhost:8000/sse".into(),
-                headers: None,
-            },
-        }),
+        // "echo" => Box::new(SseTransport {
+        //     params: SseTransportParams {
+        //         url: "http://localhost:8000/sse".into(),
+        //         headers: None,
+        //     },
+        // }),
         _ => return Err(anyhow!("Invalid mode. Use 'git' or 'echo'")),
     };
 
@@ -60,29 +59,29 @@ async fn main() -> Result<()> {
     let tools = session.list_tools().await?;
     println!("Tools: {:?}", tools);
 
-    if args.mode == "echo" {
-        // Call a tool (replace with actual tool name and arguments)
-        let call_result = session
-            .call_tool("echo_tool", Some(json!({"message": "Hello, world!"})))
-            .await?;
-        println!("Call tool result: {:?}", call_result);
+    // if args.mode == "echo" {
+    //     // Call a tool (replace with actual tool name and arguments)
+    //     let call_result = session
+    //         .call_tool("echo_tool", Some(json!({"message": "Hello, world!"})))
+    //         .await?;
+    //     println!("Call tool result: {:?}", call_result);
 
-        // List available resources
-        let resources = session.list_resources().await?;
-        println!("Resources: {:?}", resources);
+    //     // List available resources
+    //     let resources = session.list_resources().await?;
+    //     println!("Resources: {:?}", resources);
 
-        // Read a resource (replace with actual URI)
-        if let Some(resource) = resources.resources.first() {
-            let read_result = session.read_resource(&resource.uri).await?;
-            println!("Read resource result: {:?}", read_result);
-        }
-    } else {
-        // Call a tool (replace with actual tool name and arguments)
-        let call_result = session
-            .call_tool("git_status", Some(json!({"repo_path": "."})))
-            .await?;
-        println!("Call tool result: {:?}", call_result);
-    }
+    //     // Read a resource (replace with actual URI)
+    //     if let Some(resource) = resources.resources.first() {
+    //         let read_result = session.read_resource(&resource.uri).await?;
+    //         println!("Read resource result: {:?}", read_result);
+    //     }
+    // } else {
+    //     // Call a tool (replace with actual tool name and arguments)
+    //     let call_result = session
+    //         .call_tool("git_status", Some(json!({"repo_path": "."})))
+    //         .await?;
+    //     println!("Call tool result: {:?}", call_result);
+    // }
 
     session.shutdown().await?;
     println!("Done!");

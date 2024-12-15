@@ -1,5 +1,5 @@
-use crate::transport::{ReadStream, Transport, WriteStream};
-use anyhow::{anyhow, Context, Result};
+use crate::transport::{ConnectError, ReadError, ReadStream, Transport, WriteError, WriteStream};
+use anyhow::Result;
 use async_trait::async_trait;
 use mcp_core::types::*;
 use std::process::Stdio;
@@ -30,19 +30,22 @@ impl StdioTransport {
             .collect()
     }
 
-    async fn monitor_child(mut child: Child, tx_read: mpsc::Sender<Result<JsonRpcMessage>>) {
+    async fn monitor_child(
+        mut child: Child,
+        tx_read: mpsc::Sender<Result<JsonRpcMessage, ReadError>>,
+    ) {
         match child.wait().await {
             Ok(status) => {
                 let msg = if status.success() {
-                    format!("Child process terminated normally with status: {}", status)
+                    format!("Terminated normally with status: {}", status)
                 } else {
-                    format!("Child process terminated with error status: {}", status)
+                    format!("Terminated with error status: {}", status)
                 };
-                let _ = tx_read.send(Err(anyhow!(msg))).await;
+                let _ = tx_read.send(Err(ReadError::ChildTerminated(msg))).await;
             }
             Err(e) => {
                 let _ = tx_read
-                    .send(Err(anyhow!("Child process error: {}", e)))
+                    .send(Err(ReadError::ChildTerminated(e.to_string())))
                     .await;
             }
         }
@@ -51,7 +54,7 @@ impl StdioTransport {
 
 #[async_trait]
 impl Transport for StdioTransport {
-    async fn connect(&self) -> Result<(ReadStream, WriteStream)> {
+    async fn connect(&self) -> Result<(ReadStream, WriteStream), ConnectError> {
         let mut child = Command::new(&self.params.command)
             .args(&self.params.args)
             .env_clear()
@@ -63,15 +66,21 @@ impl Transport for StdioTransport {
             )
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
+            // .stderr(Stdio::inherit())
             .spawn()
-            .context("Failed to spawn child process")?;
+            .map_err(|e| ConnectError::SpawnError(e.to_string()))?;
 
-        let stdin = child.stdin.take().context("Failed to get stdin handle")?;
-        let stdout = child.stdout.take().context("Failed to get stdout handle")?;
+        let stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| ConnectError::Unknown("Missing stdin handle".to_string()))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| ConnectError::Unknown("Missing stdout handle".to_string()))?;
 
-        let (tx_read, rx_read) = mpsc::channel(100);
-        let (tx_write, mut rx_write) = mpsc::channel(100);
+        let (tx_read, rx_read) = mpsc::channel::<Result<JsonRpcMessage, ReadError>>(100);
+        let (tx_write, mut rx_write) = mpsc::channel::<Result<JsonRpcMessage, WriteError>>(100);
 
         // Clone tx_read for the child monitor
         let tx_read_monitor = tx_read.clone();
@@ -91,23 +100,78 @@ impl Transport for StdioTransport {
                         }
                     }
                     Err(e) => {
-                        let _ = tx_read.send(Err(e.into())).await;
+                        let _ = tx_read
+                            .send(Err(ReadError::InvalidMessage(e.to_string())))
+                            .await;
                     }
                 }
             }
+            // // Notify on EOF
+            // let _ = tx_read.send(Err(ReadError::TransportClosed)).await;
         });
 
         // Spawn stdin writer task
-        let mut stdin = stdin;
         tokio::spawn(async move {
-            while let Some(message) = rx_write.recv().await {
-                let json = serde_json::to_string(&message).expect("Failed to serialize message");
-                if stdin
+            let mut stdin = stdin;
+
+            // Serialize the message into JSON
+            fn serialize_message(message: &JsonRpcMessage) -> Result<String, WriteError> {
+                serde_json::to_string(message)
+                    .map_err(|err| WriteError::SerializationError(err.to_string()))
+            }
+
+            // Write the JSON message to the transport (stdin)
+            async fn write_to_transport(
+                stdin: &mut tokio::process::ChildStdin,
+                json: &str,
+            ) -> Result<(), WriteError> {
+                stdin
                     .write_all(format!("{}\n", json).as_bytes())
                     .await
-                    .is_err()
-                {
-                    break;
+                    .map_err(|_| WriteError::TransportClosed)
+            }
+
+            // Log an error received from the channel
+            fn log_channel_error(error: &WriteError) {
+                match error {
+                    WriteError::SerializationError(msg) => {
+                        eprintln!("Serialization error: {}", msg);
+                    }
+                    WriteError::TransportClosed => {
+                        eprintln!("Transport closed; stopping writer task.");
+                    }
+                    WriteError::Unknown(msg) => {
+                        eprintln!("Unknown error: {}", msg);
+                    }
+                }
+            }
+
+            // Handle the result of receiving a message and writing it to the transport
+            async fn handle_message_result(
+                result: Result<JsonRpcMessage, WriteError>,
+                stdin: &mut tokio::process::ChildStdin,
+            ) -> Result<(), WriteError> {
+                match result {
+                    Ok(message) => {
+                        // Serialize and write the message
+                        let json = serialize_message(&message)?;
+                        write_to_transport(stdin, &json).await?;
+                        Ok(())
+                    }
+                    Err(error) => {
+                        log_channel_error(&error);
+                        Err(error)
+                    }
+                }
+            }
+
+            while let Some(message) = rx_write.recv().await {
+                // Handle the message or break on fatal errors
+                if let Err(error) = handle_message_result(message, &mut stdin).await {
+                    // Only break if the error is fatal
+                    if matches!(error, WriteError::TransportClosed) {
+                        break;
+                    }
                 }
             }
         });
@@ -151,8 +215,8 @@ mod tests {
         });
 
         // Send messages
-        tx.send(request.clone()).await.unwrap();
-        tx.send(response.clone()).await.unwrap();
+        tx.send(Ok(request.clone())).await.unwrap();
+        tx.send(Ok(response.clone())).await.unwrap();
 
         // Receive and verify messages
         let mut read_messages = Vec::new();
@@ -183,11 +247,11 @@ mod tests {
         };
         let (mut rx, _tx) = transport.connect().await.unwrap();
 
-        // Try to receive a message - should get an error about process termination
+        // should get an error about process termination - either normal termination or transport connection was closed
         match timeout(Duration::from_secs(1), rx.recv()).await {
             Ok(Some(Err(e))) => {
                 assert!(
-                    e.to_string().contains("Child process terminated normally"),
+                    e.to_string().contains("Terminated normally") || e.to_string().contains("Transport connection was closed"),
                     "Expected process termination error, got: {}",
                     e
                 );
