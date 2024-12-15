@@ -1,6 +1,6 @@
 use crate::transport::{ReadStream, WriteStream};
 use anyhow::{anyhow, Context, Result};
-use mcp_core::types::*;
+use mcp_core::protocol::*;
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicU64, Ordering};

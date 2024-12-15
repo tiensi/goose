@@ -1,3 +1,6 @@
+/// Content sent around agents, systems, and LLMs
+/// The various content types can be display to humans but also understood by models
+/// They include optional annotations used to help inform agent usage
 use super::role::Role;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -48,7 +51,6 @@ pub struct ImageContent {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
-/// Content passed to or from an LLM
 pub enum Content {
     Text(TextContent),
     Image(ImageContent),

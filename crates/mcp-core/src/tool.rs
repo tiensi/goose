@@ -1,3 +1,5 @@
+/// Tools represent a routine that a server can execute
+/// Tool calls represent requests from the client to execute one
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

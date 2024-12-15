@@ -1,3 +1,4 @@
+/// The protocol messages exchanged between client and server
 use crate::{content::Content, resource::Resource, resource::ResourceContents, tool::Tool};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
