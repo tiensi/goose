@@ -244,7 +244,10 @@ impl Agent {
             // since priority is float, we need to sort by priority within error margin - PRIORITY_EPSILON
             all_resources.sort_by(|a, b| {
                 // Compare priorities with epsilon
-                if (b.2.priority() - a.2.priority()).abs() < PRIORITY_EPSILON {
+                // Compare priorities with Option handling - default to 0.0 if None
+                let a_priority = a.2.priority().unwrap_or(0.0);
+                let b_priority = b.2.priority().unwrap_or(0.0);
+                if (b_priority - a_priority).abs() < PRIORITY_EPSILON {
                     // Priorities are "equal" within epsilon, use timestamp as tiebreaker
                     b.2.timestamp().cmp(&a.2.timestamp())
                 } else {
