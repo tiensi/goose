@@ -546,11 +546,11 @@ mod tests {
         let initial_messages = vec![initial_message];
 
         let mut stream = agent.reply(&initial_messages).await?;
-        while let Some(_) = stream.try_next().await? {}
+        while stream.try_next().await?.is_some() {}
 
         // Second message
         let mut stream = agent.reply(&initial_messages).await?;
-        while let Some(_) = stream.try_next().await? {}
+        while stream.try_next().await?.is_some() {}
 
         let usage = agent.usage().await?;
         assert_eq!(usage.len(), 1); // 2 messages rolled up to one usage per model
