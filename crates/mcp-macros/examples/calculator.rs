@@ -7,9 +7,9 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let calculator = Calculator::default();
 
     // Print tool information
-    println!("Tool name: {}", Calculator::name());
-    println!("Tool description: {}", Calculator::description());
-    println!("Tool schema: {}", Calculator::schema());
+    println!("Tool name: {}", calculator.name());
+    println!("Tool description: {}", calculator.description());
+    println!("Tool schema: {}", calculator.schema());
 
     // Test the tool with some sample input
     let input = serde_json::json!({

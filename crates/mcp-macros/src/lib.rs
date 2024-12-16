@@ -126,15 +126,15 @@ pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
 
         #[async_trait::async_trait]
         impl mcp_core::handler::Tool for #struct_name {
-            fn name() -> &'static str {
+            fn name(&self) -> &'static str {
                 #tool_name
             }
 
-            fn description() -> &'static str {
+            fn description(&self) -> &'static str {
                 #tool_description
             }
 
-            fn schema() -> serde_json::Value {
+            fn schema(&self) -> serde_json::Value {
                 mcp_core::handler::generate_schema::<#params_struct_name>()
                     .expect("Failed to generate schema")
             }

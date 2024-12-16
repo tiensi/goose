@@ -21,13 +21,13 @@ pub type Result<T> = std::result::Result<T, ToolError>;
 #[async_trait]
 pub trait Tool: Send + Sync + 'static {
     /// The name of the tool
-    fn name() -> &'static str;
+    fn name(&self) -> &'static str;
 
     /// A description of what the tool does
-    fn description() -> &'static str;
+    fn description(&self) -> &'static str;
 
     /// JSON schema describing the tool's parameters
-    fn schema() -> Value;
+    fn schema(&self) -> Value;
 
     /// Execute the tool with the given parameters
     async fn call(&self, params: Value) -> Result<Value>;
