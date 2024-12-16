@@ -11,6 +11,7 @@ use goose::providers::{
 };
 use serde::Deserialize;
 use std::net::SocketAddr;
+use goose::providers::configs::GoogleProviderConfig;
 
 #[derive(Debug, Default, Deserialize)]
 pub struct ServerSettings {
@@ -64,6 +65,17 @@ pub enum ProviderSettings {
         #[serde(default)]
         max_tokens: Option<i32>,
     },
+    Google {
+        #[serde(default = "default_google_host")]
+        host: String,
+        api_key: String,
+        #[serde(default = "default_google_model")]
+        model: String,
+        #[serde(default)]
+        temperature: Option<f32>,
+        #[serde(default)]
+        max_tokens: Option<i32>,
+    },
 }
 
 impl ProviderSettings {
@@ -74,6 +86,7 @@ impl ProviderSettings {
             ProviderSettings::OpenAi { .. } => ProviderType::OpenAi,
             ProviderSettings::Databricks { .. } => ProviderType::Databricks,
             ProviderSettings::Ollama { .. } => ProviderType::Ollama,
+            ProviderSettings::Google { .. } => ProviderType::Google,
         }
     }
 
@@ -114,6 +127,19 @@ impl ProviderSettings {
                 max_tokens,
             } => ProviderConfig::Ollama(OllamaProviderConfig {
                 host,
+                model,
+                temperature,
+                max_tokens,
+            }),
+            ProviderSettings::Google{
+                host,
+                api_key,
+                model,
+                temperature,
+                max_tokens,
+            } => ProviderConfig::Google(GoogleProviderConfig {
+                host,
+                api_key,
                 model,
                 temperature,
                 max_tokens,

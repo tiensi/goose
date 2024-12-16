@@ -47,6 +47,7 @@ pub async fn handle_configure(
                 ("databricks", "Databricks", "Models on AI Gateway"),
                 ("ollama", "Ollama", "Local open source models"),
                 ("anthropic", "Anthropic", "Claude models"),
+                ("google", "Google Gemini", "Gemini models"),
             ])
             .interact()?
             .to_string()
@@ -153,6 +154,7 @@ pub fn get_recommended_model(provider_name: &str) -> &str {
         "databricks" => "claude-3-5-sonnet-2",
         "ollama" => OLLAMA_MODEL,
         "anthropic" => "claude-3-5-sonnet-2",
+        "google" => "gemini-1.5-flash-8b",
         _ => panic!("Invalid provider name"),
     }
 }
@@ -163,6 +165,7 @@ pub fn get_required_keys(provider_name: &str) -> Vec<&'static str> {
         "databricks" => vec!["DATABRICKS_HOST"],
         "ollama" => vec!["OLLAMA_HOST"],
         "anthropic" => vec!["ANTHROPIC_API_KEY"], // Removed ANTHROPIC_HOST since we use a fixed endpoint
+        "google" => vec!["GOOGLE_API_KEY"],
         _ => panic!("Invalid provider name"),
     }
 }

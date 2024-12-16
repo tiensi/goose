@@ -234,12 +234,12 @@ pub fn openai_response_to_message(response: Value) -> Result<Message> {
     })
 }
 
-fn sanitize_function_name(name: &str) -> String {
+pub fn sanitize_function_name(name: &str) -> String {
     let re = Regex::new(r"[^a-zA-Z0-9_-]").unwrap();
     re.replace_all(name, "_").to_string()
 }
 
-fn is_valid_function_name(name: &str) -> bool {
+pub fn is_valid_function_name(name: &str) -> bool {
     let re = Regex::new(r"^[a-zA-Z0-9_-]+$").unwrap();
     re.is_match(name)
 }

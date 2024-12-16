@@ -4,6 +4,7 @@ use super::{
 };
 use anyhow::Result;
 use strum_macros::EnumIter;
+use crate::providers::google::GoogleProvider;
 
 #[derive(EnumIter, Debug)]
 pub enum ProviderType {
@@ -11,6 +12,7 @@ pub enum ProviderType {
     Databricks,
     Ollama,
     Anthropic,
+    Google,
 }
 
 pub fn get_provider(config: ProviderConfig) -> Result<Box<dyn Provider + Send + Sync>> {
@@ -22,6 +24,9 @@ pub fn get_provider(config: ProviderConfig) -> Result<Box<dyn Provider + Send + 
         ProviderConfig::Ollama(ollama_config) => Ok(Box::new(OllamaProvider::new(ollama_config)?)),
         ProviderConfig::Anthropic(anthropic_config) => {
             Ok(Box::new(AnthropicProvider::new(anthropic_config)?))
+        }
+        ProviderConfig::Google(google_config) => {
+            Ok(Box::new(GoogleProvider::new(google_config)?))
         }
     }
 }

@@ -11,6 +11,7 @@ pub enum ProviderConfig {
     Databricks(DatabricksProviderConfig),
     Ollama(OllamaProviderConfig),
     Anthropic(AnthropicProviderConfig),
+    Google(GoogleProviderConfig),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -80,6 +81,16 @@ pub struct OpenAiProviderConfig {
     pub temperature: Option<f32>,
     pub max_tokens: Option<i32>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GoogleProviderConfig {
+    pub host: String,
+    pub api_key: String,
+    pub model: String,
+    pub temperature: Option<f32>,
+    pub max_tokens: Option<i32>,
+}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OllamaProviderConfig {

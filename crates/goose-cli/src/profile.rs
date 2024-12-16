@@ -1,9 +1,6 @@
 use anyhow::Result;
 use goose::key_manager::{get_keyring_secret, KeyRetrievalStrategy};
-use goose::providers::configs::{
-    AnthropicProviderConfig, DatabricksAuth, DatabricksProviderConfig, OllamaProviderConfig,
-    OpenAiProviderConfig, ProviderConfig,
-};
+use goose::providers::configs::{AnthropicProviderConfig, DatabricksAuth, DatabricksProviderConfig, GoogleProviderConfig, OllamaProviderConfig, OpenAiProviderConfig, ProviderConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -116,6 +113,18 @@ pub fn get_provider_config(provider_name: &str, model: String) -> ProviderConfig
 
             ProviderConfig::Anthropic(AnthropicProviderConfig {
                 host: "https://api.anthropic.com".to_string(), // Default Anthropic API endpoint
+                api_key,
+                model,
+                temperature: None,
+                max_tokens: None,
+            })
+        }
+        "google" => {
+            let api_key = get_keyring_secret("GOOGLE_API_KEY", KeyRetrievalStrategy::Both)
+                .expect("GOOGLE_API_KEY not available in env or the keychain\nSet an env var or rerun `goose configure`");
+
+            ProviderConfig::Google(GoogleProviderConfig {
+                host: "https://generativelanguage.googleapis.com".to_string(), // Default Anthropic API endpoint
                 api_key,
                 model,
                 temperature: None,
