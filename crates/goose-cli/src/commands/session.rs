@@ -57,18 +57,11 @@ pub fn build_session<'a>(
         Err(_) => Box::new(RustylinePrompt::new()),
     };
 
-    println!(
-        "{} {} {} {} {}",
-        style("starting session |").dim(),
-        style("provider:").dim(),
-        style(loaded_profile.provider).cyan().dim(),
-        style("model:").dim(),
-        style(loaded_profile.model).cyan().dim(),
-    );
-    println!(
-        "    {} {}",
-        style("logging to").dim(),
-        style(session_file.display()).dim().cyan(),
+    display_session_info(
+        resume,
+        loaded_profile.provider,
+        loaded_profile.model,
+        session_file.as_path(),
     );
     Box::new(Session::new(agent, prompt, session_file))
 }
@@ -148,6 +141,27 @@ fn load_profile(profile_name: Option<String>) -> Box<Profile> {
         }
     };
     loaded_profile
+}
+
+fn display_session_info(resume: bool, provider: String, model: String, session_file: &Path) {
+    let start_session_msg = if resume {
+        "resuming session |"
+    } else {
+        "starting session |"
+    };
+    println!(
+        "{} {} {} {} {}",
+        style(start_session_msg).dim(),
+        style("provider:").dim(),
+        style(provider).cyan().dim(),
+        style("model:").dim(),
+        style(model).cyan().dim(),
+    );
+    println!(
+        "    {} {}",
+        style("logging to").dim(),
+        style(session_file.display()).dim().cyan(),
+    );
 }
 
 #[cfg(test)]

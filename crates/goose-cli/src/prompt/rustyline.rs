@@ -9,6 +9,7 @@ use super::{
 use anyhow::Result;
 use cliclack::spinner;
 use goose::message::Message;
+use mcp_core::Role;
 use rustyline::DefaultEditor;
 
 const PROMPT: &str = "\x1b[1m\x1b[38;5;30m( O)> \x1b[0m";
@@ -128,6 +129,18 @@ impl Prompt for RustylinePrompt {
                 input_type: InputType::Message,
                 content: Some(message_text.to_string()),
             });
+        }
+    }
+
+    fn load_user_message_history(&mut self, messages: Vec<Message>) {
+        for message in messages.into_iter().filter(|m| m.role == Role::User) {
+            for content in message.content {
+                if let Some(text) = content.as_text() {
+                    if let Err(e) = self.editor.add_history_entry(text) {
+                        eprintln!("Failed to add to history: {}", e);
+                    }
+                }
+            }
         }
     }
 

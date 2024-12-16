@@ -102,7 +102,11 @@ pub struct Session<'a> {
 }
 
 impl<'a> Session<'a> {
-    pub fn new(agent: Box<dyn Agent>, prompt: Box<dyn Prompt + 'a>, session_file: PathBuf) -> Self {
+    pub fn new(
+        agent: Box<dyn Agent>,
+        mut prompt: Box<dyn Prompt + 'a>,
+        session_file: PathBuf,
+    ) -> Self {
         let messages = match readable_session_file(&session_file) {
             Ok(file) => deserialize_messages(file).unwrap_or_else(|e| {
                 eprintln!(
@@ -116,6 +120,8 @@ impl<'a> Session<'a> {
                 Vec::<Message>::new()
             }
         };
+
+        prompt.load_user_message_history(messages.clone());
 
         Session {
             agent,
