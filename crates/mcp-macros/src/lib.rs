@@ -5,6 +5,7 @@ use syn::{
     parse::Parse, parse::ParseStream, parse_macro_input, punctuated::Punctuated, Expr, ExprLit,
     FnArg, ItemFn, Lit, Meta, Pat, PatType, Token,
 };
+use convert_case::{Case, Casing};
 
 struct MacroArgs {
     name: Option<String>,
@@ -76,11 +77,7 @@ pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
 
     // Generate PascalCase struct name from the function name
     let struct_name = format_ident!("{}", {
-        let mut s = fn_name_str.clone();
-        if let Some(c) = s.get_mut(0..1) {
-            c.make_ascii_uppercase();
-        }
-        s
+        fn_name_str.to_case(Case::Pascal)
     });
 
     // Use provided name or function name as default
