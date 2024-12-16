@@ -71,6 +71,10 @@ where
                             return Poll::Ready(Some(Err(TransportError::InvalidMessage("Missing or invalid jsonrpc version".into()))));
                         }
 
+                        tracing::info!(
+                            json = %line,
+                            "incoming message"
+                        );
                         // Now try to parse as proper message
                         match serde_json::from_value::<JsonRpcMessage>(value) {
                             Ok(msg) => Poll::Ready(Some(Ok(msg))),
@@ -124,26 +128,53 @@ where
         use futures::StreamExt;
         let mut service = self.service;
 
+        tracing::info!("Server started");
         while let Some(msg_result) = transport.next().await {
+            let _span = tracing::span!(tracing::Level::INFO, "message_processing").entered();
             match msg_result {
                 Ok(msg) => {
                     match msg {
                         JsonRpcMessage::Request(request) => {
+                            // Serialize request for logging
+                            let id = request.id.clone();
+                            let request_json = serde_json::to_string(&request)
+                                .unwrap_or_else(|_| "Failed to serialize request".to_string());
+                            
+                            tracing::info!(
+                                request_id = ?id,
+                                method = ?request.method,
+                                json = %request_json,
+                                "Received request"
+                            );
+                            
                             // Process the request using our service
                             let response = match service.call(request).await {
                                 Ok(resp) => resp,
-                                Err(e) => JsonRpcResponse {
-                                    jsonrpc: "2.0".to_string(),
-                                    id: None, // We still have a valid request ID here
-                                    result: None,
-                                    error: Some(mcp_core::protocol::ErrorData {
-                                        code: mcp_core::protocol::INTERNAL_ERROR,
-                                        message: Into::<BoxError>::into(e).to_string(),
-                                        data: None,
-                                    }),
+                                Err(e) => {
+                                    let error_msg = e.into().to_string();
+                                    tracing::error!(error = %error_msg, "Request processing failed");
+                                    JsonRpcResponse {
+                                        jsonrpc: "2.0".to_string(),
+                                        id,
+                                        result: None,
+                                        error: Some(mcp_core::protocol::ErrorData {
+                                            code: mcp_core::protocol::INTERNAL_ERROR,
+                                            message: error_msg,
+                                            data: None,
+                                        }),
+                                    }
                                 },
                             };
                             
+                            // Serialize response for logging
+                            let response_json = serde_json::to_string(&response)
+                                .unwrap_or_else(|_| "Failed to serialize response".to_string());
+                            
+                            tracing::info!(
+                                response_id = ?response.id,
+                                json = %response_json,
+                                "Sending response"
+                            );
                             // Send the response back
                             if let Err(e) = transport.write_message(JsonRpcMessage::Response(response)).await {
                                 return Err(ServerError::Transport(TransportError::Io(e)));

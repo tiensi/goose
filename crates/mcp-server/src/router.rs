@@ -55,7 +55,7 @@ impl Service<JsonRpcRequest> for Router {
                 },
                 "initialize" => {
                     let result = InitializeResult {
-                        protocol_version: "0.1.0".to_string(),
+                        protocol_version: "2024-11-05".to_string(),
                         capabilities,
                         server_info: Implementation {
                             name: "mcp-server".to_string(),
