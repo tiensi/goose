@@ -812,7 +812,6 @@ mod tests {
             // Create a log directory
             let home_dir = dirs::home_dir().unwrap();
             let log_dir = home_dir.join(".config").join("goose").join("logs");
-            std::fs::create_dir_all(&log_dir)?;
 
             session.close_session().await;
 

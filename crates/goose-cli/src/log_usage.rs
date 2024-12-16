@@ -56,6 +56,7 @@ mod tests {
         log_usage::{log_usage, SessionLog},
         test_helpers::run_with_tmp_dir,
     };
+
     #[test]
     fn test_session_logging() {
         run_with_tmp_dir(|| {
