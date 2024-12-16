@@ -9,8 +9,8 @@ use std::time::Duration;
 use super::base::ProviderUsage;
 use super::base::{Provider, Usage};
 use super::configs::AnthropicProviderConfig;
-use super::model_pricing::model_pricing_for;
 use super::model_pricing::cost;
+use super::model_pricing::model_pricing_for;
 use super::utils::get_model;
 use crate::message::{Message, MessageContent};
 use mcp_core::content::Content;
@@ -28,10 +28,7 @@ impl AnthropicProvider {
             .timeout(Duration::from_secs(600)) // 10 minutes timeout
             .build()?;
 
-        Ok(Self {
-            client,
-            config,
-        })
+        Ok(Self { client, config })
     }
 
     fn get_usage(data: &Value) -> Result<Usage> {

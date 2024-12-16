@@ -391,7 +391,10 @@ mod tests {
     use super::*;
     use goose::{
         agent::Agent,
-        providers::{base::{Provider, ProviderUsage, Usage}, configs::OpenAiProviderConfig},
+        providers::{
+            base::{Provider, ProviderUsage, Usage},
+            configs::OpenAiProviderConfig,
+        },
     };
     use mcp_core::tool::Tool;
 

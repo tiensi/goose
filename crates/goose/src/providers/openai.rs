@@ -8,8 +8,8 @@ use std::time::Duration;
 use super::base::ProviderUsage;
 use super::base::{Provider, Usage};
 use super::configs::OpenAiProviderConfig;
-use super::model_pricing::model_pricing_for;
 use super::model_pricing::cost;
+use super::model_pricing::model_pricing_for;
 use super::utils::get_model;
 use super::utils::{
     check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message,
@@ -29,10 +29,7 @@ impl OpenAiProvider {
             .timeout(Duration::from_secs(600)) // 10 minutes timeout
             .build()?;
 
-        Ok(Self {
-            client,
-            config,
-        })
+        Ok(Self { client, config })
     }
 
     fn get_usage(data: &Value) -> Result<Usage> {

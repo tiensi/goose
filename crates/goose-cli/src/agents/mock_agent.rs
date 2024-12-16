@@ -18,6 +18,10 @@ impl Agent for MockAgent {
     }
 
     async fn usage(&self) -> Result<Vec<ProviderUsage>> {
-        Ok(vec![ProviderUsage::new("mock".to_string(), Default::default(), None)])
+        Ok(vec![ProviderUsage::new(
+            "mock".to_string(),
+            Default::default(),
+            None,
+        )])
     }
 }

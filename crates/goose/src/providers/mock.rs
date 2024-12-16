@@ -36,9 +36,15 @@ impl Provider for MockProvider {
         let usage = Usage::new(Some(1), Some(1), Some(2));
         if responses.is_empty() {
             // Return empty response if no more pre-configured responses
-            Ok((Message::assistant().with_text(""), ProviderUsage::new("mock".to_string(), usage, Some(dec!(1)))))
+            Ok((
+                Message::assistant().with_text(""),
+                ProviderUsage::new("mock".to_string(), usage, Some(dec!(1))),
+            ))
         } else {
-            Ok((responses.remove(0), ProviderUsage::new("mock".to_string(), usage, Some(dec!(1)))))
+            Ok((
+                responses.remove(0),
+                ProviderUsage::new("mock".to_string(), usage, Some(dec!(1))),
+            ))
         }
     }
 }

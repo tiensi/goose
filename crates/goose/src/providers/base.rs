@@ -14,11 +14,7 @@ pub struct ProviderUsage {
 
 impl ProviderUsage {
     pub fn new(model: String, usage: Usage, cost: Option<Decimal>) -> Self {
-        Self {
-            model,
-            usage,
-            cost,
-        }
+        Self { model, usage, cost }
     }
 }
 

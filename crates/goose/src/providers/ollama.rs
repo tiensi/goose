@@ -1,7 +1,8 @@
 use super::base::{Provider, ProviderUsage, Usage};
 use super::configs::OllamaProviderConfig;
 use super::utils::{
-    get_model, messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec, ImageFormat
+    get_model, messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec,
+    ImageFormat,
 };
 use crate::message::Message;
 use anyhow::{anyhow, Result};
@@ -26,10 +27,7 @@ impl OllamaProvider {
             .timeout(Duration::from_secs(600)) // 10 minutes timeout
             .build()?;
 
-        Ok(Self {
-            client,
-            config,
-        })
+        Ok(Self { client, config })
     }
 
     fn get_usage(data: &Value) -> Result<Usage> {

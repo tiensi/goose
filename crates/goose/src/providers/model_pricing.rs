@@ -112,8 +112,12 @@ pub fn model_pricing_for(model: &str) -> Option<Pricing> {
 
 pub fn cost(usage: &Usage, model_pricing: &Option<Pricing>) -> Option<Decimal> {
     if let Some(model_pricing) = model_pricing {
-        let input_price = Decimal::from(usage.input_tokens.unwrap_or(0)) * model_pricing.input_token_price / Decimal::from(1_000_000);
-        let output_price = Decimal::from(usage.output_tokens.unwrap_or(0)) * model_pricing.output_token_price / Decimal::from(1_000_000);
+        let input_price = Decimal::from(usage.input_tokens.unwrap_or(0))
+            * model_pricing.input_token_price
+            / Decimal::from(1_000_000);
+        let output_price = Decimal::from(usage.output_tokens.unwrap_or(0))
+            * model_pricing.output_token_price
+            / Decimal::from(1_000_000);
         Some(input_price + output_price)
     } else {
         None

@@ -64,7 +64,11 @@ mod tests {
 
             log_usage(
                 "path.txt".to_string(),
-                vec![ProviderUsage::new("model".to_string(), Usage::new(Some(10), Some(20), Some(30)), Some(dec!(0.5)))],
+                vec![ProviderUsage::new(
+                    "model".to_string(),
+                    Usage::new(Some(10), Some(20), Some(30)),
+                    Some(dec!(0.5)),
+                )],
             );
 
             // Check if log file exists and contains the expected content

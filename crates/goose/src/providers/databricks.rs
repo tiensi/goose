@@ -6,10 +6,11 @@ use std::time::Duration;
 
 use super::base::{Provider, ProviderUsage, Usage};
 use super::configs::{DatabricksAuth, DatabricksProviderConfig};
-use super::model_pricing::{model_pricing_for, cost};
+use super::model_pricing::{cost, model_pricing_for};
 use super::oauth;
 use super::utils::{
-    check_bedrock_context_length_error, check_openai_context_length_error, get_model, messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec
+    check_bedrock_context_length_error, check_openai_context_length_error, get_model,
+    messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec,
 };
 use crate::message::Message;
 use mcp_core::tool::Tool;
@@ -25,10 +26,7 @@ impl DatabricksProvider {
             .timeout(Duration::from_secs(600)) // 10 minutes timeout
             .build()?;
 
-        Ok(Self {
-            client,
-            config,
-        })
+        Ok(Self { client, config })
     }
 
     async fn ensure_auth_header(&self) -> Result<String> {

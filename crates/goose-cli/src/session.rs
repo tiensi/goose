@@ -322,10 +322,7 @@ We've removed the conversation up to the most recent user message
         ));
         self.prompt.close();
         match self.agent.usage().await {
-            Ok(usage) => log_usage(
-                self.session_file.to_string_lossy().to_string(),
-                usage,
-            ),
+            Ok(usage) => log_usage(self.session_file.to_string_lossy().to_string(), usage),
             Err(e) => eprintln!("Failed to collect total provider usage: {}", e),
         }
     }
@@ -336,9 +333,7 @@ We've removed the conversation up to the most recent user message
 }
 
 impl<'a> Drop for Session<'a> {
-    fn drop(&mut self) {
-        
-    }
+    fn drop(&mut self) {}
 }
 
 fn raw_message(content: &str) -> Box<Message> {
@@ -836,7 +831,8 @@ mod tests {
             assert!(log_content.contains("total_tokens"));
 
             Ok(())
-        }).await
+        })
+        .await
     }
 
     fn assert_last_prompt_text(session: &Session, expected_text: &str) {

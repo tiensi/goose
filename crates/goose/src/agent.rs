@@ -3,8 +3,8 @@ use async_stream;
 use futures::stream::BoxStream;
 use rust_decimal_macros::dec;
 use serde_json::json;
-use tokio::sync::Mutex;
 use std::collections::HashMap;
+use tokio::sync::Mutex;
 
 use crate::errors::{AgentError, AgentResult};
 use crate::message::{Message, ToolRequest};
@@ -407,18 +407,24 @@ impl Agent {
         let mut usage_map: HashMap<String, ProviderUsage> = HashMap::new();
         provider_usage.iter().for_each(|usage| {
             usage_map
-            .entry(usage.model.clone())
-            .and_modify(|e| {
-                e.usage.input_tokens = Some(e.usage.input_tokens.unwrap_or(0) + usage.usage.input_tokens.unwrap_or(0));
-                e.usage.output_tokens = Some(e.usage.output_tokens.unwrap_or(0) + usage.usage.output_tokens.unwrap_or(0));
-                e.usage.total_tokens = Some(e.usage.total_tokens.unwrap_or(0) + usage.usage.total_tokens.unwrap_or(0));
-                if e.cost.is_none() || usage.cost.is_none() {
-                    e.cost = None; // Pricing is not available for all models
-                } else {
-                    e.cost = Some(e.cost.unwrap_or(dec!(0)) + usage.cost.unwrap_or(dec!(0)));
-                }
-            })
-            .or_insert_with(|| usage.clone());
+                .entry(usage.model.clone())
+                .and_modify(|e| {
+                    e.usage.input_tokens = Some(
+                        e.usage.input_tokens.unwrap_or(0) + usage.usage.input_tokens.unwrap_or(0),
+                    );
+                    e.usage.output_tokens = Some(
+                        e.usage.output_tokens.unwrap_or(0) + usage.usage.output_tokens.unwrap_or(0),
+                    );
+                    e.usage.total_tokens = Some(
+                        e.usage.total_tokens.unwrap_or(0) + usage.usage.total_tokens.unwrap_or(0),
+                    );
+                    if e.cost.is_none() || usage.cost.is_none() {
+                        e.cost = None; // Pricing is not available for all models
+                    } else {
+                        e.cost = Some(e.cost.unwrap_or(dec!(0)) + usage.cost.unwrap_or(dec!(0)));
+                    }
+                })
+                .or_insert_with(|| usage.clone());
         });
         Ok(usage_map.into_values().collect())
     }
