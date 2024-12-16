@@ -4,12 +4,12 @@ use reqwest::{Client, StatusCode};
 use serde_json::{json, Value};
 use std::time::Duration;
 
-use super::base::{Provider, ProviderUsageCollector, Usage};
+use super::base::{Provider, ProviderUsage, Usage};
 use super::configs::{DatabricksAuth, DatabricksProviderConfig};
+use super::model_pricing::{model_pricing_for, cost};
 use super::oauth;
 use super::utils::{
-    check_bedrock_context_length_error, check_openai_context_length_error, messages_to_openai_spec,
-    openai_response_to_message, tools_to_openai_spec,
+    check_bedrock_context_length_error, check_openai_context_length_error, get_model, messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec
 };
 use crate::message::Message;
 use mcp_core::tool::Tool;
@@ -17,7 +17,6 @@ use mcp_core::tool::Tool;
 pub struct DatabricksProvider {
     client: Client,
     config: DatabricksProviderConfig,
-    usage_collector: ProviderUsageCollector,
 }
 
 impl DatabricksProvider {
@@ -29,7 +28,6 @@ impl DatabricksProvider {
         Ok(Self {
             client,
             config,
-            usage_collector: ProviderUsageCollector::new(),
         })
     }
 
@@ -114,7 +112,7 @@ impl Provider for DatabricksProvider {
         system: &str,
         messages: &[Message],
         tools: &[Tool],
-    ) -> Result<(Message, Usage)> {
+    ) -> Result<(Message, ProviderUsage)> {
         // Prepare messages and tools
         let messages_spec = messages_to_openai_spec(messages, &self.config.image_format);
         let tools_spec = if !tools.is_empty() {
@@ -167,13 +165,10 @@ impl Provider for DatabricksProvider {
         // Parse response
         let message = openai_response_to_message(response.clone())?;
         let usage = Self::get_usage(&response)?;
-        self.usage_collector.add_usage(usage.clone());
+        let model = get_model(&response);
+        let cost = cost(&usage, &model_pricing_for(&model));
 
-        Ok((message, usage))
-    }
-
-    fn total_usage(&self) -> Usage {
-        self.usage_collector.get_usage()
+        Ok((message, ProviderUsage::new(model, usage, cost)))
     }
 }
 
@@ -248,13 +243,9 @@ mod tests {
         } else {
             panic!("Expected Text content");
         }
-        assert_eq!(reply_usage.total_tokens, Some(35));
-
-        // Check total usage
-        let total = provider.total_usage();
-        assert_eq!(total.input_tokens, Some(10));
-        assert_eq!(total.output_tokens, Some(25));
-        assert_eq!(total.total_tokens, Some(35));
+        assert_eq!(reply_usage.usage.input_tokens, Some(10));
+        assert_eq!(reply_usage.usage.output_tokens, Some(25));
+        assert_eq!(reply_usage.usage.total_tokens, Some(35));
 
         Ok(())
     }

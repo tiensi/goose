@@ -1,7 +1,7 @@
-use super::base::{Provider, ProviderUsageCollector, Usage};
+use super::base::{Provider, ProviderUsage, Usage};
 use super::configs::OllamaProviderConfig;
 use super::utils::{
-    messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec, ImageFormat,
+    get_model, messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec, ImageFormat
 };
 use crate::message::Message;
 use anyhow::{anyhow, Result};
@@ -18,7 +18,6 @@ pub const OLLAMA_MODEL: &str = "qwen2.5";
 pub struct OllamaProvider {
     client: Client,
     config: OllamaProviderConfig,
-    usage_collector: ProviderUsageCollector,
 }
 
 impl OllamaProvider {
@@ -30,7 +29,6 @@ impl OllamaProvider {
         Ok(Self {
             client,
             config,
-            usage_collector: ProviderUsageCollector::new(),
         })
     }
 
@@ -90,7 +88,7 @@ impl Provider for OllamaProvider {
         system: &str,
         messages: &[Message],
         tools: &[Tool],
-    ) -> Result<(Message, Usage)> {
+    ) -> Result<(Message, ProviderUsage)> {
         let system_message = json!({
             "role": "system",
             "content": system
@@ -131,13 +129,10 @@ impl Provider for OllamaProvider {
         // Parse response
         let message = openai_response_to_message(response.clone())?;
         let usage = Self::get_usage(&response)?;
-        self.usage_collector.add_usage(usage.clone());
+        let model = get_model(&response);
+        let cost = None;
 
-        Ok((message, usage))
-    }
-
-    fn total_usage(&self) -> Usage {
-        self.usage_collector.get_usage()
+        Ok((message, ProviderUsage::new(model, usage, cost)))
     }
 }
 
@@ -207,15 +202,9 @@ mod tests {
         } else {
             panic!("Expected Text content");
         }
-        assert_eq!(usage.input_tokens, Some(12));
-        assert_eq!(usage.output_tokens, Some(15));
-        assert_eq!(usage.total_tokens, Some(27));
-
-        // Check total usage
-        let total = provider.total_usage();
-        assert_eq!(total.input_tokens, Some(12));
-        assert_eq!(total.output_tokens, Some(15));
-        assert_eq!(total.total_tokens, Some(27));
+        assert_eq!(usage.usage.input_tokens, Some(12));
+        assert_eq!(usage.usage.output_tokens, Some(15));
+        assert_eq!(usage.usage.total_tokens, Some(27));
 
         Ok(())
     }
@@ -284,15 +273,9 @@ mod tests {
             panic!("Expected ToolCall content");
         }
 
-        assert_eq!(usage.input_tokens, Some(63));
-        assert_eq!(usage.output_tokens, Some(70));
-        assert_eq!(usage.total_tokens, Some(133));
-
-        // Check total usage
-        let total = provider.total_usage();
-        assert_eq!(total.input_tokens, Some(63));
-        assert_eq!(total.output_tokens, Some(70));
-        assert_eq!(total.total_tokens, Some(133));
+        assert_eq!(usage.usage.input_tokens, Some(63));
+        assert_eq!(usage.usage.output_tokens, Some(70));
+        assert_eq!(usage.usage.total_tokens, Some(133));
 
         Ok(())
     }

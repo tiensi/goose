@@ -391,7 +391,7 @@ mod tests {
     use super::*;
     use goose::{
         agent::Agent,
-        providers::{base::Provider, configs::OpenAiProviderConfig},
+        providers::{base::{Provider, ProviderUsage, Usage}, configs::OpenAiProviderConfig},
     };
     use mcp_core::tool::Tool;
 
@@ -406,15 +406,11 @@ mod tests {
             _system_prompt: &str,
             _messages: &[Message],
             _tools: &[Tool],
-        ) -> Result<(Message, goose::providers::base::Usage), anyhow::Error> {
+        ) -> Result<(Message, ProviderUsage), anyhow::Error> {
             Ok((
                 Message::assistant().with_text("Mock response"),
-                goose::providers::base::Usage::default(),
+                ProviderUsage::new("mock".to_string(), Usage::default(), None),
             ))
-        }
-
-        fn total_usage(&self) -> goose::providers::base::Usage {
-            goose::providers::base::Usage::default()
         }
     }
 

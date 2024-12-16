@@ -146,7 +146,7 @@ impl<'a> Session<'a> {
             self.agent_process_messages().await;
             self.prompt.hide_busy();
         }
-        self.close_session();
+        self.close_session().await;
         Ok(())
     }
 
@@ -162,7 +162,7 @@ impl<'a> Session<'a> {
 
         self.agent_process_messages().await;
 
-        self.close_session();
+        self.close_session().await;
         Ok(())
     }
 
@@ -312,7 +312,7 @@ We've removed the conversation up to the most recent user message
         self.agent.add_system(goosehints_system);
     }
 
-    fn close_session(&mut self) {
+    async fn close_session(&mut self) {
         self.prompt.render(raw_message(
             format!(
                 "Closing session. Recorded to {}\n",
@@ -321,6 +321,13 @@ We've removed the conversation up to the most recent user message
             .as_str(),
         ));
         self.prompt.close();
+        match self.agent.usage().await {
+            Ok(usage) => log_usage(
+                self.session_file.to_string_lossy().to_string(),
+                usage,
+            ),
+            Err(e) => eprintln!("Failed to collect total provider usage: {}", e),
+        }
     }
 
     pub fn session_file(&self) -> PathBuf {
@@ -330,10 +337,7 @@ We've removed the conversation up to the most recent user message
 
 impl<'a> Drop for Session<'a> {
     fn drop(&mut self) {
-        log_usage(
-            self.session_file.to_string_lossy().to_string(),
-            self.agent.total_usage(),
-        );
+        
     }
 }
 
@@ -348,7 +352,7 @@ mod tests {
 
     use crate::agents::mock_agent::MockAgent;
     use crate::prompt::{self, Input};
-    use crate::test_helpers::run_with_tmp_dir;
+    use crate::test_helpers::{run_with_tmp_dir, run_with_tmp_dir_async};
 
     use super::*;
     use goose::errors::AgentResult;
@@ -808,19 +812,18 @@ mod tests {
         })
     }
 
-    #[test]
-    fn test_session_logging() -> Result<()> {
-        run_with_tmp_dir(|| {
+    #[tokio::test]
+    async fn test_session_logging() -> Result<()> {
+        run_with_tmp_dir_async(|| async {
             // Create a test session
-            let session = create_test_session();
+            let mut session = create_test_session();
             let session_file = session.session_file.clone();
             // Create a log directory
             let home_dir = dirs::home_dir().unwrap();
             let log_dir = home_dir.join(".config").join("goose").join("logs");
             std::fs::create_dir_all(&log_dir)?;
 
-            // Drop the session to trigger logging
-            drop(session);
+            session.close_session().await;
 
             // Check if log file exists and contains the expected content
             let log_file = log_dir.join("goose.log");
@@ -833,7 +836,7 @@ mod tests {
             assert!(log_content.contains("total_tokens"));
 
             Ok(())
-        })
+        }).await
     }
 
     fn assert_last_prompt_text(session: &Session, expected_text: &str) {

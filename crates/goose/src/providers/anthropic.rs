@@ -6,8 +6,12 @@ use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::time::Duration;
 
-use super::base::{Provider, ProviderUsageCollector, Usage};
+use super::base::ProviderUsage;
+use super::base::{Provider, Usage};
 use super::configs::AnthropicProviderConfig;
+use super::model_pricing::model_pricing_for;
+use super::model_pricing::cost;
+use super::utils::get_model;
 use crate::message::{Message, MessageContent};
 use mcp_core::content::Content;
 use mcp_core::role::Role;
@@ -16,7 +20,6 @@ use mcp_core::tool::{Tool, ToolCall};
 pub struct AnthropicProvider {
     client: Client,
     config: AnthropicProviderConfig,
-    usage_collector: ProviderUsageCollector,
 }
 
 impl AnthropicProvider {
@@ -28,7 +31,6 @@ impl AnthropicProvider {
         Ok(Self {
             client,
             config,
-            usage_collector: ProviderUsageCollector::new(),
         })
     }
 
@@ -216,7 +218,7 @@ impl Provider for AnthropicProvider {
         system: &str,
         messages: &[Message],
         tools: &[Tool],
-    ) -> Result<(Message, Usage)> {
+    ) -> Result<(Message, ProviderUsage)> {
         let anthropic_messages = Self::messages_to_anthropic_spec(messages);
         let tool_specs = Self::tools_to_anthropic_spec(tools);
 
@@ -261,19 +263,17 @@ impl Provider for AnthropicProvider {
         // Parse response
         let message = Self::parse_anthropic_response(response.clone())?;
         let usage = Self::get_usage(&response)?;
-        self.usage_collector.add_usage(usage.clone());
+        let model = get_model(&response);
+        let cost = cost(&usage, &model_pricing_for(&model));
 
-        Ok((message, usage))
-    }
-
-    fn total_usage(&self) -> Usage {
-        self.usage_collector.get_usage()
+        Ok((message, ProviderUsage::new(model, usage, cost)))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rust_decimal_macros::dec;
     use serde_json::json;
     use wiremock::matchers::{header, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -309,7 +309,7 @@ mod tests {
                 "type": "text",
                 "text": "Hello! How can I assist you today?"
             }],
-            "model": "claude-3-sonnet-20240229",
+            "model": "claude-3-5-sonnet-latest",
             "stop_reason": "end_turn",
             "stop_sequence": null,
             "usage": {
@@ -332,15 +332,11 @@ mod tests {
             panic!("Expected Text content");
         }
 
-        assert_eq!(usage.input_tokens, Some(12));
-        assert_eq!(usage.output_tokens, Some(15));
-        assert_eq!(usage.total_tokens, Some(27));
-
-        // Check total usage
-        let total = provider.total_usage();
-        assert_eq!(total.input_tokens, Some(12));
-        assert_eq!(total.output_tokens, Some(15));
-        assert_eq!(total.total_tokens, Some(27));
+        assert_eq!(usage.usage.input_tokens, Some(12));
+        assert_eq!(usage.usage.output_tokens, Some(15));
+        assert_eq!(usage.usage.total_tokens, Some(27));
+        assert_eq!(usage.model, "claude-3-5-sonnet-latest");
+        assert_eq!(usage.cost, Some(dec!(0.000261)));
 
         Ok(())
     }
@@ -397,9 +393,9 @@ mod tests {
             panic!("Expected ToolRequest content");
         }
 
-        assert_eq!(usage.input_tokens, Some(15));
-        assert_eq!(usage.output_tokens, Some(20));
-        assert_eq!(usage.total_tokens, Some(35));
+        assert_eq!(usage.usage.input_tokens, Some(15));
+        assert_eq!(usage.usage.output_tokens, Some(20));
+        assert_eq!(usage.usage.total_tokens, Some(35));
 
         Ok(())
     }

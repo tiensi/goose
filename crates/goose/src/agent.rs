@@ -1,13 +1,15 @@
 use anyhow::Result;
 use async_stream;
 use futures::stream::BoxStream;
+use rust_decimal_macros::dec;
 use serde_json::json;
+use tokio::sync::Mutex;
 use std::collections::HashMap;
 
 use crate::errors::{AgentError, AgentResult};
 use crate::message::{Message, ToolRequest};
 use crate::prompt_template::load_prompt_file;
-use crate::providers::base::Provider;
+use crate::providers::base::{Provider, ProviderUsage};
 use crate::systems::System;
 use crate::token_counter::TokenCounter;
 use mcp_core::{Content, Resource, Tool, ToolCall};
@@ -56,6 +58,7 @@ impl SystemStatus {
 pub struct Agent {
     systems: Vec<Box<dyn System>>,
     provider: Box<dyn Provider>,
+    provider_usage: Mutex<Vec<ProviderUsage>>,
 }
 
 #[allow(dead_code)]
@@ -65,6 +68,7 @@ impl Agent {
         Self {
             systems: Vec::new(),
             provider,
+            provider_usage: Mutex::new(Vec::new()),
         }
     }
 
@@ -339,11 +343,12 @@ impl Agent {
             loop {
 
                 // Get completion from provider
-                let (response, _) = self.provider.complete(
+                let (response, usage) = self.provider.complete(
                     &system_prompt,
                     &messages,
                     &tools,
                 ).await?;
+                self.provider_usage.lock().await.push(usage);
 
                 // The assistant's response is added in rewrite_messages_on_tool_response
                 // Yield the assistant's response
@@ -396,8 +401,26 @@ impl Agent {
         }))
     }
 
-    pub fn total_usage(&self) -> crate::providers::base::Usage {
-        self.provider.total_usage()
+    pub async fn usage(&self) -> Result<Vec<ProviderUsage>> {
+        let provider_usage = self.provider_usage.lock().await.clone();
+
+        let mut usage_map: HashMap<String, ProviderUsage> = HashMap::new();
+        provider_usage.iter().for_each(|usage| {
+            usage_map
+            .entry(usage.model.clone())
+            .and_modify(|e| {
+                e.usage.input_tokens = Some(e.usage.input_tokens.unwrap_or(0) + usage.usage.input_tokens.unwrap_or(0));
+                e.usage.output_tokens = Some(e.usage.output_tokens.unwrap_or(0) + usage.usage.output_tokens.unwrap_or(0));
+                e.usage.total_tokens = Some(e.usage.total_tokens.unwrap_or(0) + usage.usage.total_tokens.unwrap_or(0));
+                if e.cost.is_none() || usage.cost.is_none() {
+                    e.cost = None; // Pricing is not available for all models
+                } else {
+                    e.cost = Some(e.cost.unwrap_or(dec!(0)) + usage.cost.unwrap_or(dec!(0)));
+                }
+            })
+            .or_insert_with(|| usage.clone());
+        });
+        Ok(usage_map.into_values().collect())
     }
 }
 
@@ -504,6 +527,32 @@ mod tests {
 
         assert_eq!(messages.len(), 1);
         assert_eq!(messages[0], response);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_usage_rollup() -> Result<()> {
+        let response = Message::assistant().with_text("Hello!");
+        let provider = MockProvider::new(vec![response.clone()]);
+        let agent = Agent::new(Box::new(provider));
+
+        let initial_message = Message::user().with_text("Hi");
+        let initial_messages = vec![initial_message];
+
+        let mut stream = agent.reply(&initial_messages).await?;
+        while let Some(_) = stream.try_next().await? {}
+
+        // Second message
+        let mut stream = agent.reply(&initial_messages).await?;
+        while let Some(_) = stream.try_next().await? {}
+
+        let usage = agent.usage().await?;
+        assert_eq!(usage.len(), 1); // 2 messages rolled up to one usage per model
+        assert_eq!(usage[0].usage.input_tokens, Some(2));
+        assert_eq!(usage[0].usage.output_tokens, Some(2));
+        assert_eq!(usage[0].usage.total_tokens, Some(4));
+        assert_eq!(usage[0].model, "mock");
+        assert_eq!(usage[0].cost, Some(dec!(2)));
         Ok(())
     }
 
