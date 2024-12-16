@@ -332,10 +332,6 @@ We've removed the conversation up to the most recent user message
     }
 }
 
-impl<'a> Drop for Session<'a> {
-    fn drop(&mut self) {}
-}
-
 fn raw_message(content: &str) -> Box<Message> {
     Box::new(Message::assistant().with_text(content))
 }
