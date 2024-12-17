@@ -25,7 +25,7 @@ pub enum ServiceError {
 }
 
 /// A Tower `Service` implementation that uses a `Transport` to send/receive JsonRpcRequests and JsonRpcMessages.
-pub struct TransportService<T> {
+pub struct TransportService<T: Transport> {
     transport: Arc<Mutex<T>>,
     initialized: AtomicBool,
 }
@@ -71,9 +71,20 @@ impl<T: Transport> Service<JsonRpcRequest> for TransportService<T> {
             transport.send(msg).await?;
 
             let line = transport.receive().await?;
-            let response_msg: JsonRpcMessage = serde_json::from_str(&line)?;
+            let response: JsonRpcMessage = serde_json::from_str(&line)?;
 
-            Ok(response_msg)
+            Ok(response)
         })
+    }
+}
+
+impl<T: Transport> Drop for TransportService<T> {
+    fn drop(&mut self) {
+        if self.initialized.load(Ordering::SeqCst) {
+            // Create a new runtime for cleanup if needed
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            let transport = rt.block_on(self.transport.lock());
+            let _ = rt.block_on(transport.close());
+        }
     }
 }
