@@ -1,5 +1,5 @@
-## Testing stdio
+## Testing
 
 ```bash
-cargo run -p mcp-client
+cargo run -p mcp-client --example stdio
 ```

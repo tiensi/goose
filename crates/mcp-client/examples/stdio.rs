@@ -54,7 +54,13 @@ async fn main() -> Result<(), ClientError> {
 
     // List tools
     let tools = client.list_tools().await?;
-    println!("Available tools: {tools:?}");
+    println!("Available tools: {tools:?}\n");
+
+    // Call tool 'git_status' wtih arguments = {"repo_path": "."}
+    let tool_result = client
+        .call_tool("git_status", serde_json::json!({ "repo_path": "." }))
+        .await?;
+    println!("Tool result: {tool_result:?}");
 
     Ok(())
 }

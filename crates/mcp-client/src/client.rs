@@ -4,8 +4,7 @@ use thiserror::Error;
 use tower::ServiceExt; // for Service::ready()
 
 use mcp_core::protocol::{
-    InitializeResult, JsonRpcError, JsonRpcMessage, JsonRpcRequest, JsonRpcResponse,
-    ListResourcesResult, ListToolsResult, ReadResourceResult,
+    CallToolResult, InitializeResult, JsonRpcError, JsonRpcMessage, JsonRpcRequest, JsonRpcResponse, ListResourcesResult, ListToolsResult, ReadResourceResult
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -180,5 +179,11 @@ where
     /// List tools
     pub async fn list_tools(&mut self) -> Result<ListToolsResult, Error> {
         self.send_message("tools/list", serde_json::json!({})).await
+    }
+
+    // Call tool
+    pub async fn call_tool(&mut self, name: &str, arguments: Value) -> Result<CallToolResult, Error> {
+        let params = serde_json::json!({ "name": name, "arguments": arguments });
+        self.send_message("tools/call", params).await
     }
 }
