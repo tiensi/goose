@@ -117,6 +117,7 @@ impl Provider for GoogleProvider {
 
         // Parse response
         let message = google_response_to_message(unescape_json_values(&response))?;
+        // Lifei: TODO Usage
         let usage = Usage::new(Some(100), Some(100), Some(100));
         // let usage = Self::get_usage(&response)?;
         // self.usage_collector.add_usage(usage.clone());
@@ -351,13 +352,12 @@ fn unescape_json_values(value: &Value) -> Value {
             Value::Object(new_map)
         }
         Value::Array(arr) => {
-            let new_array: Vec<Value> = arr.iter()
-                .map(|v| unescape_json_values(v))
-                .collect();
+            let new_array: Vec<Value> = arr.iter().map(|v| unescape_json_values(v)).collect();
             Value::Array(new_array)
         }
         Value::String(s) => {
-            let unescaped = s.replace("\\\\n", "\n")
+            let unescaped = s
+                .replace("\\\\n", "\n")
                 .replace("\\\\t", "\t")
                 .replace("\\\\r", "\r")
                 .replace("\\\\\"", "\"")
