@@ -1,28 +1,10 @@
 use anyhow::Result;
 use mcp_client::client::{ClientCapabilities, ClientInfo, Error as ClientError, McpClient};
 use mcp_client::{service::TransportService, transport::StdioTransport};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use tower::ServiceBuilder;
 use tracing_subscriber::EnvFilter;
-
-// use mcp_client::{
-//     service::{ServiceError},
-//     transport::{Error as TransportError},
-// };
-// use std::time::Duration;
-// use tower::timeout::error::Elapsed;
-
-// fn convert_box_error(err: Box<dyn std::error::Error + Send + Sync>) -> ServiceError {
-//     if let Some(elapsed) = err.downcast_ref::<Elapsed>() {
-//         ServiceError::Transport(TransportError::Io(
-//             std::io::Error::new(
-//                 std::io::ErrorKind::TimedOut,
-//                 format!("Timeout elapsed: {}", elapsed),
-//             ),
-//         ))
-//     } else {
-//         ServiceError::Other(err.to_string())
-//     }
-// }
 
 #[tokio::main]
 async fn main() -> Result<(), ClientError> {
@@ -35,14 +17,14 @@ async fn main() -> Result<(), ClientError> {
         )
         .init();
 
-    // Create the base transport
-    let transport = StdioTransport::new("uvx", ["mcp-server-git"]);
+    // Create the base transport as Arc<Mutex<StdioTransport>>
+    let transport = Arc::new(Mutex::new(StdioTransport::new("uvx", ["mcp-server-git"])));
 
     // Build service with middleware
-    let service = ServiceBuilder::new().service(TransportService::new(transport));
+    let service = ServiceBuilder::new().service(TransportService::new(Arc::clone(&transport)));
 
     // Create client
-    let mut client = McpClient::new(service);
+    let mut client = McpClient::new(service, Arc::clone(&transport));
 
     // Initialize
     let server_info = client
@@ -54,15 +36,11 @@ async fn main() -> Result<(), ClientError> {
             ClientCapabilities::default(),
         )
         .await?;
-    println!("Connected to server: {server_info:?}");
+    println!("Connected to server: {server_info:?}\n");
 
-    // List resources
-    let resources = client.list_resources().await?;
-    println!("Available resources: {resources:?}");
-
-    // Read a resource
-    let content = client.read_resource("file:///example.txt".into()).await?;
-    println!("Content: {content:?}");
+    // List tools
+    let tools = client.list_tools().await?;
+    println!("Available tools: {tools:?}");
 
     Ok(())
 }

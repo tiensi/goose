@@ -2,6 +2,7 @@ use super::{Error, Transport};
 use async_trait::async_trait;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
+use tokio::sync::Mutex;
 
 /// A `StdioTransport` uses a child process’s stdin/stdout as a communication channel.
 ///
@@ -10,9 +11,9 @@ use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 pub struct StdioTransport {
     command: String,
     args: Vec<String>,
-    child: Option<Child>,
-    stdin: Option<ChildStdin>,
-    stdout: Option<BufReader<ChildStdout>>,
+    child: Mutex<Option<Child>>,
+    stdin: Mutex<Option<ChildStdin>>,
+    stdout: Mutex<Option<BufReader<ChildStdout>>>,
 }
 
 impl StdioTransport {
@@ -27,17 +28,17 @@ impl StdioTransport {
         Self {
             command: command.into(),
             args: args.into_iter().map(Into::into).collect(),
-            child: None,
-            stdin: None,
-            stdout: None,
+            child: Mutex::new(None),
+            stdin: Mutex::new(None),
+            stdout: Mutex::new(None),
         }
     }
 }
 
 #[async_trait]
 impl Transport for StdioTransport {
-    async fn start(&mut self) -> Result<(), Error> {
-        if self.child.is_some() {
+    async fn start(&self) -> Result<(), Error> {
+        if self.child.lock().await.is_some() {
             return Ok(()); // Already started
         }
 
@@ -52,15 +53,16 @@ impl Transport for StdioTransport {
         let stdin = child.stdin.take().ok_or(Error::NotConnected)?;
         let stdout = child.stdout.take().ok_or(Error::NotConnected)?;
 
-        self.stdin = Some(stdin);
-        self.stdout = Some(BufReader::new(stdout));
-        self.child = Some(child);
+        *self.stdin.lock().await = Some(stdin);
+        *self.stdout.lock().await = Some(BufReader::new(stdout));
+        *self.child.lock().await = Some(child);
 
         Ok(())
     }
 
-    async fn send(&mut self, msg: String) -> Result<(), Error> {
-        let stdin = self.stdin.as_mut().ok_or(Error::NotConnected)?;
+    async fn send(&self, msg: String) -> Result<(), Error> {
+        let mut stdin = self.stdin.lock().await;
+        let stdin = stdin.as_mut().ok_or(Error::NotConnected)?;
         // Write the message followed by a newline
         stdin.write_all(msg.as_bytes()).await?;
         stdin.write_all(b"\n").await?;
@@ -68,8 +70,9 @@ impl Transport for StdioTransport {
         Ok(())
     }
 
-    async fn receive(&mut self) -> Result<String, Error> {
-        let stdout = self.stdout.as_mut().ok_or(Error::NotConnected)?;
+    async fn receive(&self) -> Result<String, Error> {
+        let mut stdout = self.stdout.lock().await;
+        let stdout = stdout.as_mut().ok_or(Error::NotConnected)?;
         let mut line = String::new();
         let n = stdout.read_line(&mut line).await?;
         if n == 0 {
@@ -79,14 +82,18 @@ impl Transport for StdioTransport {
         Ok(line)
     }
 
-    async fn close(&mut self) -> Result<(), Error> {
-        // Drop stdin to signal EOF
-        self.stdin.take();
-        self.stdout.take();
+    async fn close(&self) -> Result<(), Error> {
+        let mut child = self.child.lock().await;
+        let mut stdin = self.stdin.lock().await;
+        let mut stdout = self.stdout.lock().await;
 
-        if let Some(mut child) = self.child.take() {
+        // Drop stdin to signal EOF
+        *stdin = None;
+        *stdout = None;
+
+        if let Some(mut c) = child.take() {
             // Wait for child to exit
-            let _status = child.wait().await?;
+            let _status = c.wait().await?;
         }
 
         Ok(())

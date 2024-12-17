@@ -37,6 +37,11 @@ impl<T: Transport> TransportService<T> {
             initialized: AtomicBool::new(false),
         }
     }
+
+    /// Provides a clone of the transport handle for external access (e.g., for sending notifications).
+    pub fn get_transport_handle(&self) -> Arc<Mutex<T>> {
+        Arc::clone(&self.transport)
+    }
 }
 
 impl<T: Transport> Service<JsonRpcRequest> for TransportService<T> {
@@ -54,7 +59,7 @@ impl<T: Transport> Service<JsonRpcRequest> for TransportService<T> {
         let started = self.initialized.load(Ordering::SeqCst);
 
         Box::pin(async move {
-            let mut transport = transport.lock().await;
+            let transport = transport.lock().await;
 
             // Initialize (start) transport on the first call.
             if !started {

@@ -5,8 +5,12 @@ use tower::ServiceExt; // for Service::ready()
 
 use mcp_core::protocol::{
     InitializeResult, JsonRpcError, JsonRpcMessage, JsonRpcRequest, JsonRpcResponse,
-    ListResourcesResult, ReadResourceResult,
+    ListResourcesResult, ListToolsResult, ReadResourceResult,
 };
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
+use crate::transport::{Error as TransportError, Transport};
 
 /// Error type for MCP client operations.
 #[derive(Debug, Error)]
@@ -48,12 +52,13 @@ pub struct InitializeParams {
 }
 
 /// The MCP client that sends requests via the provided service.
-pub struct McpClient<S> {
+pub struct McpClient<S, T> {
     service: S,
+    transport: Arc<Mutex<T>>,
     next_id: u64,
 }
 
-impl<S> McpClient<S>
+impl<S, T> McpClient<S, T>
 where
     S: tower::Service<
             JsonRpcRequest,
@@ -61,18 +66,20 @@ where
             Error = super::service::ServiceError,
         > + Send,
     S::Future: Send,
+    T: Transport,
 {
-    pub fn new(service: S) -> Self {
+    pub fn new(service: S, transport: Arc<Mutex<T>>) -> Self {
         Self {
             service,
+            transport,
             next_id: 1,
         }
     }
 
     /// Send a JSON-RPC request and wait for a response.
-    async fn send_message<T>(&mut self, method: &str, params: Value) -> Result<T, Error>
+    async fn send_message<R>(&mut self, method: &str, params: Value) -> Result<R, Error>
     where
-        T: for<'de> Deserialize<'de>,
+        R: for<'de> Deserialize<'de>,
     {
         self.service.ready().await.map_err(|_| Error::NotReady)?;
 
@@ -122,17 +129,21 @@ where
         }
     }
 
-    // /// Send a JSON-RPC notification.
-    // pub async fn send_notification(&self, method: &str, params: Value) -> Result<(), Error> {
-    //     let notification = mcp_core::protocol::JsonRpcNotification {
-    //         jsonrpc: "2.0".to_string(),
-    //         method: method.to_string(),
-    //         params: Some(params),
-    //     };
-    //     let msg = serde_json::to_string(&notification)?;
-    //     let mut transport = self.transport.lock().await;
-    //     transport.send(msg).await
-    // }
+    /// Send a JSON-RPC notification.
+    pub async fn send_notification(&self, method: &str, params: Value) -> Result<(), Error> {
+        let notification = mcp_core::protocol::JsonRpcNotification {
+            jsonrpc: "2.0".to_string(),
+            method: method.to_string(),
+            params: Some(params),
+        };
+        let msg = serde_json::to_string(&notification)?;
+        let transport = self.transport.lock().await;
+        // transport.send(msg).await
+        transport
+            .send(msg)
+            .await
+            .map_err(|e: TransportError| Error::Service(e.into()))
+    }
 
     /// Initialize the connection with the server.
     pub async fn initialize(
@@ -145,8 +156,14 @@ where
             client_info: info,
             capabilities,
         };
-        self.send_message("initialize", serde_json::to_value(params)?)
-            .await
+        let result: InitializeResult = self
+            .send_message("initialize", serde_json::to_value(params)?)
+            .await?;
+
+        self.send_notification("notifications/initialized", serde_json::json!({}))
+            .await?;
+
+        Ok(result)
     }
 
     /// List available resources.
@@ -159,5 +176,10 @@ where
     pub async fn read_resource(&mut self, uri: &str) -> Result<ReadResourceResult, Error> {
         let params = serde_json::json!({ "uri": uri });
         self.send_message("resources/read", params).await
+    }
+
+    /// List tools
+    pub async fn list_tools(&mut self) -> Result<ListToolsResult, Error> {
+        self.send_message("tools/list", serde_json::json!({})).await
     }
 }
