@@ -69,8 +69,6 @@ impl Clone for AppState {
                         host: config.host.clone(),
                         api_key: config.api_key.clone(),
                         model: config.model.clone(),
-                        temperature: config.temperature,
-                        max_tokens: config.max_tokens,
                     })
                 }
             },

@@ -213,9 +213,13 @@ impl ProviderModelConfig for OpenAiProviderConfig {
 pub struct GoogleProviderConfig {
     pub host: String,
     pub api_key: String,
-    pub model: String,
-    pub temperature: Option<f32>,
-    pub max_tokens: Option<i32>,
+    pub model: ModelConfig,
+}
+
+impl ProviderModelConfig for GoogleProviderConfig {
+    fn model_config(&self) -> &ModelConfig {
+        &self.model
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

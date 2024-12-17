@@ -164,9 +164,7 @@ impl ProviderSettings {
             } => ProviderConfig::Google(GoogleProviderConfig {
                 host,
                 api_key,
-                model,
-                temperature,
-                max_tokens,
+                model: ModelConfig::new(model)
             }),
         }
     }

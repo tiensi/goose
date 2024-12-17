@@ -1,7 +1,7 @@
 use crate::errors::AgentError;
 use crate::message::{Message, MessageContent};
-use crate::providers::base::{Provider, ProviderUsageCollector, Usage};
-use crate::providers::configs::GoogleProviderConfig;
+use crate::providers::base::{Provider, ProviderUsage, Usage};
+use crate::providers::configs::{GoogleProviderConfig, ModelConfig, ProviderModelConfig};
 use crate::providers::utils::is_valid_function_name;
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -9,11 +9,11 @@ use mcp_core::{Content, Role, Tool, ToolCall};
 use reqwest::{Client, StatusCode};
 use serde_json::{json, Map, Value};
 use std::time::Duration;
+use rust_decimal_macros::dec;
 
 pub struct GoogleProvider {
     client: Client,
     config: GoogleProviderConfig,
-    usage_collector: ProviderUsageCollector,
 }
 
 impl GoogleProvider {
@@ -25,7 +25,6 @@ impl GoogleProvider {
         Ok(Self {
             client,
             config,
-            usage_collector: ProviderUsageCollector::new(),
         })
     }
 
@@ -60,7 +59,7 @@ impl GoogleProvider {
         let url = format!(
             "{}/v1beta/models/{}:generateContent?key={}",
             self.config.host.trim_end_matches('/'),
-            self.config.model,
+            self.config.model.model_name,
             self.config.api_key
         );
 
@@ -94,7 +93,7 @@ impl Provider for GoogleProvider {
         system: &str,
         messages: &[Message],
         tools: &[Tool],
-    ) -> anyhow::Result<(Message, Usage)> {
+    ) -> anyhow::Result<(Message, ProviderUsage)> {
         // Lifei: TODO: temperature parameters, tools may be empty, images
         let mut payload = Map::new();
         payload.insert(
@@ -121,12 +120,12 @@ impl Provider for GoogleProvider {
         let usage = Usage::new(Some(100), Some(100), Some(100));
         // let usage = Self::get_usage(&response)?;
         // self.usage_collector.add_usage(usage.clone());
-
-        Ok((message, usage))
+        let provider_usage = ProviderUsage::new("gpt-4o".to_string(), usage, Some(dec!(0.0)));
+        Ok((message, provider_usage))
     }
 
-    fn total_usage(&self) -> Usage {
-        self.usage_collector.get_usage()
+    fn get_model_config(&self) -> &ModelConfig {
+        self.config.model_config()
     }
 }
 
