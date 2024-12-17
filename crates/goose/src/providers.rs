@@ -9,6 +9,6 @@ pub mod ollama;
 pub mod openai;
 pub mod utils;
 
-mod google;
+pub mod google;
 #[cfg(test)]
 pub mod mock;

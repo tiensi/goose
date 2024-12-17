@@ -7,7 +7,7 @@ use goose::providers::{
         OpenAiProviderConfig, ProviderConfig,
     },
     factory::ProviderType,
-    ollama,
+    google, ollama,
     utils::ImageFormat,
 };
 use serde::Deserialize;
@@ -164,7 +164,9 @@ impl ProviderSettings {
             } => ProviderConfig::Google(GoogleProviderConfig {
                 host,
                 api_key,
-                model: ModelConfig::new(model),
+                model: ModelConfig::new(model)
+                    .with_temperature(temperature)
+                    .with_max_tokens(max_tokens),
             }),
         }
     }
@@ -255,6 +257,14 @@ fn default_ollama_host() -> String {
 
 fn default_ollama_model() -> String {
     ollama::OLLAMA_MODEL.to_string()
+}
+
+fn default_google_host() -> String {
+    google::GOOGLE_API_HOST.to_string()
+}
+
+fn default_google_model() -> String {
+    google::GOOGLE_DEFAULT_MODEL.to_string()
 }
 
 fn default_image_format() -> ImageFormat {

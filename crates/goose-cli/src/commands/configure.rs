@@ -158,7 +158,7 @@ pub fn get_recommended_model(provider_name: &str) -> &str {
         "databricks" => "claude-3-5-sonnet-2",
         "ollama" => OLLAMA_MODEL,
         "anthropic" => "claude-3-5-sonnet-2",
-        "google" => "gemini-1.5-flash-8b",
+        "google" => "gemini-1.5-flash",
         _ => panic!("Invalid provider name"),
     }
 }

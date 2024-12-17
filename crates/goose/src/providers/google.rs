@@ -12,6 +12,9 @@ use reqwest::{Client, StatusCode};
 use serde_json::{json, Map, Value};
 use std::time::Duration;
 
+pub const GOOGLE_API_HOST: &str = "https://generativelanguage.googleapis.com";
+pub const GOOGLE_DEFAULT_MODEL: &str = "gemini-1.5-flash";
+
 pub struct GoogleProvider {
     client: Client,
     config: GoogleProviderConfig,
