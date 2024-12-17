@@ -85,13 +85,17 @@ impl GoogleProvider {
 
 #[async_trait]
 impl Provider for GoogleProvider {
+    fn get_model_config(&self) -> &ModelConfig {
+        self.config.model_config()
+    }
+
     async fn complete(
         &self,
         system: &str,
         messages: &[Message],
         tools: &[Tool],
     ) -> anyhow::Result<(Message, ProviderUsage)> {
-        // Lifei: TODO: temperature parameters, tools may be empty, images
+        // Lifei: TODO: temperature parameters, images
         let mut payload = Map::new();
         payload.insert(
             "system_instruction".to_string(),
@@ -107,6 +111,18 @@ impl Provider for GoogleProvider {
                 json!({"functionDeclarations": tools_to_google_spec(&tools)}),
             );
         }
+        let mut generation_config = Map::new();
+        if let Some(temp) = self.config.model.temperature {
+            generation_config
+                .insert("temperature".to_string(), json!(temp));
+        }
+        if let Some(tokens) = self.config.model.max_tokens {
+            generation_config
+                .insert("maxOutputTokens".to_string(), json!(tokens));
+        }
+        if !generation_config.is_empty() {
+            payload.insert("generationConfig".to_string(), json!(generation_config));
+        }
 
         // Make request
         let response = self.post(Value::Object(payload)).await?;
@@ -119,10 +135,6 @@ impl Provider for GoogleProvider {
         // self.usage_collector.add_usage(usage.clone());
         let provider_usage = ProviderUsage::new("gpt-4o".to_string(), usage, Some(dec!(0.0)));
         Ok((message, provider_usage))
-    }
-
-    fn get_model_config(&self) -> &ModelConfig {
-        self.config.model_config()
     }
 }
 
