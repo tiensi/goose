@@ -356,3 +356,265 @@ impl Provider for GoogleProvider {
         Ok((message, provider_usage))
     }
 }
+
+#[cfg(test)] // Only compiles this module when running tests
+mod tests {
+    use super::*;
+    use crate::errors::AgentResult;
+    fn set_up_provider() -> GoogleProvider {
+        let provider_config = GoogleProviderConfig {
+            host: "dummy_host".to_string(),
+            api_key: "dummy_key".to_string(),
+            model: ModelConfig::new("dummy_model".to_string()),
+        };
+        GoogleProvider::new(provider_config).unwrap()
+    }
+
+    fn set_up_text_message(text: &str, role: Role) -> Message {
+        Message {
+            role,
+            created: 0,
+            content: vec![MessageContent::text(text.to_string())],
+        }
+    }
+
+    fn set_up_tool_request_message(id: &str, tool_call: ToolCall) -> Message {
+        Message {
+            role: Role::User,
+            created: 0,
+            content: vec![MessageContent::tool_request(id.to_string(), Ok(tool_call))],
+        }
+    }
+
+    fn set_up_tool_response_message(id: &str, tool_response: Vec<Content>) -> Message {
+        Message {
+            role: Role::Assistant,
+            created: 0,
+            content: vec![MessageContent::tool_response(
+                id.to_string(),
+                Ok(tool_response),
+            )],
+        }
+    }
+
+    fn set_up_tool(name: &str, description: &str, params: Value) -> Tool {
+        Tool {
+            name: name.to_string(),
+            description: description.to_string(),
+            input_schema: json!({
+                "properties": params
+            }),
+        }
+    }
+
+    #[test]
+    fn test_get_usage() {
+        let provider = set_up_provider();
+        let data = json!({
+            "usageMetadata": {
+                "promptTokenCount": 1,
+                "candidatesTokenCount": 2,
+                "totalTokenCount": 3
+            }
+        });
+        let usage = provider.get_usage(&data).unwrap();
+        assert_eq!(usage.input_tokens, Some(1));
+        assert_eq!(usage.output_tokens, Some(2));
+        assert_eq!(usage.total_tokens, Some(3));
+    }
+
+    #[test]
+    fn test_message_to_google_spec_text_message() {
+        let provider = set_up_provider();
+        let messages = vec![
+            set_up_text_message("Hello", Role::User),
+            set_up_text_message("World", Role::Assistant),
+        ];
+        let payload = provider.messages_to_google_spec(&messages);
+        assert_eq!(payload.len(), 2);
+        assert_eq!(payload[0]["role"], "user");
+        assert_eq!(payload[0]["parts"][0]["text"], "Hello");
+        assert_eq!(payload[1]["role"], "model");
+        assert_eq!(payload[1]["parts"][0]["text"], "World");
+    }
+
+    #[test]
+    fn test_message_to_google_spec_tool_request_message() {
+        let provider = set_up_provider();
+        let arguments = json!({
+            "param1": "value1"
+        });
+        let messages = vec![set_up_tool_request_message(
+            "id",
+            ToolCall::new("tool_name", json!(arguments)),
+        )];
+        let payload = provider.messages_to_google_spec(&messages);
+        assert_eq!(payload.len(), 1);
+        assert_eq!(payload[0]["role"], "user");
+        assert_eq!(payload[0]["parts"][0]["functionCall"]["args"], arguments);
+    }
+
+    #[test]
+    fn test_message_to_google_spec_tool_result_message() {
+        let provider = set_up_provider();
+        let tool_result: AgentResult<Vec<Content>> = Ok(vec![Content::text("Hello")]);
+        let messages = vec![set_up_tool_response_message(
+            "response_id",
+            tool_result.unwrap(),
+        )];
+        let payload = provider.messages_to_google_spec(&messages);
+        assert_eq!(payload.len(), 1);
+        assert_eq!(payload[0]["role"], "model");
+        assert_eq!(
+            payload[0]["parts"][0]["functionResponse"]["name"],
+            "response_id"
+        );
+        assert_eq!(
+            payload[0]["parts"][0]["functionResponse"]["response"]["content"]["text"],
+            "Hello"
+        );
+    }
+
+    #[test]
+    fn tools_to_google_spec_with_valid_tools() {
+        let provider = set_up_provider();
+        let params1 = json!({
+            "param1": {
+                "type": "string",
+                "description": "A parameter",
+                "field_does_not_accept": ["value1", "value2"]
+            }
+        });
+        let params2 = json!({
+            "param2": {
+                "type": "string",
+                "description": "B parameter",
+            }
+        });
+        let tools = vec![
+            set_up_tool("tool1", "description1", params1),
+            set_up_tool("tool2", "description2", params2),
+        ];
+        let result = provider.tools_to_google_spec(&tools);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0]["name"], "tool1");
+        assert_eq!(result[0]["description"], "description1");
+        assert_eq!(
+            result[0]["parameters"]["properties"],
+            json!({"param1": json!({
+                "type": "string",
+                "description": "A parameter"
+            })})
+        );
+        assert_eq!(result[1]["name"], "tool2");
+        assert_eq!(result[1]["description"], "description2");
+        assert_eq!(
+            result[1]["parameters"]["properties"],
+            json!({"param2": json!({
+                "type": "string",
+                "description": "B parameter"
+            })})
+        );
+    }
+
+    #[test]
+    fn tools_to_google_spec_with_empty_properties() {
+        let provider = set_up_provider();
+        let tools = vec![Tool {
+            name: "tool1".to_string(),
+            description: "description1".to_string(),
+            input_schema: json!({
+                "properties": {}
+            }),
+        }];
+        let result = provider.tools_to_google_spec(&tools);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0]["name"], "tool1");
+        assert_eq!(result[0]["description"], "description1");
+        assert!(result[0]["parameters"].get("properties").is_none());
+    }
+
+    #[test]
+    fn google_response_to_message_with_no_candidates() {
+        let provider = set_up_provider();
+        let response = json!({});
+        let message = provider.google_response_to_message(response).unwrap();
+        assert_eq!(message.role, Role::Assistant);
+        assert!(message.content.is_empty());
+    }
+
+    #[test]
+    fn google_response_to_message_with_text_part() {
+        let provider = set_up_provider();
+        let response = json!({
+            "candidates": [{
+                "content": {
+                    "parts": [{
+                        "text": "Hello, world!"
+                    }]
+                }
+            }]
+        });
+        let message = provider.google_response_to_message(response).unwrap();
+        assert_eq!(message.role, Role::Assistant);
+        assert_eq!(message.content.len(), 1);
+        if let MessageContent::Text(text) = &message.content[0] {
+            assert_eq!(text.text, "Hello, world!");
+        } else {
+            panic!("Expected text content");
+        }
+    }
+
+    #[test]
+    fn google_response_to_message_with_invalid_function_name() {
+        let provider = set_up_provider();
+        let response = json!({
+            "candidates": [{
+                "content": {
+                    "parts": [{
+                        "functionCall": {
+                            "name": "invalid name!",
+                            "args": {}
+                        }
+                    }]
+                }
+            }]
+        });
+        let message = provider.google_response_to_message(response).unwrap();
+        assert_eq!(message.role, Role::Assistant);
+        assert_eq!(message.content.len(), 1);
+        if let Err(error) = &message.content[0].as_tool_request().unwrap().tool_call {
+            assert!(matches!(error, AgentError::ToolNotFound(_)));
+        } else {
+            panic!("Expected tool request error");
+        }
+    }
+
+    #[test]
+    fn google_response_to_message_with_valid_function_call() {
+        let provider = set_up_provider();
+        let response = json!({
+            "candidates": [{
+                "content": {
+                    "parts": [{
+                        "functionCall": {
+                            "name": "valid_name",
+                            "args": {
+                                "param": "value"
+                            }
+                        }
+                    }]
+                }
+            }]
+        });
+        let message = provider.google_response_to_message(response).unwrap();
+        assert_eq!(message.role, Role::Assistant);
+        assert_eq!(message.content.len(), 1);
+        if let Ok(tool_call) = &message.content[0].as_tool_request().unwrap().tool_call {
+            assert_eq!(tool_call.name, "valid_name");
+            assert_eq!(tool_call.arguments["param"], "value");
+        } else {
+            panic!("Expected valid tool request");
+        }
+    }
+}

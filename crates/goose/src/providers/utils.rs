@@ -620,4 +620,54 @@ mod tests {
         let result = check_bedrock_context_length_error(&error);
         assert!(result.is_none());
     }
+
+    #[test]
+    fn unescape_json_values_with_object() {
+        let value = json!({"text": "Hello\\nWorld"});
+        let unescaped_value = unescape_json_values(&value);
+        assert_eq!(unescaped_value, json!({"text": "Hello\nWorld"}));
+    }
+
+    #[test]
+    fn unescape_json_values_with_array() {
+        let value = json!(["Hello\\nWorld", "Goodbye\\tWorld"]);
+        let unescaped_value = unescape_json_values(&value);
+        assert_eq!(unescaped_value, json!(["Hello\nWorld", "Goodbye\tWorld"]));
+    }
+
+    #[test]
+    fn unescape_json_values_with_string() {
+        let value = json!("Hello\\nWorld");
+        let unescaped_value = unescape_json_values(&value);
+        assert_eq!(unescaped_value, json!("Hello\nWorld"));
+    }
+
+    #[test]
+    fn unescape_json_values_with_mixed_content() {
+        let value = json!({
+            "text": "Hello\\nWorld\\\\n!",
+            "array": ["Goodbye\\tWorld", "See you\\rlater"],
+            "nested": {
+                "inner_text": "Inner\\\"Quote\\\""
+            }
+        });
+        let unescaped_value = unescape_json_values(&value);
+        assert_eq!(
+            unescaped_value,
+            json!({
+                "text": "Hello\nWorld\n!",
+                "array": ["Goodbye\tWorld", "See you\rlater"],
+                "nested": {
+                    "inner_text": "Inner\"Quote\""
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn unescape_json_values_with_no_escapes() {
+        let value = json!({"text": "Hello World"});
+        let unescaped_value = unescape_json_values(&value);
+        assert_eq!(unescaped_value, json!({"text": "Hello World"}));
+    }
 }
