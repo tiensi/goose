@@ -1,24 +1,31 @@
-use anyhow::{anyhow, Result};
-use clap::Parser;
-use mcp_client::{
-    session::Session,
-    sse_transport::{SseTransport, SseTransportParams},
-    stdio_transport::{StdioServerParams, StdioTransport},
-    transport::Transport,
-};
-use serde_json::json;
+use anyhow::Result;
+use mcp_client::client::{ClientCapabilities, ClientInfo, Error as ClientError, McpClient};
+use mcp_client::{service::TransportService, transport::StdioTransport};
+use tower::ServiceBuilder;
 use tracing_subscriber::EnvFilter;
 
-#[derive(Parser)]
-#[command(author, version, about, long_about = None)]
-struct Args {
-    /// Mode to run in: "git" or "echo"
-    #[arg(short, long, default_value = "git")]
-    mode: String,
-}
+// use mcp_client::{
+//     service::{ServiceError},
+//     transport::{Error as TransportError},
+// };
+// use std::time::Duration;
+// use tower::timeout::error::Elapsed;
+
+// fn convert_box_error(err: Box<dyn std::error::Error + Send + Sync>) -> ServiceError {
+//     if let Some(elapsed) = err.downcast_ref::<Elapsed>() {
+//         ServiceError::Transport(TransportError::Io(
+//             std::io::Error::new(
+//                 std::io::ErrorKind::TimedOut,
+//                 format!("Timeout elapsed: {}", elapsed),
+//             ),
+//         ))
+//     } else {
+//         ServiceError::Other(err.to_string())
+//     }
+// }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> Result<(), ClientError> {
     // Initialize logging
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -28,64 +35,34 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    let args = Args::parse();
-    println!("Args - mode: {}", args.mode);
+    // Create the base transport
+    let transport = StdioTransport::new("uvx", ["mcp-server-git"]);
 
-    // Create session based on mode
-    let transport: Box<dyn Transport> = match args.mode.as_str() {
-        "git" => Box::new(StdioTransport {
-            params: StdioServerParams {
-                command: "uvx".into(),
-                args: vec!["mcp-server-git".into()],
-                env: None,
+    // Build service with middleware
+    let service = ServiceBuilder::new().service(TransportService::new(transport));
+
+    // Create client
+    let mut client = McpClient::new(service);
+
+    // Initialize
+    let server_info = client
+        .initialize(
+            ClientInfo {
+                name: "test-client".into(),
+                version: "1.0.0".into(),
             },
-        }),
-        "echo" => Box::new(SseTransport {
-            params: SseTransportParams {
-                url: "http://localhost:8000/sse".into(),
-                headers: None,
-            },
-        }),
-        _ => return Err(anyhow!("Invalid mode. Use 'git' or 'echo'")),
-    };
+            ClientCapabilities::default(),
+        )
+        .await?;
+    println!("Connected to server: {server_info:?}");
 
-    let (read_stream, write_stream) = transport.connect().await?;
-    let mut session = Session::new(read_stream, write_stream).await?;
+    // List resources
+    let resources = client.list_resources().await?;
+    println!("Available resources: {resources:?}");
 
-    // Initialize the connection
-    let init_result = session.initialize().await?;
-    println!("Initialized: {:?}", init_result);
-
-    // List tools
-    let tools = session.list_tools().await?;
-    println!("Tools: {:?}", tools);
-
-    if args.mode == "echo" {
-        // Call a tool (replace with actual tool name and arguments)
-        let call_result = session
-            .call_tool("echo_tool", Some(json!({"message": "Hello, world!"})))
-            .await?;
-        println!("Call tool result: {:?}", call_result);
-
-        // List available resources
-        let resources = session.list_resources().await?;
-        println!("Resources: {:?}", resources);
-
-        // Read a resource (replace with actual URI)
-        if let Some(resource) = resources.resources.first() {
-            let read_result = session.read_resource(&resource.uri).await?;
-            println!("Read resource result: {:?}", read_result);
-        }
-    } else {
-        // Call a tool (replace with actual tool name and arguments)
-        let call_result = session
-            .call_tool("git_status", Some(json!({"repo_path": "."})))
-            .await?;
-        println!("Call tool result: {:?}", call_result);
-    }
-
-    session.shutdown().await?;
-    println!("Done!");
+    // Read a resource
+    let content = client.read_resource("file:///example.txt".into()).await?;
+    println!("Content: {content:?}");
 
     Ok(())
 }
