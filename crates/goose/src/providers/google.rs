@@ -7,9 +7,9 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use mcp_core::{Content, Role, Tool, ToolCall};
 use reqwest::{Client, StatusCode};
+use rust_decimal_macros::dec;
 use serde_json::{json, Map, Value};
 use std::time::Duration;
-use rust_decimal_macros::dec;
 
 pub struct GoogleProvider {
     client: Client,
@@ -22,10 +22,7 @@ impl GoogleProvider {
             .timeout(Duration::from_secs(600)) // 10 minutes timeout
             .build()?;
 
-        Ok(Self {
-            client,
-            config,
-        })
+        Ok(Self { client, config })
     }
 
     fn get_usage(data: &Value) -> anyhow::Result<Usage> {
