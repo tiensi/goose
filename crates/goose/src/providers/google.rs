@@ -1,14 +1,14 @@
-use std::time::Duration;
-use anyhow::anyhow;
-use async_trait::async_trait;
-use reqwest::{Client, StatusCode};
-use serde_json::{json, Value, Map};
-use mcp_core::{Content, Role, Tool, ToolCall};
 use crate::errors::AgentError;
 use crate::message::{Message, MessageContent};
 use crate::providers::base::{Provider, ProviderUsageCollector, Usage};
 use crate::providers::configs::GoogleProviderConfig;
-use crate::providers::utils::{is_valid_function_name};
+use crate::providers::utils::is_valid_function_name;
+use anyhow::anyhow;
+use async_trait::async_trait;
+use mcp_core::{Content, Role, Tool, ToolCall};
+use reqwest::{Client, StatusCode};
+use serde_json::{json, Map, Value};
+use std::time::Duration;
 
 pub struct GoogleProvider {
     client: Client,
@@ -97,10 +97,19 @@ impl Provider for GoogleProvider {
     ) -> anyhow::Result<(Message, Usage)> {
         // Lifei: TODO: temperature parameters, tools may be empty, images
         let mut payload = Map::new();
-        payload.insert("system_instruction".to_string(), json!({"parts": [{"text": system}]}));
-        payload.insert("contents".to_string(), json!(messages_to_google_spec(&messages)));
+        payload.insert(
+            "system_instruction".to_string(),
+            json!({"parts": [{"text": system}]}),
+        );
+        payload.insert(
+            "contents".to_string(),
+            json!(messages_to_google_spec(&messages)),
+        );
         if !tools.is_empty() {
-            payload.insert("tools".to_string(), json!({"functionDeclarations": tools_to_google_spec(&tools)}));
+            payload.insert(
+                "tools".to_string(),
+                json!({"functionDeclarations": tools_to_google_spec(&tools)}),
+            );
         }
 
         // Make request
@@ -124,8 +133,6 @@ impl Provider for GoogleProvider {
         Ok((message, usage))
     }
 
-
-
     fn total_usage(&self) -> Usage {
         self.usage_collector.get_usage()
     }
@@ -135,7 +142,11 @@ fn messages_to_google_spec(messages: &[Message]) -> Vec<Value> {
     messages
         .iter()
         .map(|message| {
-            let role = if message.role == Role::User { "user" } else { "model" };
+            let role = if message.role == Role::User {
+                "user"
+            } else {
+                "model"
+            };
             let mut parts = Vec::new();
             for message_content in message.content.iter() {
                 match message_content {
@@ -148,8 +159,11 @@ fn messages_to_google_spec(messages: &[Message]) -> Vec<Value> {
                         Ok(tool_call) => {
                             let mut function_call_part = Map::new();
                             function_call_part.insert("name".to_string(), json!(tool_call.name));
-                            if tool_call.arguments.is_object() && !tool_call.arguments.as_object().unwrap().is_empty() {
-                                function_call_part.insert("arguments".to_string(), tool_call.arguments.clone());
+                            if tool_call.arguments.is_object()
+                                && !tool_call.arguments.as_object().unwrap().is_empty()
+                            {
+                                function_call_part
+                                    .insert("arguments".to_string(), tool_call.arguments.clone());
                             }
                             parts.push(json!({
                                 "functionCall": function_call_part
@@ -158,7 +172,7 @@ fn messages_to_google_spec(messages: &[Message]) -> Vec<Value> {
                         Err(e) => {
                             parts.push(json!({"text":format!("Error: {}", e)}));
                         }
-                    }
+                    },
                     MessageContent::ToolResponse(response) => {
                         match &response.tool_result {
                             Ok(contents) => {
@@ -166,17 +180,16 @@ fn messages_to_google_spec(messages: &[Message]) -> Vec<Value> {
                                 let abridged: Vec<_> = contents
                                     .iter()
                                     .filter(|content| {
-                                        content
-                                            .audience()
-                                            .is_none_or(|audience| audience.contains(&Role::Assistant))
+                                        content.audience().is_none_or(|audience| {
+                                            audience.contains(&Role::Assistant)
+                                        })
                                     })
                                     .map(|content| content.unannotated())
                                     .collect();
 
                                 for content in abridged {
                                     match content {
-                                        Content::Image(image) => {
-                                        }
+                                        Content::Image(image) => {}
                                         _ => {
                                             parts.push(json!({
                                                 "functionResponse": {
@@ -202,7 +215,7 @@ fn messages_to_google_spec(messages: &[Message]) -> Vec<Value> {
         .collect()
 }
 
-fn tools_to_google_spec(tools:  &[Tool]) -> Vec<Value> {
+fn tools_to_google_spec(tools: &[Tool]) -> Vec<Value> {
     tools
         .iter()
         .map(|tool| {
@@ -210,10 +223,33 @@ fn tools_to_google_spec(tools:  &[Tool]) -> Vec<Value> {
             parameters.insert("name".to_string(), json!(tool.name));
             parameters.insert("description".to_string(), json!(tool.description));
             let tool_input_schema = tool.input_schema.as_object().unwrap();
-            let tool_input_schema_properties = tool_input_schema.get("properties").unwrap_or(&json!({})).as_object().unwrap().clone();
+            let tool_input_schema_properties = tool_input_schema
+                .get("properties")
+                .unwrap_or(&json!({}))
+                .as_object()
+                .unwrap()
+                .clone();
             if !tool_input_schema_properties.is_empty() {
-                let accepted_tool_schema_attributes = vec!["type".to_string(), "format".to_string(), "description".to_string(), "nullable".to_string(), "enum".to_string(), "maxItems".to_string(), "minItems".to_string(), "properties".to_string(), "required".to_string(), "items".to_string()];
-                parameters.insert("parameters".to_string(), json!(process_map(tool_input_schema, &accepted_tool_schema_attributes, None)));
+                let accepted_tool_schema_attributes = vec![
+                    "type".to_string(),
+                    "format".to_string(),
+                    "description".to_string(),
+                    "nullable".to_string(),
+                    "enum".to_string(),
+                    "maxItems".to_string(),
+                    "minItems".to_string(),
+                    "properties".to_string(),
+                    "required".to_string(),
+                    "items".to_string(),
+                ];
+                parameters.insert(
+                    "parameters".to_string(),
+                    json!(process_map(
+                        tool_input_schema,
+                        &accepted_tool_schema_attributes,
+                        None
+                    )),
+                );
             }
             json!(parameters)
         })
@@ -234,13 +270,14 @@ fn process_map(
             }
             // Process nested maps recursively
             let filtered_value = match value {
-                Value::Object(nested_map) => {
-                    process_map(
-                        &nested_map.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
-                        accepted_keys,
-                        Some(key),
-                    )
-                }
+                Value::Object(nested_map) => process_map(
+                    &nested_map
+                        .iter()
+                        .map(|(k, v)| (k.clone(), v.clone()))
+                        .collect(),
+                    accepted_keys,
+                    Some(key),
+                ),
                 _ => value.clone(),
             };
 
@@ -257,22 +294,38 @@ fn process_map(
 fn google_response_to_message(response: Value) -> anyhow::Result<Message> {
     let mut content = Vec::new();
     let binding = vec![];
-    let candidates: &Vec<Value> = response.get("candidates").and_then(|v| v.as_array()).unwrap_or(&binding);
+    let candidates: &Vec<Value> = response
+        .get("candidates")
+        .and_then(|v| v.as_array())
+        .unwrap_or(&binding);
     let candidate = candidates.get(0);
     let role = Role::Assistant;
     let created = chrono::Utc::now().timestamp();
     if candidate.is_none() {
-        return Ok(Message { role, created, content});
+        return Ok(Message {
+            role,
+            created,
+            content,
+        });
     }
     let candidate = candidate.unwrap();
-    let parts = candidate.get("content")
-        .and_then(|content| content.get("parts")).and_then(|parts| parts.as_array()).unwrap_or(&binding);
+    let parts = candidate
+        .get("content")
+        .and_then(|content| content.get("parts"))
+        .and_then(|parts| parts.as_array())
+        .unwrap_or(&binding);
     for part in parts {
         if let Some(text) = part.get("text").and_then(|v| v.as_str()) {
             content.push(MessageContent::text(text.to_string()));
         } else if let Some(function_call) = part.get("functionCall") {
-            let id = function_call["name"].as_str().unwrap_or_default().to_string();
-            let name = function_call["name"].as_str().unwrap_or_default().to_string();
+            let id = function_call["name"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string();
+            let name = function_call["name"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string();
             if !is_valid_function_name(&name) {
                 let error = AgentError::ToolNotFound(format!(
                     "The provided function name '{}' had invalid characters, it must match this regex [a-zA-Z0-9_-]+",
@@ -284,11 +337,15 @@ fn google_response_to_message(response: Value) -> anyhow::Result<Message> {
                 if parameters.is_some() {
                     content.push(MessageContent::tool_request(
                         id,
-                        Ok(ToolCall::new(&name, parameters.unwrap().clone()))));
+                        Ok(ToolCall::new(&name, parameters.unwrap().clone())),
+                    ));
                 }
             }
-
         }
     }
-    Ok(Message { role, created, content})
+    Ok(Message {
+        role,
+        created,
+        content,
+    })
 }

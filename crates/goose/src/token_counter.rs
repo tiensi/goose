@@ -49,7 +49,11 @@ impl TokenCounter {
             tokenizers: HashMap::new(),
         };
         // Add default tokenizers
-        for tokenizer_key in [GPT_4O_TOKENIZER_KEY, CLAUDE_TOKENIZER_KEY, GOOGLE_TOKENIZER_KEY] {
+        for tokenizer_key in [
+            GPT_4O_TOKENIZER_KEY,
+            CLAUDE_TOKENIZER_KEY,
+            GOOGLE_TOKENIZER_KEY,
+        ] {
             counter.load_tokenizer(tokenizer_key);
         }
         counter

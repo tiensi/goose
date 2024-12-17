@@ -2,9 +2,9 @@ use super::{
     anthropic::AnthropicProvider, base::Provider, configs::ProviderConfig,
     databricks::DatabricksProvider, ollama::OllamaProvider, openai::OpenAiProvider,
 };
+use crate::providers::google::GoogleProvider;
 use anyhow::Result;
 use strum_macros::EnumIter;
-use crate::providers::google::GoogleProvider;
 
 #[derive(EnumIter, Debug)]
 pub enum ProviderType {
@@ -25,8 +25,6 @@ pub fn get_provider(config: ProviderConfig) -> Result<Box<dyn Provider + Send + 
         ProviderConfig::Anthropic(anthropic_config) => {
             Ok(Box::new(AnthropicProvider::new(anthropic_config)?))
         }
-        ProviderConfig::Google(google_config) => {
-            Ok(Box::new(GoogleProvider::new(google_config)?))
-        }
+        ProviderConfig::Google(google_config) => Ok(Box::new(GoogleProvider::new(google_config)?)),
     }
 }

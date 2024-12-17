@@ -91,7 +91,6 @@ pub struct GoogleProviderConfig {
     pub max_tokens: Option<i32>,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OllamaProviderConfig {
     pub host: String,

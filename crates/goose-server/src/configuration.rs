@@ -1,5 +1,6 @@
 use crate::error::{to_env_var, ConfigError};
 use config::{Config, Environment};
+use goose::providers::configs::GoogleProviderConfig;
 use goose::providers::{
     configs::{
         DatabricksAuth, DatabricksProviderConfig, OllamaProviderConfig, OpenAiProviderConfig,
@@ -11,7 +12,6 @@ use goose::providers::{
 };
 use serde::Deserialize;
 use std::net::SocketAddr;
-use goose::providers::configs::GoogleProviderConfig;
 
 #[derive(Debug, Default, Deserialize)]
 pub struct ServerSettings {
@@ -131,7 +131,7 @@ impl ProviderSettings {
                 temperature,
                 max_tokens,
             }),
-            ProviderSettings::Google{
+            ProviderSettings::Google {
                 host,
                 api_key,
                 model,

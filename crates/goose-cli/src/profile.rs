@@ -1,6 +1,9 @@
 use anyhow::Result;
 use goose::key_manager::{get_keyring_secret, KeyRetrievalStrategy};
-use goose::providers::configs::{AnthropicProviderConfig, DatabricksAuth, DatabricksProviderConfig, GoogleProviderConfig, OllamaProviderConfig, OpenAiProviderConfig, ProviderConfig};
+use goose::providers::configs::{
+    AnthropicProviderConfig, DatabricksAuth, DatabricksProviderConfig, GoogleProviderConfig,
+    OllamaProviderConfig, OpenAiProviderConfig, ProviderConfig,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
