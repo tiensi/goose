@@ -1,7 +1,9 @@
+use std::vec;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use futures::stream::BoxStream;
-use goose::{message::Message, systems::System};
+use goose::{message::Message, providers::base::ProviderUsage, systems::System};
 
 use crate::agents::agent::Agent;
 
@@ -15,7 +17,11 @@ impl Agent for MockAgent {
         Ok(Box::pin(futures::stream::empty()))
     }
 
-    fn total_usage(&self) -> goose::providers::base::Usage {
-        goose::providers::base::Usage::default()
+    async fn usage(&self) -> Result<Vec<ProviderUsage>> {
+        Ok(vec![ProviderUsage::new(
+            "mock".to_string(),
+            Default::default(),
+            None,
+        )])
     }
 }

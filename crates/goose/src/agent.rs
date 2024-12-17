@@ -1,21 +1,19 @@
 use anyhow::Result;
 use async_stream;
 use futures::stream::BoxStream;
+use rust_decimal_macros::dec;
 use serde_json::json;
 use std::collections::HashMap;
+use tokio::sync::Mutex;
 
 use crate::errors::{AgentError, AgentResult};
 use crate::message::{Message, ToolRequest};
 use crate::prompt_template::load_prompt_file;
-use crate::providers::base::Provider;
+use crate::providers::base::{Provider, ProviderUsage};
 use crate::systems::System;
 use crate::token_counter::TokenCounter;
 use mcp_core::{Content, Resource, Tool, ToolCall};
 use serde::Serialize;
-
-const CONTEXT_LIMIT: usize = 200_000; // TODO: model's context limit should be in provider config
-const ESTIMATE_FACTOR: f32 = 0.8;
-const ESTIMATED_TOKEN_LIMIT: usize = (CONTEXT_LIMIT as f32 * ESTIMATE_FACTOR) as usize;
 
 // used to sort resources by priority within error margin
 const PRIORITY_EPSILON: f32 = 0.001;
@@ -56,6 +54,7 @@ impl SystemStatus {
 pub struct Agent {
     systems: Vec<Box<dyn System>>,
     provider: Box<dyn Provider>,
+    provider_usage: Mutex<Vec<ProviderUsage>>,
 }
 
 #[allow(dead_code)]
@@ -65,12 +64,18 @@ impl Agent {
         Self {
             systems: Vec::new(),
             provider,
+            provider_usage: Mutex::new(Vec::new()),
         }
     }
 
     /// Add a system to the agent
     pub fn add_system(&mut self, system: Box<dyn System>) {
         self.systems.push(system);
+    }
+
+    /// Get the context limit from the provider's configuration
+    fn get_context_limit(&self) -> usize {
+        self.provider.get_model_config().context_limit()
     }
 
     /// Get all tools from all systems with proper system prefixing
@@ -202,7 +207,7 @@ impl Agent {
             messages,
             tools,
             &resources,
-            Some("gpt-4"),
+            Some(&self.provider.get_model_config().model_name),
         );
 
         let mut status_content: Vec<String> = Vec::new();
@@ -217,7 +222,9 @@ impl Agent {
             for (system_name, resources) in &resource_content {
                 let mut resource_counts = HashMap::new();
                 for (uri, (_resource, content)) in resources {
-                    let token_count = token_counter.count_tokens(content, Some("gpt-4")) as u32;
+                    let token_count = token_counter
+                        .count_tokens(&content, Some(&self.provider.get_model_config().model_name))
+                        as u32;
                     resource_counts.insert(uri.clone(), token_count);
                 }
                 system_token_counts.insert(system_name.clone(), resource_counts);
@@ -323,6 +330,7 @@ impl Agent {
         let mut messages = messages.to_vec();
         let tools = self.get_prefixed_tools();
         let system_prompt = self.get_system_prompt()?;
+        let estimated_limit = self.provider.get_model_config().get_estimated_limit();
 
         // Update conversation history for the start of the reply
         messages = self
@@ -331,19 +339,19 @@ impl Agent {
                 &tools,
                 &messages,
                 &Vec::new(),
-                ESTIMATED_TOKEN_LIMIT,
+                estimated_limit,
             )
             .await?;
 
         Ok(Box::pin(async_stream::try_stream! {
             loop {
-
                 // Get completion from provider
-                let (response, _) = self.provider.complete(
+                let (response, usage) = self.provider.complete(
                     &system_prompt,
                     &messages,
                     &tools,
                 ).await?;
+                self.provider_usage.lock().await.push(usage);
 
                 // The assistant's response is added in rewrite_messages_on_tool_response
                 // Yield the assistant's response
@@ -391,13 +399,37 @@ impl Agent {
                 messages.pop();
 
                 let pending = vec![response, message_tool_response];
-                messages = self.prepare_inference(&system_prompt, &tools, &messages, &pending, ESTIMATED_TOKEN_LIMIT).await?;
+                messages = self.prepare_inference(&system_prompt, &tools, &messages, &pending, estimated_limit).await?;
             }
         }))
     }
 
-    pub fn total_usage(&self) -> crate::providers::base::Usage {
-        self.provider.total_usage()
+    pub async fn usage(&self) -> Result<Vec<ProviderUsage>> {
+        let provider_usage = self.provider_usage.lock().await.clone();
+
+        let mut usage_map: HashMap<String, ProviderUsage> = HashMap::new();
+        provider_usage.iter().for_each(|usage| {
+            usage_map
+                .entry(usage.model.clone())
+                .and_modify(|e| {
+                    e.usage.input_tokens = Some(
+                        e.usage.input_tokens.unwrap_or(0) + usage.usage.input_tokens.unwrap_or(0),
+                    );
+                    e.usage.output_tokens = Some(
+                        e.usage.output_tokens.unwrap_or(0) + usage.usage.output_tokens.unwrap_or(0),
+                    );
+                    e.usage.total_tokens = Some(
+                        e.usage.total_tokens.unwrap_or(0) + usage.usage.total_tokens.unwrap_or(0),
+                    );
+                    if e.cost.is_none() || usage.cost.is_none() {
+                        e.cost = None; // Pricing is not available for all models
+                    } else {
+                        e.cost = Some(e.cost.unwrap_or(dec!(0)) + usage.cost.unwrap_or(dec!(0)));
+                    }
+                })
+                .or_insert_with(|| usage.clone());
+        });
+        Ok(usage_map.into_values().collect())
     }
 }
 
@@ -405,6 +437,7 @@ impl Agent {
 mod tests {
     use super::*;
     use crate::message::MessageContent;
+    use crate::providers::configs::ModelConfig;
     use crate::providers::mock::MockProvider;
     use async_trait::async_trait;
     use chrono::Utc;
@@ -504,6 +537,32 @@ mod tests {
 
         assert_eq!(messages.len(), 1);
         assert_eq!(messages[0], response);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_usage_rollup() -> Result<()> {
+        let response = Message::assistant().with_text("Hello!");
+        let provider = MockProvider::new(vec![response.clone()]);
+        let agent = Agent::new(Box::new(provider));
+
+        let initial_message = Message::user().with_text("Hi");
+        let initial_messages = vec![initial_message];
+
+        let mut stream = agent.reply(&initial_messages).await?;
+        while stream.try_next().await?.is_some() {}
+
+        // Second message
+        let mut stream = agent.reply(&initial_messages).await?;
+        while stream.try_next().await?.is_some() {}
+
+        let usage = agent.usage().await?;
+        assert_eq!(usage.len(), 1); // 2 messages rolled up to one usage per model
+        assert_eq!(usage[0].usage.input_tokens, Some(2));
+        assert_eq!(usage[0].usage.output_tokens, Some(2));
+        assert_eq!(usage[0].usage.total_tokens, Some(4));
+        assert_eq!(usage[0].model, "mock");
+        assert_eq!(usage[0].cost, Some(dec!(2)));
         Ok(())
     }
 
@@ -668,6 +727,55 @@ mod tests {
         // Verify that only the high priority resource is included in the status
         assert!(status_content.contains("high_priority"));
         assert!(status_content.contains("low_priority"));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_context_trimming_with_custom_model_config() -> Result<()> {
+        let provider = MockProvider::with_config(
+            vec![],
+            ModelConfig::new("test_model".to_string()).with_context_limit(Some(20)),
+        );
+        let mut agent = Agent::new(Box::new(provider));
+
+        // Create a mock system with a resource that will exceed the context limit
+        let mut system = MockSystem::new("test");
+
+        // Add a resource that will exceed our tiny context limit
+        let hello_1_tokens = "hello ".repeat(1); // 1 tokens
+        let goodbye_10_tokens = "goodbye ".repeat(10); // 10 tokens
+        system.add_resource("test_resource_removed", &goodbye_10_tokens, 0.1);
+        system.add_resource("test_resource_expected", &hello_1_tokens, 0.5);
+
+        agent.add_system(Box::new(system));
+
+        // Set up test parameters
+        // 18 tokens with system + user msg in chat format
+        let system_prompt = "This is a system prompt";
+        let messages = vec![Message::user().with_text("Hi there")];
+        let tools = vec![];
+        let pending = vec![];
+
+        // Use the context limit from the model config
+        let target_limit = agent.get_context_limit();
+        assert_eq!(target_limit, 20, "Context limit should be 20");
+
+        // Call prepare_inference
+        let result = agent
+            .prepare_inference(system_prompt, &tools, &messages, &pending, target_limit)
+            .await?;
+
+        // Get the last message which should be the tool response containing status
+        let status_message = result.last().unwrap();
+        let status_content = status_message
+            .content
+            .first()
+            .and_then(|content| content.as_tool_response_text())
+            .unwrap_or_default();
+
+        // verify that "hello" is within the response, should be just under 20 tokens with "hello"
+        assert!(status_content.contains("hello"));
+
         Ok(())
     }
 }

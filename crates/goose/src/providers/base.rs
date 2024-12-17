@@ -1,9 +1,30 @@
 use anyhow::Result;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
 
+use super::configs::ModelConfig;
 use crate::message::Message;
 use mcp_core::tool::Tool;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProviderUsage {
+    pub model: String,
+    pub usage: Usage,
+    pub cost: Option<Decimal>,
+}
+
+impl ProviderUsage {
+    pub fn new(model: String, usage: Usage, cost: Option<Decimal>) -> Self {
+        Self { model, usage, cost }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Pricing {
+    /// Prices are per million tokens.
+    pub input_token_price: Decimal,
+    pub output_token_price: Decimal,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Usage {
@@ -31,6 +52,9 @@ use async_trait::async_trait;
 /// Base trait for AI providers (OpenAI, Anthropic, etc)
 #[async_trait]
 pub trait Provider: Send + Sync {
+    /// Get the model configuration
+    fn get_model_config(&self) -> &ModelConfig;
+
     /// Generate the next message using the configured model and other parameters
     ///
     /// # Arguments
@@ -39,56 +63,13 @@ pub trait Provider: Send + Sync {
     /// * `tools` - Optional list of tools the model can use
     ///
     /// # Returns
-    /// A tuple containing the model's response message and usage statistics
+    /// A tuple containing the model's response message and provider usage statistics
     async fn complete(
         &self,
         system: &str,
         messages: &[Message],
         tools: &[Tool],
-    ) -> Result<(Message, Usage)>;
-
-    /// Providers should implement this method to return their total usage statistics from provider.complete (or others)
-    fn total_usage(&self) -> Usage;
-}
-
-/// A simple struct to reuse for collecting usage statistics for provider implementations.
-pub struct ProviderUsageCollector {
-    usage: Mutex<Usage>,
-}
-
-impl Default for ProviderUsageCollector {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl ProviderUsageCollector {
-    pub fn new() -> Self {
-        Self {
-            usage: Mutex::new(Usage::default()),
-        }
-    }
-
-    pub fn add_usage(&self, usage: Usage) {
-        if let Ok(mut current) = self.usage.lock() {
-            if let Some(input_tokens) = usage.input_tokens {
-                current.input_tokens = Some(current.input_tokens.unwrap_or(0) + input_tokens);
-            }
-            if let Some(output_tokens) = usage.output_tokens {
-                current.output_tokens = Some(current.output_tokens.unwrap_or(0) + output_tokens);
-            }
-            if let Some(total_tokens) = usage.total_tokens {
-                current.total_tokens = Some(current.total_tokens.unwrap_or(0) + total_tokens);
-            }
-        }
-    }
-
-    pub fn get_usage(&self) -> Usage {
-        self.usage
-            .lock()
-            .map(|guard| guard.clone())
-            .unwrap_or_default()
-    }
+    ) -> Result<(Message, ProviderUsage)>;
 }
 
 #[cfg(test)]
@@ -121,24 +102,5 @@ mod tests {
         assert_eq!(json_value["total_tokens"], json!(30));
 
         Ok(())
-    }
-
-    #[test]
-    fn test_usage_collector() {
-        let collector = ProviderUsageCollector::new();
-
-        // Add first usage
-        collector.add_usage(Usage::new(Some(10), Some(20), Some(30)));
-        let usage1 = collector.get_usage();
-        assert_eq!(usage1.input_tokens, Some(10));
-        assert_eq!(usage1.output_tokens, Some(20));
-        assert_eq!(usage1.total_tokens, Some(30));
-
-        // Add second usage
-        collector.add_usage(Usage::new(Some(5), Some(10), Some(15)));
-        let usage2 = collector.get_usage();
-        assert_eq!(usage2.input_tokens, Some(15));
-        assert_eq!(usage2.output_tokens, Some(30));
-        assert_eq!(usage2.total_tokens, Some(45));
     }
 }

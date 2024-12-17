@@ -1,12 +1,12 @@
-use goose::providers::base::Usage;
+use goose::providers::base::ProviderUsage;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct SessionLog {
     session_file: String,
-    usage: goose::providers::base::Usage,
+    usage: Vec<ProviderUsage>,
 }
 
-pub fn log_usage(session_file: String, usage: Usage) {
+pub fn log_usage(session_file: String, usage: Vec<ProviderUsage>) {
     let log = SessionLog {
         session_file,
         usage,
@@ -49,12 +49,14 @@ pub fn log_usage(session_file: String, usage: Usage) {
 
 #[cfg(test)]
 mod tests {
-    use goose::providers::base::Usage;
+    use goose::providers::base::{ProviderUsage, Usage};
+    use rust_decimal_macros::dec;
 
     use crate::{
         log_usage::{log_usage, SessionLog},
         test_helpers::run_with_tmp_dir,
     };
+
     #[test]
     fn test_session_logging() {
         run_with_tmp_dir(|| {
@@ -63,7 +65,11 @@ mod tests {
 
             log_usage(
                 "path.txt".to_string(),
-                Usage::new(Some(10), Some(20), Some(30)),
+                vec![ProviderUsage::new(
+                    "model".to_string(),
+                    Usage::new(Some(10), Some(20), Some(30)),
+                    Some(dec!(0.5)),
+                )],
             );
 
             // Check if log file exists and contains the expected content
@@ -75,9 +81,11 @@ mod tests {
                 serde_json::from_str(log_content.lines().last().unwrap()).unwrap();
 
             assert!(log.session_file.contains("path.txt"));
-            assert_eq!(log.usage.input_tokens, Some(10));
-            assert_eq!(log.usage.output_tokens, Some(20));
-            assert_eq!(log.usage.total_tokens, Some(30));
+            assert_eq!(log.usage[0].usage.input_tokens, Some(10));
+            assert_eq!(log.usage[0].usage.output_tokens, Some(20));
+            assert_eq!(log.usage[0].usage.total_tokens, Some(30));
+            assert_eq!(log.usage[0].model, "model");
+            assert_eq!(log.usage[0].cost, Some(dec!(0.5)));
         })
     }
 }

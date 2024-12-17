@@ -5,8 +5,13 @@ use reqwest::StatusCode;
 use serde_json::{json, Value};
 use std::time::Duration;
 
-use super::base::{Provider, ProviderUsageCollector, Usage};
+use super::base::ProviderUsage;
+use super::base::{Provider, Usage};
 use super::configs::OpenAiProviderConfig;
+use super::configs::{ModelConfig, ProviderModelConfig};
+use super::model_pricing::cost;
+use super::model_pricing::model_pricing_for;
+use super::utils::get_model;
 use super::utils::{
     check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message,
     tools_to_openai_spec, ImageFormat,
@@ -17,7 +22,6 @@ use mcp_core::tool::Tool;
 pub struct OpenAiProvider {
     client: Client,
     config: OpenAiProviderConfig,
-    usage_collector: ProviderUsageCollector,
 }
 
 impl OpenAiProvider {
@@ -26,11 +30,7 @@ impl OpenAiProvider {
             .timeout(Duration::from_secs(600)) // 10 minutes timeout
             .build()?;
 
-        Ok(Self {
-            client,
-            config,
-            usage_collector: ProviderUsageCollector::new(),
-        })
+        Ok(Self { client, config })
     }
 
     fn get_usage(data: &Value) -> Result<Usage> {
@@ -96,7 +96,7 @@ impl Provider for OpenAiProvider {
         system: &str,
         messages: &[Message],
         tools: &[Tool],
-    ) -> Result<(Message, Usage)> {
+    ) -> Result<(Message, ProviderUsage)> {
         // Not checking for o1 model here since system message is not supported by o1
         let system_message = json!({
             "role": "system",
@@ -117,7 +117,7 @@ impl Provider for OpenAiProvider {
         messages_array.extend(messages_spec);
 
         let mut payload = json!({
-            "model": self.config.model,
+            "model": self.config.model.model_name,
             "messages": messages_array
         });
 
@@ -128,13 +128,13 @@ impl Provider for OpenAiProvider {
                 .unwrap()
                 .insert("tools".to_string(), json!(tools_spec));
         }
-        if let Some(temp) = self.config.temperature {
+        if let Some(temp) = self.config.model.temperature {
             payload
                 .as_object_mut()
                 .unwrap()
                 .insert("temperature".to_string(), json!(temp));
         }
-        if let Some(tokens) = self.config.max_tokens {
+        if let Some(tokens) = self.config.model.max_tokens {
             payload
                 .as_object_mut()
                 .unwrap()
@@ -155,13 +155,14 @@ impl Provider for OpenAiProvider {
         // Parse response
         let message = openai_response_to_message(response.clone())?;
         let usage = Self::get_usage(&response)?;
-        self.usage_collector.add_usage(usage.clone());
+        let model = get_model(&response);
+        let cost = cost(&usage, &model_pricing_for(&model));
 
-        Ok((message, usage))
+        Ok((message, ProviderUsage::new(model, usage, cost)))
     }
 
-    fn total_usage(&self) -> Usage {
-        self.usage_collector.get_usage()
+    fn get_model_config(&self) -> &ModelConfig {
+        self.config.model_config()
     }
 }
 
@@ -169,6 +170,8 @@ impl Provider for OpenAiProvider {
 mod tests {
     use super::*;
     use crate::message::MessageContent;
+    use crate::providers::configs::ModelConfig;
+    use rust_decimal_macros::dec;
     use serde_json::json;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -185,9 +188,7 @@ mod tests {
         let config = OpenAiProviderConfig {
             host: mock_server.uri(),
             api_key: "test_api_key".to_string(),
-            model: "gpt-3.5-turbo".to_string(),
-            temperature: Some(0.7),
-            max_tokens: None,
+            model: ModelConfig::new("gpt-3.5-turbo".to_string()).with_temperature(Some(0.7)),
         };
 
         let provider = OpenAiProvider::new(config).unwrap();
@@ -213,7 +214,8 @@ mod tests {
                 "prompt_tokens": 12,
                 "completion_tokens": 15,
                 "total_tokens": 27
-            }
+            },
+            "model": "gpt-4o"
         });
 
         let (_, provider) = _setup_mock_server(response_body).await;
@@ -232,15 +234,11 @@ mod tests {
         } else {
             panic!("Expected Text content");
         }
-        assert_eq!(usage.input_tokens, Some(12));
-        assert_eq!(usage.output_tokens, Some(15));
-        assert_eq!(usage.total_tokens, Some(27));
-
-        // Check total usage
-        let total = provider.total_usage();
-        assert_eq!(total.input_tokens, Some(12));
-        assert_eq!(total.output_tokens, Some(15));
-        assert_eq!(total.total_tokens, Some(27));
+        assert_eq!(usage.usage.input_tokens, Some(12));
+        assert_eq!(usage.usage.output_tokens, Some(15));
+        assert_eq!(usage.usage.total_tokens, Some(27));
+        assert_eq!(usage.model, "gpt-4o");
+        assert_eq!(usage.cost, Some(dec!(0.00018)));
 
         Ok(())
     }
@@ -312,9 +310,9 @@ mod tests {
             panic!("Expected ToolCall content");
         }
 
-        assert_eq!(usage.input_tokens, Some(20));
-        assert_eq!(usage.output_tokens, Some(15));
-        assert_eq!(usage.total_tokens, Some(35));
+        assert_eq!(usage.usage.input_tokens, Some(20));
+        assert_eq!(usage.usage.output_tokens, Some(15));
+        assert_eq!(usage.usage.total_tokens, Some(35));
 
         Ok(())
     }
