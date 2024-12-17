@@ -127,7 +127,14 @@ impl GoogleProvider {
 
                                     for content in abridged {
                                         match content {
-                                            Content::Image(image) => {}
+                                            Content::Image(image) => {
+                                                parts.push(json!({
+                                                    "inline_data": {
+                                                        "mime_type": image.mime_type,
+                                                        "data": image.data,
+                                                    }
+                                                }));
+                                            }
                                             _ => {
                                                 parts.push(json!({
                                                     "functionResponse": {
@@ -303,7 +310,6 @@ impl Provider for GoogleProvider {
         messages: &[Message],
         tools: &[Tool],
     ) -> anyhow::Result<(Message, ProviderUsage)> {
-        // Lifei: TODO: images
         let mut payload = Map::new();
         payload.insert(
             "system_instruction".to_string(),
