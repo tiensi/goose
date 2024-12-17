@@ -13,7 +13,7 @@ pub struct TokenCounter {
 
 const GPT_4O_TOKENIZER_KEY: &str = "Xenova--gpt-4o";
 const CLAUDE_TOKENIZER_KEY: &str = "Xenova--claude-tokenizer";
-const GOOGLE_TOKENIZER_KEY: &str = "Xenova--google-tokenizer";
+const GOOGLE_TOKENIZER_KEY: &str = "Xenova--gemini-nano";
 const QWEN_TOKENIZER_KEY: &str = "Qwen--Qwen2.5-Coder-32B-Instruct";
 
 impl Default for TokenCounter {
@@ -62,7 +62,6 @@ impl TokenCounter {
     fn model_to_tokenizer_key(model_name: Option<&str>) -> &str {
         let model_name = model_name.unwrap_or("gpt-4o").to_lowercase();
         // Lifei: to remove
-        println!("Model name: {}", model_name);
         if model_name.contains("claude") {
             CLAUDE_TOKENIZER_KEY
         } else if model_name.contains("qwen") {

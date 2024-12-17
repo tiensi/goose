@@ -104,7 +104,7 @@ impl Provider for GoogleProvider {
         }
 
         // Make request
-        let response = self.post(serde_json::Value::Object(payload)).await?;
+        let response = self.post(Value::Object(payload)).await?;
 
         // Lifei: TODO handle api errors https://ai.google.dev/gemini-api/docs/troubleshooting?lang=python
         // // Raise specific error if context length is exceeded
@@ -146,11 +146,13 @@ fn messages_to_google_spec(messages: &[Message]) -> Vec<Value> {
                     }
                     MessageContent::ToolRequest(request) => match &request.tool_call {
                         Ok(tool_call) => {
+                            let mut function_call_part = Map::new();
+                            function_call_part.insert("name".to_string(), json!(tool_call.name));
+                            if tool_call.arguments.is_object() && !tool_call.arguments.as_object().unwrap().is_empty() {
+                                function_call_part.insert("arguments".to_string(), tool_call.arguments.clone());
+                            }
                             parts.push(json!({
-                                "functionCall": {
-                                    "name": tool_call.name,
-                                    "arguments": tool_call.arguments,
-                                }
+                                "functionCall": function_call_part
                             }));
                         }
                         Err(e) => {
@@ -204,13 +206,52 @@ fn tools_to_google_spec(tools:  &[Tool]) -> Vec<Value> {
     tools
         .iter()
         .map(|tool| {
-            json!({
-                    "name": tool.name,
-                    "description": tool.description,
-                    "parameters": tool.input_schema,
-            })
+            let mut parameters = Map::new();
+            parameters.insert("name".to_string(), json!(tool.name));
+            parameters.insert("description".to_string(), json!(tool.description));
+            let tool_input_schema = tool.input_schema.as_object().unwrap();
+            let tool_input_schema_properties = tool_input_schema.get("properties").unwrap_or(&json!({})).as_object().unwrap().clone();
+            if !tool_input_schema_properties.is_empty() {
+                let accepted_tool_schema_attributes = vec!["type".to_string(), "format".to_string(), "description".to_string(), "nullable".to_string(), "enum".to_string(), "maxItems".to_string(), "minItems".to_string(), "properties".to_string(), "required".to_string(), "items".to_string()];
+                parameters.insert("parameters".to_string(), json!(process_map(tool_input_schema, &accepted_tool_schema_attributes, None)));
+            }
+            json!(parameters)
         })
         .collect()
+}
+
+fn process_map(
+    map: &Map<String, Value>,
+    accepted_keys: &[String],
+    parent_key: Option<&str>, // Track the parent key
+) -> Value {
+    let mut filtered_map: Map<String, serde_json::Value> = map
+        .iter()
+        .filter_map(|(key, value)| {
+            let should_remove = !accepted_keys.contains(key) && parent_key != Some("properties");
+            if should_remove {
+                return None;
+            }
+            // Process nested maps recursively
+            let filtered_value = match value {
+                Value::Object(nested_map) => {
+                    process_map(
+                        &nested_map.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+                        accepted_keys,
+                        Some(key),
+                    )
+                }
+                _ => value.clone(),
+            };
+
+            Some((key.clone(), filtered_value))
+        })
+        .collect();
+    if parent_key != Some("properties") && !filtered_map.contains_key("type") {
+        filtered_map.insert("type".to_string(), Value::String("string".to_string()));
+    }
+
+    Value::Object(filtered_map)
 }
 
 fn google_response_to_message(response: Value) -> anyhow::Result<Message> {
