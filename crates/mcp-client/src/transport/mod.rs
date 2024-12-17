@@ -12,6 +12,15 @@ pub enum Error {
     #[error("Transport was not connected or is already closed")]
     NotConnected,
 
+    #[error("Invalid URL provided")]
+    InvalidUrl,
+
+    #[error("Connection timeout")]
+    Timeout,
+
+    #[error("Failed to send message")]
+    SendFailed,
+
     #[error("Unexpected transport error: {0}")]
     Other(String),
 }
@@ -65,3 +74,6 @@ impl<T: Transport> Transport for Arc<Mutex<T>> {
 
 pub mod stdio;
 pub use stdio::StdioTransport;
+
+pub mod sse;
+pub use sse::SseTransport;
