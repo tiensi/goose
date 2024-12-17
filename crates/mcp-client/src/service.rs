@@ -17,6 +17,9 @@ pub enum ServiceError {
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
 
+    #[error("Request timed out")]
+    Timeout(#[from] tower::timeout::error::Elapsed),
+
     #[error("Other error: {0}")]
     Other(String),
 

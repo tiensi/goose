@@ -1,9 +1,14 @@
 use anyhow::Result;
 use mcp_client::client::{ClientCapabilities, ClientInfo, Error as ClientError, McpClient};
-use mcp_client::{service::TransportService, transport::StdioTransport};
+use mcp_client::{
+    service::{ServiceError, TransportService},
+    transport::StdioTransport,
+};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Mutex;
-use tower::ServiceBuilder;
+use tower::timeout::TimeoutLayer;
+use tower::{ServiceBuilder, ServiceExt};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -20,8 +25,17 @@ async fn main() -> Result<(), ClientError> {
     // Create the base transport as Arc<Mutex<StdioTransport>>
     let transport = Arc::new(Mutex::new(StdioTransport::new("uvx", ["mcp-server-git"])));
 
-    // Build service with middleware
-    let service = ServiceBuilder::new().service(TransportService::new(Arc::clone(&transport)));
+    // Build service with middleware including timeout
+    let service = ServiceBuilder::new()
+        .layer(TimeoutLayer::new(Duration::from_secs(30)))
+        .service(TransportService::new(Arc::clone(&transport)))
+        .map_err(|e: Box<dyn std::error::Error + Send + Sync>| {
+            if e.is::<tower::timeout::error::Elapsed>() {
+                ServiceError::Timeout(tower::timeout::error::Elapsed::new())
+            } else {
+                ServiceError::Other(e.to_string())
+            }
+        });
 
     // Create client
     let mut client = McpClient::new(service, Arc::clone(&transport));

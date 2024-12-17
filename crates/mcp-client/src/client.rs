@@ -138,7 +138,6 @@ where
         };
         let msg = serde_json::to_string(&notification)?;
         let transport = self.transport.lock().await;
-        // transport.send(msg).await
         transport
             .send(msg)
             .await
