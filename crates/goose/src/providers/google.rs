@@ -7,7 +7,6 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use mcp_core::{Content, Role, Tool, ToolCall};
 use reqwest::{Client, StatusCode};
-use rust_decimal_macros::dec;
 use serde_json::{json, Map, Value};
 use std::time::Duration;
 
@@ -25,31 +24,25 @@ impl GoogleProvider {
         Ok(Self { client, config })
     }
 
-    fn get_usage(data: &Value) -> anyhow::Result<Usage> {
-        let usage = data
-            .get("usage")
-            .ok_or_else(|| anyhow!("No usage data in response"))?;
-
-        let input_tokens = usage
-            .get("prompt_tokens")
-            .and_then(|v| v.as_i64())
-            .map(|v| v as i32);
-
-        let output_tokens = usage
-            .get("completion_tokens")
-            .and_then(|v| v.as_i64())
-            .map(|v| v as i32);
-
-        let total_tokens = usage
-            .get("total_tokens")
-            .and_then(|v| v.as_i64())
-            .map(|v| v as i32)
-            .or_else(|| match (input_tokens, output_tokens) {
-                (Some(input), Some(output)) => Some(input + output),
-                _ => None,
-            });
-
-        Ok(Usage::new(input_tokens, output_tokens, total_tokens))
+    fn get_usage(&self, data: &Value) -> anyhow::Result<Usage> {
+        if let Some(usage_meta_data) = data.get("usageMetadata") {
+            let input_tokens = usage_meta_data
+                .get("promptTokenCount")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as i32);
+            let output_tokens = usage_meta_data
+                .get("candidatesTokenCount")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as i32);
+            let total_tokens = usage_meta_data
+                .get("totalTokenCount")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as i32);
+            Ok(Usage::new(input_tokens, output_tokens, total_tokens))
+        } else {
+            // If no usage data, return None for all values
+            Ok(Usage::new(None, None, None))
+        }
     }
 
     async fn post(&self, payload: Value) -> anyhow::Result<Value> {
@@ -95,7 +88,7 @@ impl Provider for GoogleProvider {
         messages: &[Message],
         tools: &[Tool],
     ) -> anyhow::Result<(Message, ProviderUsage)> {
-        // Lifei: TODO: temperature parameters, images
+        // Lifei: TODO: images
         let mut payload = Map::new();
         payload.insert(
             "system_instruction".to_string(),
@@ -126,14 +119,15 @@ impl Provider for GoogleProvider {
 
         // Make request
         let response = self.post(Value::Object(payload)).await?;
-
         // Parse response
         let message = google_response_to_message(unescape_json_values(&response))?;
-        // Lifei: TODO Usage
-        let usage = Usage::new(Some(100), Some(100), Some(100));
-        // let usage = Self::get_usage(&response)?;
-        // self.usage_collector.add_usage(usage.clone());
-        let provider_usage = ProviderUsage::new("gpt-4o".to_string(), usage, Some(dec!(0.0)));
+        let usage = self.get_usage(&response)?;
+        let model =  match response.get("modelVersion") {
+            Some(model_version) => model_version.as_str().unwrap_or_default().to_string(),
+            None => self.config.model.model_name.clone(),
+        };
+        let provider_usage = ProviderUsage::new(model, usage, None);
+        println!("====== Google provider: {:?}", provider_usage);
         Ok((message, provider_usage))
     }
 }
