@@ -2,7 +2,9 @@ use crate::errors::AgentError;
 use crate::message::{Message, MessageContent};
 use crate::providers::base::{Provider, ProviderUsage, Usage};
 use crate::providers::configs::{GoogleProviderConfig, ModelConfig, ProviderModelConfig};
-use crate::providers::utils::{is_valid_function_name, unescape_json_values};
+use crate::providers::utils::{
+    is_valid_function_name, sanitize_function_name, unescape_json_values,
+};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use mcp_core::{Content, Role, Tool, ToolCall};
@@ -95,8 +97,10 @@ impl GoogleProvider {
                         MessageContent::ToolRequest(request) => match &request.tool_call {
                             Ok(tool_call) => {
                                 let mut function_call_part = Map::new();
-                                function_call_part
-                                    .insert("name".to_string(), json!(tool_call.name));
+                                function_call_part.insert(
+                                    "name".to_string(),
+                                    json!(sanitize_function_name(&tool_call.name)),
+                                );
                                 if tool_call.arguments.is_object()
                                     && !tool_call.arguments.as_object().unwrap().is_empty()
                                 {
