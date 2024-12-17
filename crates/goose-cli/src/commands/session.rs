@@ -6,7 +6,6 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 use crate::profile::{get_provider_config, load_profiles, Profile};
-use crate::prompt::cliclack::CliclackPrompt;
 use crate::prompt::rustyline::RustylinePrompt;
 use crate::prompt::Prompt;
 use crate::session::{ensure_session_dir, get_most_recent_session, Session};
@@ -42,15 +41,13 @@ pub fn build_session<'a>(
 
     let loaded_profile = load_profile(profile);
 
-    let provider_config =
-        get_provider_config(&loaded_profile.provider, loaded_profile.model.clone());
+    let provider_config = get_provider_config(&loaded_profile.provider, (*loaded_profile).clone());
 
     // TODO: Odd to be prepping the provider rather than having that done in the agent?
     let provider = factory::get_provider(provider_config).unwrap();
     let agent = Box::new(Agent::new(provider));
     let prompt = match std::env::var("GOOSE_INPUT") {
         Ok(val) => match val.as_str() {
-            "cliclack" => Box::new(CliclackPrompt::new()) as Box<dyn Prompt>,
             "rustyline" => Box::new(RustylinePrompt::new()) as Box<dyn Prompt>,
             _ => Box::new(RustylinePrompt::new()) as Box<dyn Prompt>,
         },

@@ -10,7 +10,7 @@ use anyhow::Result;
 use cliclack::spinner;
 use goose::message::Message;
 use mcp_core::Role;
-use rustyline::DefaultEditor;
+use rustyline::{DefaultEditor, EventHandler, KeyCode, KeyEvent, Modifiers};
 
 const PROMPT: &str = "\x1b[1m\x1b[38;5;30m( O)> \x1b[0m";
 
@@ -32,7 +32,11 @@ impl RustylinePrompt {
             Box::new(bash_dev_system_renderer),
         );
 
-        let editor = DefaultEditor::new().expect("Failed to create editor");
+        let mut editor = DefaultEditor::new().expect("Failed to create editor");
+        editor.bind_sequence(
+            KeyEvent(KeyCode::Char('j'), Modifiers::CTRL),
+            EventHandler::Simple(rustyline::Cmd::Newline),
+        );
 
         RustylinePrompt {
             spinner: spinner(),
@@ -119,6 +123,7 @@ impl Prompt for RustylinePrompt {
             println!("/t - Toggle Light/Dark theme");
             println!("/? | /help - Display this help message");
             println!("Ctrl+C - Interrupt goose (resets the interaction to before the interrupted user request)");
+            println!("Ctrl+j - Adds a newline");
             println!("Use Up/Down arrow keys to navigate through command history");
             return Ok(Input {
                 input_type: InputType::AskAgain,
