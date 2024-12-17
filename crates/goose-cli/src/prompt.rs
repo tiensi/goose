@@ -1,7 +1,6 @@
 use anyhow::Result;
 use goose::message::Message;
 
-pub mod cliclack;
 pub mod renderer;
 pub mod rustyline;
 pub mod thinking;

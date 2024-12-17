@@ -6,7 +6,6 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 use crate::profile::{get_provider_config, load_profiles, Profile};
-use crate::prompt::cliclack::CliclackPrompt;
 use crate::prompt::rustyline::RustylinePrompt;
 use crate::prompt::Prompt;
 use crate::session::{ensure_session_dir, get_most_recent_session, Session};
@@ -50,7 +49,6 @@ pub fn build_session<'a>(
     let agent = Box::new(Agent::new(provider));
     let prompt = match std::env::var("GOOSE_INPUT") {
         Ok(val) => match val.as_str() {
-            "cliclack" => Box::new(CliclackPrompt::new()) as Box<dyn Prompt>,
             "rustyline" => Box::new(RustylinePrompt::new()) as Box<dyn Prompt>,
             _ => Box::new(RustylinePrompt::new()) as Box<dyn Prompt>,
         },
