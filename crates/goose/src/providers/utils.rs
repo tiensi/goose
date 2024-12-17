@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
 use crate::errors::AgentError;
 use crate::message::{Message, MessageContent};
@@ -284,6 +284,35 @@ pub fn get_model(data: &Value) -> String {
         }
     } else {
         "Unknown".to_string()
+    }
+}
+
+pub fn unescape_json_values(value: &Value) -> Value {
+    match value {
+        Value::Object(map) => {
+            let new_map: Map<String, Value> = map
+                .iter()
+                .map(|(k, v)| (k.clone(), unescape_json_values(v))) // Process each value
+                .collect();
+            Value::Object(new_map)
+        }
+        Value::Array(arr) => {
+            let new_array: Vec<Value> = arr.iter().map(|v| unescape_json_values(v)).collect();
+            Value::Array(new_array)
+        }
+        Value::String(s) => {
+            let unescaped = s
+                .replace("\\\\n", "\n")
+                .replace("\\\\t", "\t")
+                .replace("\\\\r", "\r")
+                .replace("\\\\\"", "\"")
+                .replace("\\n", "\n")
+                .replace("\\t", "\t")
+                .replace("\\r", "\r")
+                .replace("\\\"", "\"");
+            Value::String(unescaped)
+        }
+        _ => value.clone(),
     }
 }
 
