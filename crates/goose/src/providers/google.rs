@@ -115,17 +115,8 @@ impl Provider for GoogleProvider {
         // Make request
         let response = self.post(Value::Object(payload)).await?;
 
-        // Lifei: TODO handle api errors https://ai.google.dev/gemini-api/docs/troubleshooting?lang=python
-        // // Raise specific error if context length is exceeded
-        // if let Some(error) = response.get("error") {
-        //     if let Some(err) = check_openai_context_length_error(error) {
-        //         return Err(err.into());
-        //     }
-        //     return Err(anyhow!("OpenAI API error: {}", error));
-        // }
-
         // Parse response
-        let message = google_response_to_message(response.clone())?;
+        let message = google_response_to_message(unescape_json_values(&response))?;
         let usage = Usage::new(Some(100), Some(100), Some(100));
         // let usage = Self::get_usage(&response)?;
         // self.usage_collector.add_usage(usage.clone());
@@ -163,7 +154,7 @@ fn messages_to_google_spec(messages: &[Message]) -> Vec<Value> {
                                 && !tool_call.arguments.as_object().unwrap().is_empty()
                             {
                                 function_call_part
-                                    .insert("arguments".to_string(), tool_call.arguments.clone());
+                                    .insert("args".to_string(), tool_call.arguments.clone());
                             }
                             parts.push(json!({
                                 "functionCall": function_call_part
@@ -333,7 +324,7 @@ fn google_response_to_message(response: Value) -> anyhow::Result<Message> {
                 ));
                 content.push(MessageContent::tool_request(id, Err(error)));
             } else {
-                let parameters = function_call.get("arguments");
+                let parameters = function_call.get("args");
                 if parameters.is_some() {
                     content.push(MessageContent::tool_request(
                         id,
@@ -348,4 +339,34 @@ fn google_response_to_message(response: Value) -> anyhow::Result<Message> {
         created,
         content,
     })
+}
+
+fn unescape_json_values(value: &Value) -> Value {
+    match value {
+        Value::Object(map) => {
+            let new_map: Map<String, Value> = map
+                .iter()
+                .map(|(k, v)| (k.clone(), unescape_json_values(v))) // Process each value
+                .collect();
+            Value::Object(new_map)
+        }
+        Value::Array(arr) => {
+            let new_array: Vec<Value> = arr.iter()
+                .map(|v| unescape_json_values(v))
+                .collect();
+            Value::Array(new_array)
+        }
+        Value::String(s) => {
+            let unescaped = s.replace("\\\\n", "\n")
+                .replace("\\\\t", "\t")
+                .replace("\\\\r", "\r")
+                .replace("\\\\\"", "\"")
+                .replace("\\n", "\n")
+                .replace("\\t", "\t")
+                .replace("\\r", "\r")
+                .replace("\\\"", "\"");
+            Value::String(unescaped)
+        }
+        _ => value.clone(),
+    }
 }
