@@ -190,8 +190,8 @@ function ChatContent({
   };
 
   return (
-    <div className="chat-content flex flex-col w-screen h-screen items-center justify-center p-[10px]">
-      <div className="relative block h-[20px] w-screen">
+    <div className="chat-content flex flex-col w-full h-screen items-center justify-center p-[10px]">
+      <div className="relative block h-[20px] w-full">
         <MoreMenu />
       </div>
       <Card className="flex flex-col flex-1 h-[calc(100vh-95px)] w-full bg-card-gradient dark:bg-dark-card-gradient mt-0 border-none rounded-2xl relative">
