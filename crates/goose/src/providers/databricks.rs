@@ -104,6 +104,7 @@ impl DatabricksProvider {
 
 #[async_trait]
 impl Provider for DatabricksProvider {
+    #[tracing::instrument(skip(self, system, messages, tools), fields(model = self.config.model))]
     async fn complete(
         &self,
         system: &str,
@@ -146,8 +147,18 @@ impl Provider for DatabricksProvider {
                 .collect(),
         );
 
+        tracing::info!(
+            kind = "input",
+            input = serde_json::to_string(&payload).unwrap_or_else(|_| "null".to_string())
+        );
+
         // Make request
         let response = self.post(payload).await?;
+        
+        tracing::info!(
+            kind = "output",
+            output = serde_json::to_string(&response).unwrap_or_else(|_| "null".to_string())
+        );
 
         // Raise specific error if context length is exceeded
         if let Some(error) = response.get("error") {
