@@ -38,7 +38,7 @@ async fn main() -> Result<(), ClientError> {
         });
 
     // Create client
-    let mut client = McpClient::new(service, Arc::clone(&transport));
+    let mut client = McpClient::new(service);
 
     // Initialize
     let server_info = client

@@ -7,7 +7,7 @@ use tokio::sync::Mutex;
 use tower::Service;
 
 use crate::transport::{Error as TransportError, Transport};
-use mcp_core::protocol::{JsonRpcMessage, JsonRpcRequest};
+use mcp_core::protocol::{JsonRpcMessage, JsonRpcResponse};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ServiceError {
@@ -27,7 +27,7 @@ pub enum ServiceError {
     UnexpectedResponse,
 }
 
-/// A Tower `Service` implementation that uses a `Transport` to send/receive JsonRpcRequests and JsonRpcMessages.
+/// A Tower `Service` implementation that uses a `Transport` to send/receive JsonRpcMessages and JsonRpcMessages.
 pub struct TransportService<T: Transport> {
     transport: Arc<Mutex<T>>,
     initialized: AtomicBool,
@@ -47,7 +47,7 @@ impl<T: Transport> TransportService<T> {
     }
 }
 
-impl<T: Transport> Service<JsonRpcRequest> for TransportService<T> {
+impl<T: Transport> Service<JsonRpcMessage> for TransportService<T> {
     type Response = JsonRpcMessage;
     type Error = ServiceError;
     type Future = Pin<Box<dyn Future<Output = Result<JsonRpcMessage, ServiceError>> + Send>>;
@@ -57,7 +57,7 @@ impl<T: Transport> Service<JsonRpcRequest> for TransportService<T> {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, request: JsonRpcRequest) -> Self::Future {
+    fn call(&mut self, message: JsonRpcMessage) -> Self::Future {
         let transport = Arc::clone(&self.transport);
         let started = self.initialized.load(Ordering::SeqCst);
 
@@ -69,14 +69,32 @@ impl<T: Transport> Service<JsonRpcRequest> for TransportService<T> {
                 transport.start().await?;
             }
 
-            // Serialize request to JSON line
-            let msg = serde_json::to_string(&request)?;
-            transport.send(msg).await?;
+            match message {
+                JsonRpcMessage::Notification(notification) => {
+                    // Serialize notification
+                    let msg = serde_json::to_string(&notification)?;
+                    transport.send(msg).await?;
+                    // For notifications, the protocol does not require a response
+                    // So we return an empty response here and this is not checked upstream
+                    let response: JsonRpcMessage = JsonRpcMessage::Response(JsonRpcResponse {
+                        jsonrpc: "2.0".to_string(),
+                        id: None,
+                        result: None,
+                        error: None,
+                    });
 
-            let line = transport.receive().await?;
-            let response: JsonRpcMessage = serde_json::from_str(&line)?;
-
-            Ok(response)
+                    Ok(response)
+                }
+                JsonRpcMessage::Request(request) => {
+                    // Serialize request & wait for response
+                    let msg = serde_json::to_string(&request)?;
+                    transport.send(msg).await?;
+                    let line = transport.receive().await?;
+                    let response: JsonRpcMessage = serde_json::from_str(&line)?;
+                    Ok(response)
+                }
+                _ => return Err(ServiceError::Other("Invalid message type".to_string())),
+            }
         })
     }
 }

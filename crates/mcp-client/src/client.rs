@@ -4,13 +4,9 @@ use thiserror::Error;
 use tower::ServiceExt; // for Service::ready()
 
 use mcp_core::protocol::{
-    CallToolResult, InitializeResult, JsonRpcError, JsonRpcMessage, JsonRpcRequest,
-    JsonRpcResponse, ListResourcesResult, ListToolsResult, ReadResourceResult,
+    CallToolResult, InitializeResult, JsonRpcError, JsonRpcMessage, JsonRpcNotification,
+    JsonRpcRequest, JsonRpcResponse, ListResourcesResult, ListToolsResult, ReadResourceResult,
 };
-use std::sync::Arc;
-use tokio::sync::Mutex;
-
-use crate::transport::{Error as TransportError, Transport};
 
 /// Error type for MCP client operations.
 #[derive(Debug, Error)]
@@ -52,26 +48,23 @@ pub struct InitializeParams {
 }
 
 /// The MCP client that sends requests via the provided service.
-pub struct McpClient<S, T> {
+pub struct McpClient<S> {
     service: S,
-    transport: Arc<Mutex<T>>,
     next_id: u64,
 }
 
-impl<S, T> McpClient<S, T>
+impl<S> McpClient<S>
 where
     S: tower::Service<
-            JsonRpcRequest,
+            JsonRpcMessage,
             Response = JsonRpcMessage,
             Error = super::service::ServiceError,
         > + Send,
     S::Future: Send,
-    T: Transport,
 {
-    pub fn new(service: S, transport: Arc<Mutex<T>>) -> Self {
+    pub fn new(service: S) -> Self {
         Self {
             service,
-            transport,
             next_id: 1,
         }
     }
@@ -83,12 +76,12 @@ where
     {
         self.service.ready().await.map_err(|_| Error::NotReady)?;
 
-        let request = JsonRpcRequest {
+        let request = JsonRpcMessage::Request(JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
             id: Some(self.next_id),
             method: method.to_string(),
             params: Some(params),
-        };
+        });
 
         self.next_id += 1;
 
@@ -130,18 +123,17 @@ where
     }
 
     /// Send a JSON-RPC notification.
-    pub async fn send_notification(&self, method: &str, params: Value) -> Result<(), Error> {
-        let notification = mcp_core::protocol::JsonRpcNotification {
+    pub async fn send_notification(&mut self, method: &str, params: Value) -> Result<(), Error> {
+        self.service.ready().await.map_err(|_| Error::NotReady)?;
+
+        let notification = JsonRpcMessage::Notification(JsonRpcNotification {
             jsonrpc: "2.0".to_string(),
             method: method.to_string(),
             params: Some(params),
-        };
-        let msg = serde_json::to_string(&notification)?;
-        let transport = self.transport.lock().await;
-        transport
-            .send(msg)
-            .await
-            .map_err(|e: TransportError| Error::Service(e.into()))
+        });
+
+        self.service.call(notification).await?;
+        Ok(())
     }
 
     /// Initialize the connection with the server.
