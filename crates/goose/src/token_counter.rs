@@ -13,7 +13,7 @@ pub struct TokenCounter {
 
 const GPT_4O_TOKENIZER_KEY: &str = "Xenova--gpt-4o";
 const CLAUDE_TOKENIZER_KEY: &str = "Xenova--claude-tokenizer";
-const GOOGLE_TOKENIZER_KEY: &str = "Xenova--gemini-nano";
+const GOOGLE_TOKENIZER_KEY: &str = "Xenova--gemma-2-tokenizer";
 const QWEN_TOKENIZER_KEY: &str = "Qwen--Qwen2.5-Coder-32B-Instruct";
 
 impl Default for TokenCounter {
