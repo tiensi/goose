@@ -7,12 +7,9 @@ use std::{
 use tokio::time::sleep;
 
 use mcp_core::{
-    handler::ToolError,
-    protocol::{
-        JsonRpcRequest, JsonRpcResponse, ServerCapabilities, InitializeResult, Implementation,
-        PromptsCapability, ResourcesCapability, ToolsCapability, ListToolsResult, CallToolResult,
-    },
-    content::Content,
+    content::Content, handler::{ResourceError, ToolError}, protocol::{
+        CallToolResult, Implementation, InitializeResult, JsonRpcRequest, JsonRpcResponse, ListResourcesResult, ListToolsResult, PromptsCapability, ReadResourceResult, ResourcesCapability, ServerCapabilities, ToolsCapability
+    }, ResourceContents
 };
 use tower_service::Service;
 use serde_json::Value;
@@ -76,6 +73,8 @@ pub trait Router: Send + Sync + 'static {
     fn capabilities(&self) -> ServerCapabilities;
     fn list_tools(&self) -> Vec<mcp_core::tool::Tool>;
     fn call_tool(&self, tool_name: &str, arguments: Value) -> Pin<Box<dyn Future<Output = Result<Value, ToolError>> + Send + 'static>>;
+    fn list_resources(&self) -> Vec<mcp_core::resource::Resource>;
+    fn read_resource(&self, uri: &str) -> Pin<Box<dyn Future<Output = Result<String, ResourceError>> + Send + 'static>>;
 
     // Helper method to create base response
     fn create_response(&self, id: Option<u64>) -> JsonRpcResponse {
@@ -149,6 +148,53 @@ pub trait Router: Send + Sync + 'static {
             Ok(response)
         }
     }
+
+    fn handle_resources_list(&self, req: JsonRpcRequest) -> impl Future<Output = Result<JsonRpcResponse, RouterError>> + Send {
+        async move {
+            let resources = self.list_resources();
+
+            let result = ListResourcesResult { resources };
+            let mut response = self.create_response(req.id);
+            response.result = Some(serde_json::to_value(result)
+                .map_err(|e| RouterError::Internal(format!("JSON serialization error: {}", e)))?);
+
+            Ok(response)
+        }
+    }
+
+    fn handle_resources_read(
+        &self,
+        req: JsonRpcRequest,
+    ) -> impl Future<Output = Result<JsonRpcResponse, RouterError>> + Send {
+        async move {
+            let params = req
+                .params
+                .ok_or_else(|| RouterError::InvalidParams("Missing parameters".into()))?;
+
+            let uri = params
+                .get("uri")
+                .and_then(Value::as_str)
+                .ok_or_else(|| RouterError::InvalidParams("Missing resource URI".into()))?;
+
+            let contents = self.read_resource(uri).await.map_err(RouterError::from)?;
+
+            let result = ReadResourceResult {
+                contents: vec![ResourceContents::TextResourceContents {
+                    uri: uri.to_string(),
+                    mime_type: Some("text/plain".to_string()),
+                    text: contents,
+                }],
+            };
+
+            let mut response = self.create_response(req.id);
+            response.result =
+                Some(serde_json::to_value(result).map_err(|e| {
+                    RouterError::Internal(format!("JSON serialization error: {}", e))
+                })?);
+
+            Ok(response)
+        }
+    }
 }
 
 // A wrapper type to implement the Service trait locally
@@ -180,6 +226,8 @@ where
                 "initialize" => this.handle_initialize(req).await,
                 "tools/list" => this.handle_tools_list(req).await,
                 "tools/call" => this.handle_tools_call(req).await,
+                "resources/list" => this.handle_resources_list(req).await,
+                "resources/read" => this.handle_resources_read(req).await,
                 _ => {
                     let mut response = this.create_response(req.id);
                     response.error = Some(RouterError::MethodNotFound(req.method).into());

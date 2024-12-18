@@ -49,6 +49,8 @@ pub enum RouterError {
     #[error("Tool not found: {0}")]
     ToolNotFound(String),
 
+    #[error("Resource not found: {0}")]
+    ResourceNotFound(String),
 }
 
 impl From<RouterError> for mcp_core::protocol::ErrorData {
@@ -75,6 +77,20 @@ impl From<RouterError> for mcp_core::protocol::ErrorData {
                 message: msg,
                 data: None,
             },
+            RouterError::ResourceNotFound(msg) => ErrorData {
+                code: INVALID_REQUEST,
+                message: msg,
+                data: None,
+            },
+        }
+    }
+}
+
+impl From<mcp_core::handler::ResourceError> for RouterError {
+    fn from(err: mcp_core::handler::ResourceError) -> Self {
+        match err {
+            mcp_core::handler::ResourceError::NotFound(msg) => RouterError::ResourceNotFound(msg),
+            _ => RouterError::Internal("Unknown resource error".to_string()),
         }
     }
 }
