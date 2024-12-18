@@ -117,15 +117,22 @@ impl Router for CounterRouter {
         ]
     }
 
-    fn read_resource(&self, uri: &str) -> Pin<Box<dyn Future<Output = Result<String, ResourceError>> + Send + 'static>> {
+    fn read_resource(
+        &self,
+        uri: &str,
+    ) -> Pin<Box<dyn Future<Output = Result<String, ResourceError>> + Send + 'static>> {
         let uri = uri.to_string();
         Box::pin(async move {
             match uri.as_str() {
                 "memo://insights" => {
-                    let memo = "Business Intelligence Memo\n\nAnalysis has revealed 5 key insights ...";
+                    let memo =
+                        "Business Intelligence Memo\n\nAnalysis has revealed 5 key insights ...";
                     Ok(memo.to_string())
                 }
-                _ => Err(ResourceError::NotFound(format!("Resource {} not found", uri))),
+                _ => Err(ResourceError::NotFound(format!(
+                    "Resource {} not found",
+                    uri
+                ))),
             }
         })
     }

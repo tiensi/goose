@@ -7,7 +7,7 @@ use std::{
 use tokio::time::sleep;
 
 use mcp_core::{
-    content::Content, handler::ToolError, protocol::{
+    content::Content, handler::{ResourceError, ToolError}, protocol::{
         CallToolResult, Implementation, InitializeResult, JsonRpcRequest, JsonRpcResponse, ListResourcesResult, ListToolsResult, PromptsCapability, ReadResourceResult, ResourcesCapability, ServerCapabilities, ToolsCapability
     }, ResourceContents
 };
@@ -74,7 +74,7 @@ pub trait Router: Send + Sync + 'static {
     fn list_tools(&self) -> Vec<mcp_core::tool::Tool>;
     fn call_tool(&self, tool_name: &str, arguments: Value) -> Pin<Box<dyn Future<Output = Result<Value, ToolError>> + Send + 'static>>;
     fn list_resources(&self) -> Vec<mcp_core::resource::Resource>;
-    fn read_resource(&self, uri: &str) -> Pin<Box<dyn Future<Output = Result<String, RouterError>> + Send + 'static>>;
+    fn read_resource(&self, uri: &str) -> Pin<Box<dyn Future<Output = Result<String, ResourceError>> + Send + 'static>>;
 
     // Helper method to create base response
     fn create_response(&self, id: Option<u64>) -> JsonRpcResponse {
@@ -162,27 +162,35 @@ pub trait Router: Send + Sync + 'static {
         }
     }
 
-    fn handle_resources_read(&self, req: JsonRpcRequest) -> impl Future<Output = Result<JsonRpcResponse, RouterError>> + Send {
+    fn handle_resources_read(
+        &self,
+        req: JsonRpcRequest,
+    ) -> impl Future<Output = Result<JsonRpcResponse, RouterError>> + Send {
         async move {
-            let params = req.params.ok_or_else(|| RouterError::InvalidParams("Missing parameters".into()))?;
-            let uri = params.get("uri")
+            let params = req
+                .params
+                .ok_or_else(|| RouterError::InvalidParams("Missing parameters".into()))?;
+
+            let uri = params
+                .get("uri")
                 .and_then(Value::as_str)
                 .ok_or_else(|| RouterError::InvalidParams("Missing resource URI".into()))?;
 
-            let result = match self.read_resource(uri).await {
-                Ok(result) => ReadResourceResult {
-                    contents: vec![ResourceContents::TextResourceContents {
-                        uri: uri.to_string(),
-                        mime_type: Some("text/plain".to_string()),
-                        text: result,
-                    }],
-                },
-                Err(err) => return Err(err),
+            let contents = self.read_resource(uri).await.map_err(RouterError::from)?;
+
+            let result = ReadResourceResult {
+                contents: vec![ResourceContents::TextResourceContents {
+                    uri: uri.to_string(),
+                    mime_type: Some("text/plain".to_string()),
+                    text: contents,
+                }],
             };
 
             let mut response = self.create_response(req.id);
-            response.result = Some(serde_json::to_value(result)
-                .map_err(|e| RouterError::Internal(format!("JSON serialization error: {}", e)))?);
+            response.result =
+                Some(serde_json::to_value(result).map_err(|e| {
+                    RouterError::Internal(format!("JSON serialization error: {}", e))
+                })?);
 
             Ok(response)
         }
