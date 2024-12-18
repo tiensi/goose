@@ -1,8 +1,10 @@
 use anyhow::Result;
+use mcp_core::handler::ResourceError;
 use mcp_core::{
     handler::ToolError,
     tool::Tool,
     protocol::ServerCapabilities,
+    resource::Resource,
 };
 use mcp_server::{Router, Server, ByteTransport};
 use mcp_server::router::{RouterService, CapabilitiesBuilder};
@@ -101,6 +103,29 @@ impl Router for CounterRouter {
                     Ok(Value::Number(value.into()))
                 }
                 _ => Err(ToolError::NotFound(format!("Tool {} not found", tool_name))),
+            }
+        })
+    }
+
+    fn list_resources(&self) -> Vec<Resource> {
+        vec![
+            Resource::new(
+                "memo://insights".to_string(),
+                Some("text/plain".to_string()),
+                Some("memo-resource".to_string())
+            ).unwrap()
+        ]
+    }
+
+    fn read_resource(&self, uri: &str) -> Pin<Box<dyn Future<Output = Result<String, ResourceError>> + Send + 'static>> {
+        let uri = uri.to_string();
+        Box::pin(async move {
+            match uri.as_str() {
+                "memo://insights" => {
+                    let memo = "Business Intelligence Memo\n\nAnalysis has revealed 5 key insights ...";
+                    Ok(memo.to_string())
+                }
+                _ => Err(ResourceError::NotFound(format!("Resource {} not found", uri))),
             }
         })
     }

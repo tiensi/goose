@@ -17,6 +17,14 @@ pub enum ToolError {
     NotFound(String),
 }
 
+#[derive(Error, Debug)]
+pub enum ResourceError {
+    #[error("Execution failed: {0}")]
+    ExecutionError(String),
+    #[error("Resource not found: {0}")]
+    NotFound(String),
+}
+
 pub type Result<T> = std::result::Result<T, ToolError>;
 
 /// Trait for implementing MCP tools
