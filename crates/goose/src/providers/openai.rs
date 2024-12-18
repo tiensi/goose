@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use reqwest::Client;
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::time::Duration;
 
 use super::base::ProviderUsage;
@@ -11,8 +11,7 @@ use super::configs::{ModelConfig, ProviderModelConfig};
 use super::model_pricing::cost;
 use super::model_pricing::model_pricing_for;
 use super::utils::{
-    check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message,
-    tools_to_openai_spec, ImageFormat,
+    check_openai_context_length_error, openai_response_to_message,
 };
 use super::utils::{create_openai_request_payload, get_model, get_openai_usage, handle_response};
 use crate::message::Message;

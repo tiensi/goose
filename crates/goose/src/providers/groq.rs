@@ -1,16 +1,14 @@
 use crate::message::Message;
 use crate::providers::base::{Provider, ProviderUsage, Usage};
 use crate::providers::configs::{GroqProviderConfig, ModelConfig, ProviderModelConfig};
-use crate::providers::google::GoogleProvider;
 use crate::providers::utils::{
     create_openai_request_payload, get_model, get_openai_usage, handle_response,
-    openai_response_to_message, unescape_json_values,
+    openai_response_to_message,
 };
-use anyhow::anyhow;
 use async_trait::async_trait;
 use mcp_core::Tool;
 use reqwest::Client;
-use serde_json::{json, Map, Value};
+use serde_json::Value;
 use std::time::Duration;
 
 pub const GROQ_API_HOST: &str = "https://api.groq.com";

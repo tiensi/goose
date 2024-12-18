@@ -5,10 +5,9 @@ use crate::providers::configs::{GoogleProviderConfig, ModelConfig, ProviderModel
 use crate::providers::utils::{
     handle_response, is_valid_function_name, sanitize_function_name, unescape_json_values,
 };
-use anyhow::anyhow;
 use async_trait::async_trait;
 use mcp_core::{Content, Role, Tool, ToolCall};
-use reqwest::{Client, StatusCode};
+use reqwest::Client;
 use serde_json::{json, Map, Value};
 use std::time::Duration;
 
