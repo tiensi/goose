@@ -15,6 +15,7 @@ import { ApiKeyWarning } from './components/ApiKeyWarning';
 import { askAi } from './utils/askAI';
 import WingToWing, { Working } from './components/WingToWing';
 import { WelcomeScreen } from './components/WelcomeScreen';
+import FlappyGoose from './components/FlappyGoose';
 
 // update this when you want to show the welcome screen again - doesn't have to be an actual version, just anything woudln't have been seen before
 const CURRENT_VERSION = '0.0.0';
@@ -55,6 +56,7 @@ function ChatContent({
   const [messageMetadata, setMessageMetadata] = useState<Record<string, string[]>>({});
   const [hasMessages, setHasMessages] = useState(false);
   const [lastInteractionTime, setLastInteractionTime] = useState<number>(Date.now());
+  const [showGame, setShowGame] = useState(false);
 
   const {
     messages,
@@ -185,12 +187,11 @@ function ChatContent({
       const updatedMessages = [...messages.slice(0, -1), newLastMessage];
       setMessages(updatedMessages);
     }
-
   };
 
   return (
-    <div className="chat-content flex flex-col w-screen h-screen items-center justify-center p-[10px]">
-      <div className="relative block h-[20px] w-screen">
+    <div className="chat-content flex flex-col w-full h-screen items-center justify-center p-[10px]">
+      <div className="relative block h-[20px] w-full">
         <MoreMenu />
       </div>
       <Card className="flex flex-col flex-1 h-[calc(100vh-95px)] w-full bg-card-gradient dark:bg-dark-card-gradient mt-0 border-none rounded-2xl relative">
@@ -221,7 +222,9 @@ function ChatContent({
             </div>
             {isLoading && (
               <div className="flex items-center justify-center p-4">
-                <LoadingGoose />
+                <div onClick={() => setShowGame(true)} style={{ cursor: 'pointer' }}>
+                  <LoadingGoose />
+                </div>
               </div>
             )}
             {error && (
@@ -260,6 +263,10 @@ function ChatContent({
         <div className="self-stretch h-px bg-black/5 dark:bg-white/5 rounded-sm" />
         <BottomMenu hasMessages={hasMessages} />
       </Card>
+
+      {showGame && (
+        <FlappyGoose onClose={() => setShowGame(false)} />
+      )}
     </div>
   );
 }
@@ -368,7 +375,6 @@ export default function ChatWindow() {
           </div>
 
           <WingToWing onExpand={toggleMode} progressMessage={progressMessage} working={working} />
-
         </>
       )}
     </div>

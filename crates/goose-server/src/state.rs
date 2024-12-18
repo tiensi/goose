@@ -64,6 +64,13 @@ impl Clone for AppState {
                         model: config.model.clone(),
                     })
                 }
+                ProviderConfig::Google(config) => {
+                    ProviderConfig::Google(goose::providers::configs::GoogleProviderConfig {
+                        host: config.host.clone(),
+                        api_key: config.api_key.clone(),
+                        model: config.model.clone(),
+                    })
+                }
             },
             agent: self.agent.clone(),
             secret_key: self.secret_key.clone(),

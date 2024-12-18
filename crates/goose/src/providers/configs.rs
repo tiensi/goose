@@ -13,6 +13,7 @@ pub enum ProviderConfig {
     Databricks(DatabricksProviderConfig),
     Ollama(OllamaProviderConfig),
     Anthropic(AnthropicProviderConfig),
+    Google(GoogleProviderConfig),
 }
 
 /// Configuration for model-specific settings and limits
@@ -203,6 +204,19 @@ impl OpenAiProviderConfig {
 }
 
 impl ProviderModelConfig for OpenAiProviderConfig {
+    fn model_config(&self) -> &ModelConfig {
+        &self.model
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GoogleProviderConfig {
+    pub host: String,
+    pub api_key: String,
+    pub model: ModelConfig,
+}
+
+impl ProviderModelConfig for GoogleProviderConfig {
     fn model_config(&self) -> &ModelConfig {
         &self.model
     }

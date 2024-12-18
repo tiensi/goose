@@ -1,12 +1,13 @@
 use crate::error::{to_env_var, ConfigError};
 use config::{Config, Environment};
+use goose::providers::configs::GoogleProviderConfig;
 use goose::providers::{
     configs::{
         DatabricksAuth, DatabricksProviderConfig, ModelConfig, OllamaProviderConfig,
         OpenAiProviderConfig, ProviderConfig,
     },
     factory::ProviderType,
-    ollama,
+    google, ollama,
     utils::ImageFormat,
 };
 use serde::Deserialize;
@@ -76,6 +77,17 @@ pub enum ProviderSettings {
         #[serde(default)]
         estimate_factor: Option<f32>,
     },
+    Google {
+        #[serde(default = "default_google_host")]
+        host: String,
+        api_key: String,
+        #[serde(default = "default_google_model")]
+        model: String,
+        #[serde(default)]
+        temperature: Option<f32>,
+        #[serde(default)]
+        max_tokens: Option<i32>,
+    },
 }
 
 impl ProviderSettings {
@@ -86,6 +98,7 @@ impl ProviderSettings {
             ProviderSettings::OpenAi { .. } => ProviderType::OpenAi,
             ProviderSettings::Databricks { .. } => ProviderType::Databricks,
             ProviderSettings::Ollama { .. } => ProviderType::Ollama,
+            ProviderSettings::Google { .. } => ProviderType::Google,
         }
     }
 
@@ -141,6 +154,19 @@ impl ProviderSettings {
                     .with_max_tokens(max_tokens)
                     .with_context_limit(context_limit)
                     .with_estimate_factor(estimate_factor),
+            }),
+            ProviderSettings::Google {
+                host,
+                api_key,
+                model,
+                temperature,
+                max_tokens,
+            } => ProviderConfig::Google(GoogleProviderConfig {
+                host,
+                api_key,
+                model: ModelConfig::new(model)
+                    .with_temperature(temperature)
+                    .with_max_tokens(max_tokens),
             }),
         }
     }
@@ -231,6 +257,14 @@ fn default_ollama_host() -> String {
 
 fn default_ollama_model() -> String {
     ollama::OLLAMA_MODEL.to_string()
+}
+
+fn default_google_host() -> String {
+    google::GOOGLE_API_HOST.to_string()
+}
+
+fn default_google_model() -> String {
+    google::GOOGLE_DEFAULT_MODEL.to_string()
 }
 
 fn default_image_format() -> ImageFormat {
