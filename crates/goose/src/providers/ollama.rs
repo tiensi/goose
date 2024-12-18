@@ -1,6 +1,9 @@
 use super::base::{Provider, ProviderUsage, Usage};
 use super::configs::{ModelConfig, OllamaProviderConfig, ProviderModelConfig};
-use super::utils::{get_model, handle_response, messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec, ImageFormat};
+use super::utils::{
+    create_openai_request_payload, get_model, get_openai_usage, handle_response,
+    messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec, ImageFormat,
+};
 use crate::message::Message;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -28,30 +31,7 @@ impl OllamaProvider {
     }
 
     fn get_usage(data: &Value) -> Result<Usage> {
-        let usage = data
-            .get("usage")
-            .ok_or_else(|| anyhow!("No usage data in response"))?;
-
-        let input_tokens = usage
-            .get("prompt_tokens")
-            .and_then(|v| v.as_i64())
-            .map(|v| v as i32);
-
-        let output_tokens = usage
-            .get("completion_tokens")
-            .and_then(|v| v.as_i64())
-            .map(|v| v as i32);
-
-        let total_tokens = usage
-            .get("total_tokens")
-            .and_then(|v| v.as_i64())
-            .map(|v| v as i32)
-            .or_else(|| match (input_tokens, output_tokens) {
-                (Some(input), Some(output)) => Some(input + output),
-                _ => None,
-            });
-
-        Ok(Usage::new(input_tokens, output_tokens, total_tokens))
+        get_openai_usage(data)
     }
 
     async fn post(&self, payload: Value) -> Result<Value> {
@@ -78,40 +58,7 @@ impl Provider for OllamaProvider {
         messages: &[Message],
         tools: &[Tool],
     ) -> Result<(Message, ProviderUsage)> {
-        let system_message = json!({
-            "role": "system",
-            "content": system
-        });
-
-        let messages_spec = messages_to_openai_spec(messages, &ImageFormat::OpenAi);
-        let tools_spec = tools_to_openai_spec(tools)?;
-
-        let mut messages_array = vec![system_message];
-        messages_array.extend(messages_spec);
-
-        let mut payload = json!({
-            "model": self.config.model.model_name,
-            "messages": messages_array
-        });
-
-        if !tools_spec.is_empty() {
-            payload
-                .as_object_mut()
-                .unwrap()
-                .insert("tools".to_string(), json!(tools_spec));
-        }
-        if let Some(temp) = self.config.model.temperature {
-            payload
-                .as_object_mut()
-                .unwrap()
-                .insert("temperature".to_string(), json!(temp));
-        }
-        if let Some(tokens) = self.config.model.max_tokens {
-            payload
-                .as_object_mut()
-                .unwrap()
-                .insert("max_tokens".to_string(), json!(tokens));
-        }
+        let payload = create_openai_request_payload(&self.config.model, system, messages, tools)?;
 
         let response = self.post(payload).await?;
 

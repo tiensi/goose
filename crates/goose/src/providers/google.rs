@@ -2,7 +2,9 @@ use crate::errors::AgentError;
 use crate::message::{Message, MessageContent};
 use crate::providers::base::{Provider, ProviderUsage, Usage};
 use crate::providers::configs::{GoogleProviderConfig, ModelConfig, ProviderModelConfig};
-use crate::providers::utils::{handle_response, is_valid_function_name, sanitize_function_name, unescape_json_values};
+use crate::providers::utils::{
+    handle_response, is_valid_function_name, sanitize_function_name, unescape_json_values,
+};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use mcp_core::{Content, Role, Tool, ToolCall};

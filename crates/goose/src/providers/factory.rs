@@ -3,9 +3,9 @@ use super::{
     databricks::DatabricksProvider, google::GoogleProvider, ollama::OllamaProvider,
     openai::OpenAiProvider,
 };
+use crate::providers::groq::GroqProvider;
 use anyhow::Result;
 use strum_macros::EnumIter;
-use crate::providers::groq::GroqProvider;
 
 #[derive(EnumIter, Debug)]
 pub enum ProviderType {
@@ -14,7 +14,7 @@ pub enum ProviderType {
     Ollama,
     Anthropic,
     Google,
-    Groq
+    Groq,
 }
 
 pub fn get_provider(config: ProviderConfig) -> Result<Box<dyn Provider + Send + Sync>> {

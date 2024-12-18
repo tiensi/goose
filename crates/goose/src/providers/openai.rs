@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use reqwest::{Client};
+use reqwest::Client;
 use serde_json::{json, Value};
 use std::time::Duration;
 
@@ -10,11 +10,11 @@ use super::configs::OpenAiProviderConfig;
 use super::configs::{ModelConfig, ProviderModelConfig};
 use super::model_pricing::cost;
 use super::model_pricing::model_pricing_for;
-use super::utils::{get_model, handle_response};
 use super::utils::{
     check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message,
     tools_to_openai_spec, ImageFormat,
 };
+use super::utils::{create_openai_request_payload, get_model, get_openai_usage, handle_response};
 use crate::message::Message;
 use mcp_core::tool::Tool;
 
@@ -33,30 +33,7 @@ impl OpenAiProvider {
     }
 
     fn get_usage(data: &Value) -> Result<Usage> {
-        let usage = data
-            .get("usage")
-            .ok_or_else(|| anyhow!("No usage data in response"))?;
-
-        let input_tokens = usage
-            .get("prompt_tokens")
-            .and_then(|v| v.as_i64())
-            .map(|v| v as i32);
-
-        let output_tokens = usage
-            .get("completion_tokens")
-            .and_then(|v| v.as_i64())
-            .map(|v| v as i32);
-
-        let total_tokens = usage
-            .get("total_tokens")
-            .and_then(|v| v.as_i64())
-            .map(|v| v as i32)
-            .or_else(|| match (input_tokens, output_tokens) {
-                (Some(input), Some(output)) => Some(input + output),
-                _ => None,
-            });
-
-        Ok(Usage::new(input_tokens, output_tokens, total_tokens))
+        get_openai_usage(data)
     }
 
     async fn post(&self, payload: Value) -> Result<Value> {
@@ -90,48 +67,7 @@ impl Provider for OpenAiProvider {
         tools: &[Tool],
     ) -> Result<(Message, ProviderUsage)> {
         // Not checking for o1 model here since system message is not supported by o1
-        let system_message = json!({
-            "role": "system",
-            "content": system
-        });
-
-        // Convert messages and tools to OpenAI format
-        let messages_spec = messages_to_openai_spec(messages, &ImageFormat::OpenAi);
-        let tools_spec = if !tools.is_empty() {
-            tools_to_openai_spec(tools)?
-        } else {
-            vec![]
-        };
-
-        // Build payload
-        // create messages array with system message first
-        let mut messages_array = vec![system_message];
-        messages_array.extend(messages_spec);
-
-        let mut payload = json!({
-            "model": self.config.model.model_name,
-            "messages": messages_array
-        });
-
-        // Add optional parameters
-        if !tools_spec.is_empty() {
-            payload
-                .as_object_mut()
-                .unwrap()
-                .insert("tools".to_string(), json!(tools_spec));
-        }
-        if let Some(temp) = self.config.model.temperature {
-            payload
-                .as_object_mut()
-                .unwrap()
-                .insert("temperature".to_string(), json!(temp));
-        }
-        if let Some(tokens) = self.config.model.max_tokens {
-            payload
-                .as_object_mut()
-                .unwrap()
-                .insert("max_tokens".to_string(), json!(tokens));
-        }
+        let payload = create_openai_request_payload(&self.config.model, system, messages, tools)?;
 
         // Make request
         let response = self.post(payload).await?;

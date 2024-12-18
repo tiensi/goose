@@ -1,13 +1,17 @@
-use std::time::Duration;
+use crate::message::Message;
+use crate::providers::base::{Provider, ProviderUsage, Usage};
+use crate::providers::configs::{GroqProviderConfig, ModelConfig, ProviderModelConfig};
+use crate::providers::google::GoogleProvider;
+use crate::providers::utils::{
+    create_openai_request_payload, get_model, get_openai_usage, handle_response,
+    openai_response_to_message, unescape_json_values,
+};
+use anyhow::anyhow;
 use async_trait::async_trait;
+use mcp_core::Tool;
 use reqwest::Client;
 use serde_json::{json, Map, Value};
-use mcp_core::Tool;
-use crate::message::Message;
-use crate::providers::base::{Provider, ProviderUsage};
-use crate::providers::configs::{GroqProviderConfig, ModelConfig};
-use crate::providers::google::GoogleProvider;
-use crate::providers::utils::unescape_json_values;
+use std::time::Duration;
 
 pub const GROQ_API_HOST: &str = "https://api.groq.com";
 pub const GROQ_DEFAULT_MODEL: &str = "llama3-70b-8192";
@@ -25,6 +29,27 @@ impl GroqProvider {
 
         Ok(Self { client, config })
     }
+
+    fn get_usage(data: &Value) -> anyhow::Result<Usage> {
+        get_openai_usage(data)
+    }
+
+    async fn post(&self, payload: Value) -> anyhow::Result<Value> {
+        let url = format!(
+            "{}/openai/v1/chat/completions",
+            self.config.host.trim_end_matches('/')
+        );
+
+        let response = self
+            .client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", self.config.api_key))
+            .json(&payload)
+            .send()
+            .await?;
+
+        handle_response(payload, response).await?
+    }
 }
 
 #[async_trait]
@@ -39,42 +64,14 @@ impl Provider for GroqProvider {
         messages: &[Message],
         tools: &[Tool],
     ) -> anyhow::Result<(Message, ProviderUsage)> {
-        let mut payload = Map::new();
-        payload.insert(
-            "system_instruction".to_string(),
-            json!({"parts": [{"text": system}]}),
-        );
-        payload.insert(
-            "contents".to_string(),
-            json!(self.messages_to_google_spec(&messages)),
-        );
-        if !tools.is_empty() {
-            payload.insert(
-                "tools".to_string(),
-                json!({"functionDeclarations": self.tools_to_google_spec(&tools)}),
-            );
-        }
-        let mut generation_config = Map::new();
-        if let Some(temp) = self.config.model.temperature {
-            generation_config.insert("temperature".to_string(), json!(temp));
-        }
-        if let Some(tokens) = self.config.model.max_tokens {
-            generation_config.insert("maxOutputTokens".to_string(), json!(tokens));
-        }
-        if !generation_config.is_empty() {
-            payload.insert("generationConfig".to_string(), json!(generation_config));
-        }
+        let payload = create_openai_request_payload(&self.config.model, system, messages, tools)?;
 
-        // Make request
-        let response = self.post(Value::Object(payload)).await?;
-        // Parse response
-        let message = self.google_response_to_message(unescape_json_values(&response))?;
-        let usage = self.get_usage(&response)?;
-        let model = match response.get("modelVersion") {
-            Some(model_version) => model_version.as_str().unwrap_or_default().to_string(),
-            None => self.config.model.model_name.clone(),
-        };
-        let provider_usage = ProviderUsage::new(model, usage, None);
-        Ok((message, provider_usage))
+        let response = self.post(payload).await?;
+
+        let message = openai_response_to_message(response.clone())?;
+        let usage = Self::get_usage(&response)?;
+        let model = get_model(&response);
+
+        Ok((message, ProviderUsage::new(model, usage, None)))
     }
 }

@@ -6,6 +6,8 @@ use serde_json::{json, Map, Value};
 
 use crate::errors::AgentError;
 use crate::message::{Message, MessageContent};
+use crate::providers::base::Usage;
+use crate::providers::configs::ModelConfig;
 use mcp_core::content::{Content, ImageContent};
 use mcp_core::role::Role;
 use mcp_core::tool::{Tool, ToolCall};
@@ -243,11 +245,81 @@ pub async fn handle_response(payload: Value, response: Response) -> Result<Resul
             Err(anyhow!("Server error: {}", status))
         }
         _ => Err(anyhow!(
-                "Request failed: {}\nPayload: {}",
-                response.status(),
-                payload
-            )),
+            "Request failed: {}\nPayload: {}",
+            response.status(),
+            payload
+        )),
     })
+}
+
+pub fn get_openai_usage(data: &Value) -> Result<Usage> {
+    let usage = data
+        .get("usage")
+        .ok_or_else(|| anyhow!("No usage data in response"))?;
+
+    let input_tokens = usage
+        .get("prompt_tokens")
+        .and_then(|v| v.as_i64())
+        .map(|v| v as i32);
+
+    let output_tokens = usage
+        .get("completion_tokens")
+        .and_then(|v| v.as_i64())
+        .map(|v| v as i32);
+
+    let total_tokens = usage
+        .get("total_tokens")
+        .and_then(|v| v.as_i64())
+        .map(|v| v as i32)
+        .or_else(|| match (input_tokens, output_tokens) {
+            (Some(input), Some(output)) => Some(input + output),
+            _ => None,
+        });
+
+    Ok(Usage::new(input_tokens, output_tokens, total_tokens))
+}
+
+pub fn create_openai_request_payload(
+    model_config: &ModelConfig,
+    system: &str,
+    messages: &[Message],
+    tools: &[Tool],
+) -> Result<Value, Error> {
+    let system_message = json!({
+        "role": "system",
+        "content": system
+    });
+
+    let messages_spec = messages_to_openai_spec(messages, &ImageFormat::OpenAi);
+    let tools_spec = tools_to_openai_spec(tools)?;
+
+    let mut messages_array = vec![system_message];
+    messages_array.extend(messages_spec);
+
+    let mut payload = json!({
+        "model": model_config.model_name,
+        "messages": messages_array
+    });
+
+    if !tools_spec.is_empty() {
+        payload
+            .as_object_mut()
+            .unwrap()
+            .insert("tools".to_string(), json!(tools_spec));
+    }
+    if let Some(temp) = model_config.temperature {
+        payload
+            .as_object_mut()
+            .unwrap()
+            .insert("temperature".to_string(), json!(temp));
+    }
+    if let Some(tokens) = model_config.max_tokens {
+        payload
+            .as_object_mut()
+            .unwrap()
+            .insert("max_tokens".to_string(), json!(tokens));
+    }
+    Ok(payload)
 }
 
 pub fn sanitize_function_name(name: &str) -> String {
@@ -533,7 +605,7 @@ mod tests {
 
         assert_eq!(message.content.len(), 1);
         if let MessageContent::ToolRequest(request) = &message.content[0] {
-            let tool_call = request.tool_call.as_ref().unwrap();
+            let tool_call = request.tool_call.as_ref()?;
             assert_eq!(tool_call.name, "example_fn");
             assert_eq!(tool_call.arguments, json!({"param": "value"}));
         } else {
