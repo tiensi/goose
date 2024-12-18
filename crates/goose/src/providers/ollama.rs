@@ -1,8 +1,6 @@
 use super::base::{Provider, ProviderUsage, Usage};
 use super::configs::{ModelConfig, OllamaProviderConfig, ProviderModelConfig};
-use super::utils::{
-    create_openai_request_payload, get_model, get_openai_usage, handle_response, openai_response_to_message,
-};
+use super::utils::{ get_model, handle_response, };
 use crate::message::Message;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -10,6 +8,7 @@ use mcp_core::tool::Tool;
 use reqwest::Client;
 use serde_json::Value;
 use std::time::Duration;
+use crate::providers::openai_utils::{create_openai_request_payload, get_openai_usage, openai_response_to_message};
 
 pub const OLLAMA_HOST: &str = "http://localhost:11434";
 pub const OLLAMA_MODEL: &str = "qwen2.5";
@@ -195,7 +194,6 @@ mod tests {
         let (message, usage) = provider
             .complete("You are a helpful assistant.", &messages, &[tool])
             .await?;
-
         // Assert the response
         if let MessageContent::ToolRequest(tool_request) = &message.content[0] {
             let tool_call = tool_request.tool_call.as_ref().unwrap();

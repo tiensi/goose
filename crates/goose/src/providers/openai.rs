@@ -10,12 +10,10 @@ use super::configs::OpenAiProviderConfig;
 use super::configs::{ModelConfig, ProviderModelConfig};
 use super::model_pricing::cost;
 use super::model_pricing::model_pricing_for;
-use super::utils::{
-    check_openai_context_length_error, openai_response_to_message,
-};
-use super::utils::{create_openai_request_payload, get_model, get_openai_usage, handle_response};
+use super::utils::{get_model, handle_response};
 use crate::message::Message;
 use mcp_core::tool::Tool;
+use crate::providers::openai_utils::{check_openai_context_length_error, create_openai_request_payload, get_openai_usage, openai_response_to_message};
 
 pub struct OpenAiProvider {
     client: Client,
