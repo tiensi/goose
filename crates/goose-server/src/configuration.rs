@@ -7,7 +7,7 @@ use goose::providers::{
         OpenAiProviderConfig, ProviderConfig,
     },
     factory::ProviderType,
-    google, ollama, groq,
+    google, groq, ollama,
     utils::ImageFormat,
 };
 use serde::Deserialize;
