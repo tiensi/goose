@@ -8,12 +8,13 @@ use super::base::{Provider, ProviderUsage, Usage};
 use super::configs::{DatabricksAuth, DatabricksProviderConfig, ModelConfig, ProviderModelConfig};
 use super::model_pricing::{cost, model_pricing_for};
 use super::oauth;
-use super::utils::{
-    check_bedrock_context_length_error, get_model
-};
+use super::utils::{check_bedrock_context_length_error, get_model};
 use crate::message::Message;
+use crate::providers::openai_utils::{
+    check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message,
+    tools_to_openai_spec,
+};
 use mcp_core::tool::Tool;
-use crate::providers::openai_utils::{check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec};
 
 pub struct DatabricksProvider {
     client: Client,

@@ -1,11 +1,14 @@
-use anyhow::{anyhow, Error};
-use serde_json::{json, Value};
-use mcp_core::{Content, Role, Tool, ToolCall};
 use crate::errors::AgentError;
 use crate::message::{Message, MessageContent};
 use crate::providers::base::Usage;
 use crate::providers::configs::ModelConfig;
-use crate::providers::utils::{convert_image, is_valid_function_name, sanitize_function_name, ContextLengthExceededError, ImageFormat};
+use crate::providers::utils::{
+    convert_image, is_valid_function_name, sanitize_function_name, ContextLengthExceededError,
+    ImageFormat,
+};
+use anyhow::{anyhow, Error};
+use mcp_core::{Content, Role, Tool, ToolCall};
+use serde_json::{json, Value};
 
 /// Convert internal Message format to OpenAI's API message specification
 ///   some openai compatible endpoints use the anthropic image spec at the content level
@@ -388,10 +391,7 @@ mod tests {
         assert_eq!(spec[2]["role"], "assistant");
         assert!(spec[2]["tool_calls"].is_array());
         assert_eq!(spec[3]["role"], "tool");
-        assert_eq!(
-            spec[3]["content"],
-            json!([{"text": "Result", "type": "text"}])
-        );
+        assert_eq!(spec[3]["content"], "Result");
         assert_eq!(spec[3]["tool_call_id"], spec[2]["tool_calls"][0]["id"]);
 
         Ok(())
@@ -481,7 +481,7 @@ mod tests {
 
         assert_eq!(message.content.len(), 1);
         if let MessageContent::ToolRequest(request) = &message.content[0] {
-            let tool_call = request.tool_call.as_ref()?;
+            let tool_call = request.tool_call.as_ref().unwrap();
             assert_eq!(tool_call.name, "example_fn");
             assert_eq!(tool_call.arguments, json!({"param": "value"}));
         } else {

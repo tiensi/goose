@@ -12,8 +12,11 @@ use super::model_pricing::cost;
 use super::model_pricing::model_pricing_for;
 use super::utils::{get_model, handle_response};
 use crate::message::Message;
+use crate::providers::openai_utils::{
+    check_openai_context_length_error, create_openai_request_payload, get_openai_usage,
+    openai_response_to_message,
+};
 use mcp_core::tool::Tool;
-use crate::providers::openai_utils::{check_openai_context_length_error, create_openai_request_payload, get_openai_usage, openai_response_to_message};
 
 pub struct OpenAiProvider {
     client: Client,
@@ -221,7 +224,7 @@ mod tests {
 
         // Assert the response
         if let MessageContent::ToolRequest(tool_request) = &message.content[0] {
-            let tool_call = tool_request.tool_call.as_ref()?;
+            let tool_call = tool_request.tool_call.as_ref().unwrap();
             assert_eq!(tool_call.name, "get_weather");
             assert_eq!(
                 tool_call.arguments,

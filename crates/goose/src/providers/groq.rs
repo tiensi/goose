@@ -1,13 +1,15 @@
 use crate::message::Message;
 use crate::providers::base::{Provider, ProviderUsage, Usage};
 use crate::providers::configs::{GroqProviderConfig, ModelConfig, ProviderModelConfig};
+use crate::providers::openai_utils::{
+    create_openai_request_payload, get_openai_usage, openai_response_to_message,
+};
 use crate::providers::utils::{get_model, handle_response};
 use async_trait::async_trait;
 use mcp_core::Tool;
 use reqwest::Client;
 use serde_json::Value;
 use std::time::Duration;
-use crate::providers::openai_utils::{create_openai_request_payload, get_openai_usage, openai_response_to_message};
 
 pub const GROQ_API_HOST: &str = "https://api.groq.com";
 pub const GROQ_DEFAULT_MODEL: &str = "llama3-70b-8192";

@@ -1,14 +1,16 @@
 use super::base::{Provider, ProviderUsage, Usage};
 use super::configs::{ModelConfig, OllamaProviderConfig, ProviderModelConfig};
-use super::utils::{ get_model, handle_response, };
+use super::utils::{get_model, handle_response};
 use crate::message::Message;
+use crate::providers::openai_utils::{
+    create_openai_request_payload, get_openai_usage, openai_response_to_message,
+};
 use anyhow::Result;
 use async_trait::async_trait;
 use mcp_core::tool::Tool;
 use reqwest::Client;
 use serde_json::Value;
 use std::time::Duration;
-use crate::providers::openai_utils::{create_openai_request_payload, get_openai_usage, openai_response_to_message};
 
 pub const OLLAMA_HOST: &str = "http://localhost:11434";
 pub const OLLAMA_MODEL: &str = "qwen2.5";
