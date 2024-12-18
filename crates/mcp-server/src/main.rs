@@ -1,47 +1,114 @@
 use anyhow::Result;
-use mcp_core::handler::ToolError;
+use mcp_core::{
+    handler::ToolError,
+    tool::Tool,
+    protocol::ServerCapabilities,
+};
 use mcp_server::{Router, Server, ByteTransport};
-use tokio::io::{stdin, stdout};
-use tokio::time::Duration;
-use tower::timeout::Timeout;
+use mcp_server::router::{RouterService, CapabilitiesBuilder};
+use serde_json::Value;
+use std::{future::Future, pin::Pin, sync::Arc};
+use tokio::{io::{stdin, stdout}, sync::Mutex};
 use tracing_subscriber::{self, EnvFilter};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
-use mcp_macros::tool;
 
-#[tool(
-    name = "calculator",
-    description = "Perform basic arithmetic operations",
-    params(
-        x = "First number in the calculation",
-        y = "Second number in the calculation",
-        operation = "The operation to perform (add, subtract, multiply, divide)"
-    )
-)]
-async fn calculator(x: String, y: String, operation: String) -> mcp_core::handler::Result<i32> {
-    let x: i32 = x.parse().unwrap();
-    let y: i32 = y.parse().unwrap();
-    match operation.as_str() {
-        "add" => Ok(x + y),
-        "subtract" => Ok(x - y),
-        "multiply" => Ok(x * y),
-        "divide" => {
-            if y == 0 {
-                Err(ToolError::ExecutionError("Division by zero".into()))
-            } else {
-                Ok(x / y)
-            }
+// A simple counter service that demonstrates the Router trait
+#[derive(Clone)]
+struct CounterRouter {
+    counter: Arc<Mutex<i32>>,
+}
+
+impl CounterRouter {
+    fn new() -> Self {
+        Self {
+            counter: Arc::new(Mutex::new(0)),
         }
-        _ => Err(ToolError::InvalidParameters(format!(
-            "Unknown operation: {}",
-            operation
-        ))),
+    }
+
+    async fn increment(&self) -> Result<i32, ToolError> {
+        let mut counter = self.counter.lock().await;
+        *counter += 1;
+        Ok(*counter)
+    }
+
+    async fn decrement(&self) -> Result<i32, ToolError> {
+        let mut counter = self.counter.lock().await;
+        *counter -= 1;
+        Ok(*counter)
+    }
+
+    async fn get_value(&self) -> Result<i32, ToolError> {
+        let counter = self.counter.lock().await;
+        Ok(*counter)
     }
 }
 
+impl Router for CounterRouter {
+    fn capabilities(&self) -> ServerCapabilities {
+        CapabilitiesBuilder::new()
+            .with_tools(true)
+            .build()
+    }
+
+    fn list_tools(&self) -> Vec<Tool> {
+        vec![
+            Tool::new(
+                "increment".to_string(),
+                "Increment the counter by 1".to_string(),
+                serde_json::json!({
+                    "type": "object",
+                    "properties": {},
+                    "required": []
+                }),
+            ),
+            Tool::new(
+                "decrement".to_string(),
+                "Decrement the counter by 1".to_string(),
+                serde_json::json!({
+                    "type": "object",
+                    "properties": {},
+                    "required": []
+                }),
+            ),
+            Tool::new(
+                "get_value".to_string(),
+                "Get the current counter value".to_string(),
+                serde_json::json!({
+                    "type": "object",
+                    "properties": {},
+                    "required": []
+                }),
+            ),
+        ]
+    }
+
+    fn call_tool(&self, tool_name: &str, _arguments: Value) -> Pin<Box<dyn Future<Output = Result<Value, ToolError>> + Send + 'static>> {
+        let this = self.clone();
+        let tool_name = tool_name.to_string();
+
+        Box::pin(async move {
+            match tool_name.as_str() {
+                "increment" => {
+                    let value = this.increment().await?;
+                    Ok(Value::Number(value.into()))
+                }
+                "decrement" => {
+                    let value = this.decrement().await?;
+                    Ok(Value::Number(value.into()))
+                }
+                "get_value" => {
+                    let value = this.get_value().await?;
+                    Ok(Value::Number(value.into()))
+                }
+                _ => Err(ToolError::NotFound(format!("Tool {} not found", tool_name))),
+            }
+        })
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Set up file appender
+    // Set up file appender for logging
     let file_appender = RollingFileAppender::new(
         Rotation::DAILY,
         "logs",
@@ -61,15 +128,43 @@ async fn main() -> Result<()> {
 
     tracing::info!("Starting MCP server");
 
-    // Create a router with the calculator tool
-    let router = Router::builder()
-        .with_tool(Calculator::default())
-        .build();
-
-    // Add a 30 second timeout to all requests
-    let router = Timeout::new(router, Duration::from_secs(30));
-    let server = Server::new(router);
+    // Create an instance of our counter router
+    let router = RouterService(CounterRouter::new());
     
+    // Create and run the server
+    let server = Server::new(router);
     let transport = ByteTransport::new(stdin(), stdout());
+    
+    tracing::info!("Server initialized and ready to handle requests");
     Ok(server.run(transport).await?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::test;
+
+    #[test]
+    async fn test_counter_operations() {
+        let router = CounterRouter::new();
+        
+        // Test increment
+        let result = router.call_tool("increment", Value::Null).await.unwrap();
+        assert_eq!(result, Value::Number(1.into()));
+        
+        // Test get_value
+        let result = router.call_tool("get_value", Value::Null).await.unwrap();
+        assert_eq!(result, Value::Number(1.into()));
+        
+        // Test decrement
+        let result = router.call_tool("decrement", Value::Null).await.unwrap();
+        assert_eq!(result, Value::Number(0.into()));
+    }
+
+    #[test]
+    async fn test_invalid_tool() {
+        let router = CounterRouter::new();
+        let result = router.call_tool("invalid_tool", Value::Null).await;
+        assert!(result.is_err());
+    }
 }

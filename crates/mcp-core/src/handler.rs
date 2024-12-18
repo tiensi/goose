@@ -13,6 +13,8 @@ pub enum ToolError {
     SerializationError(#[from] serde_json::Error),
     #[error("Schema error: {0}")]
     SchemaError(String),
+    #[error("Tool not found: {0}")]
+    NotFound(String),
 }
 
 pub type Result<T> = std::result::Result<T, ToolError>;
