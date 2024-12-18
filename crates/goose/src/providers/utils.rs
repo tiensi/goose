@@ -23,7 +23,6 @@ pub enum ImageFormat {
 ///   even though the message structure is otherwise following openai, the enum switches this
 pub fn messages_to_openai_spec(messages: &[Message], image_format: &ImageFormat) -> Vec<Value> {
     let mut messages_spec = Vec::new();
-
     for message in messages {
         let mut converted = json!({
             "role": message.role
@@ -99,14 +98,20 @@ pub fn messages_to_openai_spec(messages: &[Message], image_format: &ImageFormat)
                                     }
                                 }
                             }
-
+                            let concatenated_content = tool_content
+                                .iter()
+                                .map(|content| match content {
+                                    Content::Text(text) => text.text.clone(),
+                                    _ => String::new(),
+                                })
+                                .collect::<Vec<String>>()
+                                .join(" ");
                             // First add the tool response with all content
                             output.push(json!({
                                 "role": "tool",
-                                "content": tool_content,
+                                "content": concatenated_content,
                                 "tool_call_id": response.id
                             }));
-
                             // Then add any image messages that need to follow
                             output.extend(image_messages);
                         }

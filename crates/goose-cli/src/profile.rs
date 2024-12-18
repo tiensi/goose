@@ -139,7 +139,7 @@ pub fn get_provider_config(provider_name: &str, profile: Profile) -> ProviderCon
             let api_key = get_keyring_secret("GROQ_API_KEY", KeyRetrievalStrategy::Both)
                 .expect("GROQ_API_KEY not available in env or the keychain\nSet an env var or rerun `goose configure`");
 
-            ProviderConfig::Google(GoogleProviderConfig {
+            ProviderConfig::Groq(GroqProviderConfig {
                 host: "https://api.groq.com".to_string(),
                 api_key,
                 model: model_config,
