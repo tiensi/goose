@@ -1,7 +1,6 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use reqwest::Client;
-use reqwest::StatusCode;
+use reqwest::{Client};
 use serde_json::{json, Value};
 use std::time::Duration;
 
@@ -11,7 +10,7 @@ use super::configs::OpenAiProviderConfig;
 use super::configs::{ModelConfig, ProviderModelConfig};
 use super::model_pricing::cost;
 use super::model_pricing::model_pricing_for;
-use super::utils::get_model;
+use super::utils::{get_model, handle_response};
 use super::utils::{
     check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message,
     tools_to_openai_spec, ImageFormat,
@@ -69,28 +68,21 @@ impl OpenAiProvider {
         let response = self
             .client
             .post(&url)
-            // .header("Authorization", format!("Bearer {}", self.config.api_key))
+            .header("Authorization", format!("Bearer {}", self.config.api_key))
             .json(&payload)
             .send()
             .await?;
 
-        match response.status() {
-            StatusCode::OK => Ok(response.json().await?),
-            status if status == StatusCode::TOO_MANY_REQUESTS || status.as_u16() >= 500 => {
-                // Implement retry logic here if needed
-                Err(anyhow!("Server error: {}", status))
-            }
-            _ => Err(anyhow!(
-                "Request failed: {}\nPayload: {}",
-                response.status(),
-                payload
-            )),
-        }
+        handle_response(payload, response).await?
     }
 }
 
 #[async_trait]
 impl Provider for OpenAiProvider {
+    fn get_model_config(&self) -> &ModelConfig {
+        self.config.model_config()
+    }
+
     async fn complete(
         &self,
         system: &str,
@@ -159,10 +151,6 @@ impl Provider for OpenAiProvider {
         let cost = cost(&usage, &model_pricing_for(&model));
 
         Ok((message, ProviderUsage::new(model, usage, cost)))
-    }
-
-    fn get_model_config(&self) -> &ModelConfig {
-        self.config.model_config()
     }
 }
 
@@ -300,7 +288,7 @@ mod tests {
 
         // Assert the response
         if let MessageContent::ToolRequest(tool_request) = &message.content[0] {
-            let tool_call = tool_request.tool_call.as_ref().unwrap();
+            let tool_call = tool_request.tool_call.as_ref()?;
             assert_eq!(tool_call.name, "get_weather");
             assert_eq!(
                 tool_call.arguments,

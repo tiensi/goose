@@ -1,5 +1,6 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Error, Result};
 use regex::Regex;
+use reqwest::{Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
@@ -231,6 +232,21 @@ pub fn openai_response_to_message(response: Value) -> Result<Message> {
         role: Role::Assistant,
         created: chrono::Utc::now().timestamp(),
         content,
+    })
+}
+
+pub async fn handle_response(payload: Value, response: Response) -> Result<Result<Value>, Error> {
+    Ok(match response.status() {
+        StatusCode::OK => Ok(response.json().await?),
+        status if status == StatusCode::TOO_MANY_REQUESTS || status.as_u16() >= 500 => {
+            // Implement retry logic here if needed
+            Err(anyhow!("Server error: {}", status))
+        }
+        _ => Err(anyhow!(
+                "Request failed: {}\nPayload: {}",
+                response.status(),
+                payload
+            )),
     })
 }
 

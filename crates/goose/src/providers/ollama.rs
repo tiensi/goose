@@ -1,9 +1,6 @@
 use super::base::{Provider, ProviderUsage, Usage};
 use super::configs::{ModelConfig, OllamaProviderConfig, ProviderModelConfig};
-use super::utils::{
-    get_model, messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec,
-    ImageFormat,
-};
+use super::utils::{get_model, handle_response, messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec, ImageFormat};
 use crate::message::Message;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -65,22 +62,16 @@ impl OllamaProvider {
 
         let response = self.client.post(&url).json(&payload).send().await?;
 
-        match response.status() {
-            StatusCode::OK => Ok(response.json().await?),
-            status if status == StatusCode::TOO_MANY_REQUESTS || status.as_u16() >= 500 => {
-                Err(anyhow!("Server error: {}", status))
-            }
-            _ => Err(anyhow!(
-                "Request failed: {}\nPayload: {}",
-                response.status(),
-                payload
-            )),
-        }
+        handle_response(payload, response).await?
     }
 }
 
 #[async_trait]
 impl Provider for OllamaProvider {
+    fn get_model_config(&self) -> &ModelConfig {
+        self.config.model_config()
+    }
+
     async fn complete(
         &self,
         system: &str,
@@ -131,10 +122,6 @@ impl Provider for OllamaProvider {
         let cost = None;
 
         Ok((message, ProviderUsage::new(model, usage, cost)))
-    }
-
-    fn get_model_config(&self) -> &ModelConfig {
-        self.config.model_config()
     }
 }
 

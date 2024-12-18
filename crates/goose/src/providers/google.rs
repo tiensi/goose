@@ -2,9 +2,7 @@ use crate::errors::AgentError;
 use crate::message::{Message, MessageContent};
 use crate::providers::base::{Provider, ProviderUsage, Usage};
 use crate::providers::configs::{GoogleProviderConfig, ModelConfig, ProviderModelConfig};
-use crate::providers::utils::{
-    is_valid_function_name, sanitize_function_name, unescape_json_values,
-};
+use crate::providers::utils::{handle_response, is_valid_function_name, sanitize_function_name, unescape_json_values};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use mcp_core::{Content, Role, Tool, ToolCall};
@@ -66,18 +64,7 @@ impl GoogleProvider {
             .send()
             .await?;
 
-        match response.status() {
-            StatusCode::OK => Ok(response.json().await?),
-            status if status == StatusCode::TOO_MANY_REQUESTS || status.as_u16() >= 500 => {
-                // Implement retry logic here if needed
-                Err(anyhow!("Server error: {}", status))
-            }
-            _ => Err(anyhow!(
-                "Request failed: {}\nPayload: {}",
-                response.status(),
-                payload
-            )),
-        }
+        handle_response(payload, response).await?
     }
 
     fn messages_to_google_spec(&self, messages: &[Message]) -> Vec<Value> {
