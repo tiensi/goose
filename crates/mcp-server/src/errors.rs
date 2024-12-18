@@ -45,6 +45,10 @@ pub enum RouterError {
     
     #[error("Internal error: {0}")]
     Internal(String),
+
+    #[error("Tool not found: {0}")]
+    ToolNotFound(String),
+
 }
 
 impl From<RouterError> for mcp_core::protocol::ErrorData {
@@ -63,6 +67,11 @@ impl From<RouterError> for mcp_core::protocol::ErrorData {
             },
             RouterError::Internal(msg) => ErrorData {
                 code: INTERNAL_ERROR,
+                message: msg,
+                data: None,
+            },
+            RouterError::ToolNotFound(msg) => ErrorData {
+                code: INVALID_REQUEST,
                 message: msg,
                 data: None,
             },

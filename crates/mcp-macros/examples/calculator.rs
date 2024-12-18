@@ -1,4 +1,4 @@
-use mcp_core::handler::{Tool, ToolError, Result};
+use mcp_core::handler::{ToolHandler, ToolError, Result};
 use mcp_macros::tool;
 
 #[tokio::main]
