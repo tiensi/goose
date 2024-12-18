@@ -7,6 +7,7 @@ use goose::{
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use goose::providers::configs::GroqProviderConfig;
 
 /// Shared application state
 pub struct AppState {
@@ -66,6 +67,13 @@ impl Clone for AppState {
                 }
                 ProviderConfig::Google(config) => {
                     ProviderConfig::Google(goose::providers::configs::GoogleProviderConfig {
+                        host: config.host.clone(),
+                        api_key: config.api_key.clone(),
+                        model: config.model.clone(),
+                    })
+                }
+                ProviderConfig::Groq(config) => {
+                    ProviderConfig::Groq(GroqProviderConfig {
                         host: config.host.clone(),
                         api_key: config.api_key.clone(),
                         model: config.model.clone(),

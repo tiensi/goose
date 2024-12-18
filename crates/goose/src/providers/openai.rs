@@ -69,7 +69,7 @@ impl OpenAiProvider {
         let response = self
             .client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", self.config.api_key))
+            // .header("Authorization", format!("Bearer {}", self.config.api_key))
             .json(&payload)
             .send()
             .await?;

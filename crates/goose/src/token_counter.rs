@@ -65,6 +65,7 @@ impl TokenCounter {
 
     fn model_to_tokenizer_key(model_name: Option<&str>) -> &str {
         let model_name = model_name.unwrap_or("gpt-4o").to_lowercase();
+        // Lifei: TODO: add llamas to the list
         if model_name.contains("claude") {
             CLAUDE_TOKENIZER_KEY
         } else if model_name.contains("qwen") {

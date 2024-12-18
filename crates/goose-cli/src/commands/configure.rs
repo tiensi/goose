@@ -48,6 +48,7 @@ pub async fn handle_configure(
                 ("ollama", "Ollama", "Local open source models"),
                 ("anthropic", "Anthropic", "Claude models"),
                 ("google", "Google Gemini", "Gemini models"),
+                ("groq", "Groq", "AI models"),
             ])
             .interact()?
             .to_string()
@@ -159,6 +160,7 @@ pub fn get_recommended_model(provider_name: &str) -> &str {
         "ollama" => OLLAMA_MODEL,
         "anthropic" => "claude-3-5-sonnet-2",
         "google" => "gemini-1.5-flash",
+        "groq" => "llama3-70b-8192",
         _ => panic!("Invalid provider name"),
     }
 }
@@ -170,6 +172,7 @@ pub fn get_required_keys(provider_name: &str) -> Vec<&'static str> {
         "ollama" => vec!["OLLAMA_HOST"],
         "anthropic" => vec!["ANTHROPIC_API_KEY"], // Removed ANTHROPIC_HOST since we use a fixed endpoint
         "google" => vec!["GOOGLE_API_KEY"],
+        "groq" => vec!["GROQ_API_KEY"],
         _ => panic!("Invalid provider name"),
     }
 }
