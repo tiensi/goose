@@ -54,6 +54,7 @@ impl TokenCounter {
             GPT_4O_TOKENIZER_KEY,
             CLAUDE_TOKENIZER_KEY,
             GOOGLE_TOKENIZER_KEY,
+            QWEN_TOKENIZER_KEY,
             LLAMA_TOKENIZER_KEY,
         ] {
             counter.load_tokenizer(tokenizer_key);
