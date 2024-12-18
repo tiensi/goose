@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
 use crate::errors::AgentError;
 use crate::message::{Message, MessageContent};
@@ -234,12 +234,12 @@ pub fn openai_response_to_message(response: Value) -> Result<Message> {
     })
 }
 
-fn sanitize_function_name(name: &str) -> String {
+pub fn sanitize_function_name(name: &str) -> String {
     let re = Regex::new(r"[^a-zA-Z0-9_-]").unwrap();
     re.replace_all(name, "_").to_string()
 }
 
-fn is_valid_function_name(name: &str) -> bool {
+pub fn is_valid_function_name(name: &str) -> bool {
     let re = Regex::new(r"^[a-zA-Z0-9_-]+$").unwrap();
     re.is_match(name)
 }
@@ -284,6 +284,35 @@ pub fn get_model(data: &Value) -> String {
         }
     } else {
         "Unknown".to_string()
+    }
+}
+
+pub fn unescape_json_values(value: &Value) -> Value {
+    match value {
+        Value::Object(map) => {
+            let new_map: Map<String, Value> = map
+                .iter()
+                .map(|(k, v)| (k.clone(), unescape_json_values(v))) // Process each value
+                .collect();
+            Value::Object(new_map)
+        }
+        Value::Array(arr) => {
+            let new_array: Vec<Value> = arr.iter().map(|v| unescape_json_values(v)).collect();
+            Value::Array(new_array)
+        }
+        Value::String(s) => {
+            let unescaped = s
+                .replace("\\\\n", "\n")
+                .replace("\\\\t", "\t")
+                .replace("\\\\r", "\r")
+                .replace("\\\\\"", "\"")
+                .replace("\\n", "\n")
+                .replace("\\t", "\t")
+                .replace("\\r", "\r")
+                .replace("\\\"", "\"");
+            Value::String(unescaped)
+        }
+        _ => value.clone(),
     }
 }
 
@@ -590,5 +619,55 @@ mod tests {
 
         let result = check_bedrock_context_length_error(&error);
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn unescape_json_values_with_object() {
+        let value = json!({"text": "Hello\\nWorld"});
+        let unescaped_value = unescape_json_values(&value);
+        assert_eq!(unescaped_value, json!({"text": "Hello\nWorld"}));
+    }
+
+    #[test]
+    fn unescape_json_values_with_array() {
+        let value = json!(["Hello\\nWorld", "Goodbye\\tWorld"]);
+        let unescaped_value = unescape_json_values(&value);
+        assert_eq!(unescaped_value, json!(["Hello\nWorld", "Goodbye\tWorld"]));
+    }
+
+    #[test]
+    fn unescape_json_values_with_string() {
+        let value = json!("Hello\\nWorld");
+        let unescaped_value = unescape_json_values(&value);
+        assert_eq!(unescaped_value, json!("Hello\nWorld"));
+    }
+
+    #[test]
+    fn unescape_json_values_with_mixed_content() {
+        let value = json!({
+            "text": "Hello\\nWorld\\\\n!",
+            "array": ["Goodbye\\tWorld", "See you\\rlater"],
+            "nested": {
+                "inner_text": "Inner\\\"Quote\\\""
+            }
+        });
+        let unescaped_value = unescape_json_values(&value);
+        assert_eq!(
+            unescaped_value,
+            json!({
+                "text": "Hello\nWorld\n!",
+                "array": ["Goodbye\tWorld", "See you\rlater"],
+                "nested": {
+                    "inner_text": "Inner\"Quote\""
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn unescape_json_values_with_no_escapes() {
+        let value = json!({"text": "Hello World"});
+        let unescaped_value = unescape_json_values(&value);
+        assert_eq!(unescaped_value, json!({"text": "Hello World"}));
     }
 }

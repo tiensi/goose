@@ -1,12 +1,13 @@
 use crate::error::{to_env_var, ConfigError};
 use config::{Config, Environment};
+use goose::providers::configs::GoogleProviderConfig;
 use goose::providers::{
     configs::{
-        DatabricksAuth, DatabricksProviderConfig, OllamaProviderConfig, OpenAiProviderConfig,
-        ProviderConfig,
+        DatabricksAuth, DatabricksProviderConfig, ModelConfig, OllamaProviderConfig,
+        OpenAiProviderConfig, ProviderConfig,
     },
     factory::ProviderType,
-    ollama,
+    google, ollama,
     utils::ImageFormat,
 };
 use serde::Deserialize;
@@ -41,6 +42,10 @@ pub enum ProviderSettings {
         temperature: Option<f32>,
         #[serde(default)]
         max_tokens: Option<i32>,
+        #[serde(default)]
+        context_limit: Option<usize>,
+        #[serde(default)]
+        estimate_factor: Option<f32>,
     },
     Databricks {
         #[serde(default = "default_databricks_host")]
@@ -51,6 +56,10 @@ pub enum ProviderSettings {
         temperature: Option<f32>,
         #[serde(default)]
         max_tokens: Option<i32>,
+        #[serde(default)]
+        context_limit: Option<usize>,
+        #[serde(default)]
+        estimate_factor: Option<f32>,
         #[serde(default = "default_image_format")]
         image_format: ImageFormat,
     },
@@ -58,6 +67,21 @@ pub enum ProviderSettings {
         #[serde(default = "default_ollama_host")]
         host: String,
         #[serde(default = "default_ollama_model")]
+        model: String,
+        #[serde(default)]
+        temperature: Option<f32>,
+        #[serde(default)]
+        max_tokens: Option<i32>,
+        #[serde(default)]
+        context_limit: Option<usize>,
+        #[serde(default)]
+        estimate_factor: Option<f32>,
+    },
+    Google {
+        #[serde(default = "default_google_host")]
+        host: String,
+        api_key: String,
+        #[serde(default = "default_google_model")]
         model: String,
         #[serde(default)]
         temperature: Option<f32>,
@@ -74,6 +98,7 @@ impl ProviderSettings {
             ProviderSettings::OpenAi { .. } => ProviderType::OpenAi,
             ProviderSettings::Databricks { .. } => ProviderType::Databricks,
             ProviderSettings::Ollama { .. } => ProviderType::Ollama,
+            ProviderSettings::Google { .. } => ProviderType::Google,
         }
     }
 
@@ -86,25 +111,33 @@ impl ProviderSettings {
                 model,
                 temperature,
                 max_tokens,
+                context_limit,
+                estimate_factor,
             } => ProviderConfig::OpenAi(OpenAiProviderConfig {
                 host,
                 api_key,
-                model,
-                temperature,
-                max_tokens,
+                model: ModelConfig::new(model)
+                    .with_temperature(temperature)
+                    .with_max_tokens(max_tokens)
+                    .with_context_limit(context_limit)
+                    .with_estimate_factor(estimate_factor),
             }),
             ProviderSettings::Databricks {
                 host,
                 model,
                 temperature,
                 max_tokens,
+                context_limit,
                 image_format,
+                estimate_factor,
             } => ProviderConfig::Databricks(DatabricksProviderConfig {
                 host: host.clone(),
                 auth: DatabricksAuth::oauth(host),
-                model,
-                temperature,
-                max_tokens,
+                model: ModelConfig::new(model)
+                    .with_temperature(temperature)
+                    .with_max_tokens(max_tokens)
+                    .with_context_limit(context_limit)
+                    .with_estimate_factor(estimate_factor),
                 image_format,
             }),
             ProviderSettings::Ollama {
@@ -112,11 +145,28 @@ impl ProviderSettings {
                 model,
                 temperature,
                 max_tokens,
+                context_limit,
+                estimate_factor,
             } => ProviderConfig::Ollama(OllamaProviderConfig {
                 host,
+                model: ModelConfig::new(model)
+                    .with_temperature(temperature)
+                    .with_max_tokens(max_tokens)
+                    .with_context_limit(context_limit)
+                    .with_estimate_factor(estimate_factor),
+            }),
+            ProviderSettings::Google {
+                host,
+                api_key,
                 model,
                 temperature,
                 max_tokens,
+            } => ProviderConfig::Google(GoogleProviderConfig {
+                host,
+                api_key,
+                model: ModelConfig::new(model)
+                    .with_temperature(temperature)
+                    .with_max_tokens(max_tokens),
             }),
         }
     }
@@ -209,6 +259,14 @@ fn default_ollama_model() -> String {
     ollama::OLLAMA_MODEL.to_string()
 }
 
+fn default_google_host() -> String {
+    google::GOOGLE_API_HOST.to_string()
+}
+
+fn default_google_model() -> String {
+    google::GOOGLE_DEFAULT_MODEL.to_string()
+}
+
 fn default_image_format() -> ImageFormat {
     ImageFormat::Anthropic
 }
@@ -246,6 +304,8 @@ mod tests {
             model,
             temperature,
             max_tokens,
+            context_limit,
+            estimate_factor,
         } = settings.provider
         {
             assert_eq!(host, "https://api.openai.com");
@@ -253,6 +313,8 @@ mod tests {
             assert_eq!(model, "gpt-4o");
             assert_eq!(temperature, None);
             assert_eq!(max_tokens, None);
+            assert_eq!(context_limit, None);
+            assert_eq!(estimate_factor, None);
         } else {
             panic!("Expected OpenAI provider");
         }
@@ -264,6 +326,33 @@ mod tests {
 
     #[test]
     #[serial]
+    fn test_into_config_conversion() {
+        // Test OpenAI conversion
+        let settings = ProviderSettings::OpenAi {
+            host: "https://api.openai.com".to_string(),
+            api_key: "test-key".to_string(),
+            model: "gpt-4o".to_string(),
+            temperature: Some(0.7),
+            max_tokens: Some(1000),
+            context_limit: Some(150_000),
+            estimate_factor: Some(0.8),
+        };
+
+        if let ProviderConfig::OpenAi(config) = settings.into_config() {
+            assert_eq!(config.host, "https://api.openai.com");
+            assert_eq!(config.api_key, "test-key");
+            assert_eq!(config.model.model_name, "gpt-4o");
+            assert_eq!(config.model.temperature, Some(0.7));
+            assert_eq!(config.model.max_tokens, Some(1000));
+            assert_eq!(config.model.context_limit, Some(150_000));
+            assert_eq!(config.model.estimate_factor, Some(0.8));
+        } else {
+            panic!("Expected OpenAI config");
+        }
+    }
+
+    #[test]
+    #[serial]
     fn test_databricks_settings() {
         clean_env();
         env::set_var("GOOSE_PROVIDER__TYPE", "databricks");
@@ -271,6 +360,7 @@ mod tests {
         env::set_var("GOOSE_PROVIDER__MODEL", "llama-2-70b");
         env::set_var("GOOSE_PROVIDER__TEMPERATURE", "0.7");
         env::set_var("GOOSE_PROVIDER__MAX_TOKENS", "2000");
+        env::set_var("GOOSE_PROVIDER__CONTEXT_LIMIT", "150000");
 
         let settings = Settings::new().unwrap();
         if let ProviderSettings::Databricks {
@@ -278,6 +368,8 @@ mod tests {
             model,
             temperature,
             max_tokens,
+            context_limit,
+            estimate_factor,
             image_format: _,
         } = settings.provider
         {
@@ -285,6 +377,8 @@ mod tests {
             assert_eq!(model, "llama-2-70b");
             assert_eq!(temperature, Some(0.7));
             assert_eq!(max_tokens, Some(2000));
+            assert_eq!(context_limit, Some(150000));
+            assert_eq!(estimate_factor, None);
         } else {
             panic!("Expected Databricks provider");
         }
@@ -295,6 +389,7 @@ mod tests {
         env::remove_var("GOOSE_PROVIDER__MODEL");
         env::remove_var("GOOSE_PROVIDER__TEMPERATURE");
         env::remove_var("GOOSE_PROVIDER__MAX_TOKENS");
+        env::remove_var("GOOSE_PROVIDER__CONTEXT_LIMIT");
     }
 
     #[test]
@@ -306,6 +401,8 @@ mod tests {
         env::set_var("GOOSE_PROVIDER__MODEL", "llama2");
         env::set_var("GOOSE_PROVIDER__TEMPERATURE", "0.7");
         env::set_var("GOOSE_PROVIDER__MAX_TOKENS", "2000");
+        env::set_var("GOOSE_PROVIDER__CONTEXT_LIMIT", "150000");
+        env::set_var("GOOSE_PROVIDER__ESTIMATE_FACTOR", "0.7");
 
         let settings = Settings::new().unwrap();
         if let ProviderSettings::Ollama {
@@ -313,12 +410,16 @@ mod tests {
             model,
             temperature,
             max_tokens,
+            context_limit,
+            estimate_factor,
         } = settings.provider
         {
             assert_eq!(host, "http://custom.ollama.host");
             assert_eq!(model, "llama2");
             assert_eq!(temperature, Some(0.7));
             assert_eq!(max_tokens, Some(2000));
+            assert_eq!(context_limit, Some(150000));
+            assert_eq!(estimate_factor, Some(0.7));
         } else {
             panic!("Expected Ollama provider");
         }
@@ -329,6 +430,8 @@ mod tests {
         env::remove_var("GOOSE_PROVIDER__MODEL");
         env::remove_var("GOOSE_PROVIDER__TEMPERATURE");
         env::remove_var("GOOSE_PROVIDER__MAX_TOKENS");
+        env::remove_var("GOOSE_PROVIDER__CONTEXT_LIMIT");
+        env::remove_var("GOOSE_PROVIDER__ESTIMATE_FACTOR");
     }
 
     #[test]
@@ -341,6 +444,7 @@ mod tests {
         env::set_var("GOOSE_PROVIDER__HOST", "https://custom.openai.com");
         env::set_var("GOOSE_PROVIDER__MODEL", "gpt-3.5-turbo");
         env::set_var("GOOSE_PROVIDER__TEMPERATURE", "0.8");
+        env::set_var("GOOSE_PROVIDER__CONTEXT_LIMIT", "150000");
 
         let settings = Settings::new().unwrap();
         assert_eq!(settings.server.port, 8080);
@@ -350,6 +454,7 @@ mod tests {
             api_key,
             model,
             temperature,
+            context_limit,
             ..
         } = settings.provider
         {
@@ -357,6 +462,7 @@ mod tests {
             assert_eq!(api_key, "test-key");
             assert_eq!(model, "gpt-3.5-turbo");
             assert_eq!(temperature, Some(0.8));
+            assert_eq!(context_limit, Some(150000));
         } else {
             panic!("Expected OpenAI provider");
         }
@@ -368,6 +474,7 @@ mod tests {
         env::remove_var("GOOSE_PROVIDER__HOST");
         env::remove_var("GOOSE_PROVIDER__MODEL");
         env::remove_var("GOOSE_PROVIDER__TEMPERATURE");
+        env::remove_var("GOOSE_PROVIDER__CONTEXT_LIMIT");
     }
 
     #[test]

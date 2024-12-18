@@ -32,3 +32,4 @@ download_tokenizer() {
 download_tokenizer "Xenova/gpt-4o"
 download_tokenizer "Xenova/claude-tokenizer"
 download_tokenizer "Qwen/Qwen2.5-Coder-32B-Instruct"
+download_tokenizer "Xenova/gemma-2-tokenizer"

@@ -13,6 +13,7 @@ pub struct TokenCounter {
 
 const GPT_4O_TOKENIZER_KEY: &str = "Xenova--gpt-4o";
 const CLAUDE_TOKENIZER_KEY: &str = "Xenova--claude-tokenizer";
+const GOOGLE_TOKENIZER_KEY: &str = "Xenova--gemma-2-tokenizer";
 const QWEN_TOKENIZER_KEY: &str = "Qwen--Qwen2.5-Coder-32B-Instruct";
 
 impl Default for TokenCounter {
@@ -48,7 +49,11 @@ impl TokenCounter {
             tokenizers: HashMap::new(),
         };
         // Add default tokenizers
-        for tokenizer_key in [GPT_4O_TOKENIZER_KEY, CLAUDE_TOKENIZER_KEY] {
+        for tokenizer_key in [
+            GPT_4O_TOKENIZER_KEY,
+            CLAUDE_TOKENIZER_KEY,
+            GOOGLE_TOKENIZER_KEY,
+        ] {
             counter.load_tokenizer(tokenizer_key);
         }
         counter
@@ -64,6 +69,8 @@ impl TokenCounter {
             CLAUDE_TOKENIZER_KEY
         } else if model_name.contains("qwen") {
             QWEN_TOKENIZER_KEY
+        } else if model_name.contains("gemini") {
+            GOOGLE_TOKENIZER_KEY
         } else {
             // default
             GPT_4O_TOKENIZER_KEY

@@ -16,6 +16,7 @@ for repo_id in [
     "Xenova/gpt-4o",
     "Xenova/claude-tokenizer",
     "Qwen/Qwen2.5-Coder-32B-Instruct",
+    "Xenova/gemma-2-tokenizer",
 ]:
     download_dir = BASE_DIR / repo_id.replace("/", "--")
     _path = hf_hub_download(repo_id, filename="tokenizer.json", local_dir=download_dir)
