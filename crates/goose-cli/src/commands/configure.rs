@@ -6,6 +6,8 @@ use console::style;
 use goose::key_manager::{get_keyring_secret, save_to_keyring, KeyRetrievalStrategy};
 use goose::message::Message;
 use goose::providers::factory;
+use goose::providers::google::GOOGLE_DEFAULT_MODEL;
+use goose::providers::groq::GROQ_DEFAULT_MODEL;
 use goose::providers::ollama::OLLAMA_MODEL;
 use std::error::Error;
 
@@ -159,8 +161,8 @@ pub fn get_recommended_model(provider_name: &str) -> &str {
         "databricks" => "claude-3-5-sonnet-2",
         "ollama" => OLLAMA_MODEL,
         "anthropic" => "claude-3-5-sonnet-2",
-        "google" => "gemini-1.5-flash",
-        "groq" => "llama3-70b-8192",
+        "google" => GOOGLE_DEFAULT_MODEL,
+        "groq" => GROQ_DEFAULT_MODEL,
         _ => panic!("Invalid provider name"),
     }
 }

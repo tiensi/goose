@@ -12,7 +12,7 @@ use serde_json::Value;
 use std::time::Duration;
 
 pub const GROQ_API_HOST: &str = "https://api.groq.com";
-pub const GROQ_DEFAULT_MODEL: &str = "llama3-70b-8192";
+pub const GROQ_DEFAULT_MODEL: &str = "llama-3.3-70b-versatile";
 
 pub struct GroqProvider {
     client: Client,
