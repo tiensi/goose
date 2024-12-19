@@ -58,6 +58,15 @@ function ChatContent({
   const [lastInteractionTime, setLastInteractionTime] = useState<number>(Date.now());
   const [showGame, setShowGame] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [working, setWorkingLocal] = useState<Working>(Working.Idle);
+
+  useEffect(() => {
+    setWorking(working);
+  }, [working, setWorking]);
+
+  const updateWorking = (newWorking: Working) => {
+    setWorkingLocal(newWorking);
+  };
 
   const {
     messages,
@@ -70,28 +79,30 @@ function ChatContent({
     api: getApiUrl('/reply'),
     initialMessages: chat?.messages || [],
     onToolCall: ({ toolCall }) => {
-      setWorking(Working.Working);
+      updateWorking(Working.Working);
       setProgressMessage(`Executing tool: ${toolCall.toolName}`);
+      requestAnimationFrame(() => scrollToBottom('instant'));
     },
     onResponse: (response) => {
       if (!response.ok) {
         setProgressMessage('An error occurred while receiving the response.');
-        setWorking(Working.Idle);
+        updateWorking(Working.Idle);
       } else {
         setProgressMessage('thinking...');
-        setWorking(Working.Working);
+        updateWorking(Working.Working);
       }
     },
     onFinish: async (message, options) => {
       setTimeout(() => {
         setProgressMessage('Task finished. Click here to expand.');
-        setWorking(Working.Idle);
+        updateWorking(Working.Idle);
       }, 500);
       
       const fetchResponses = await askAi(message.content);
       setMessageMetadata((prev) => ({ ...prev, [message.id]: fetchResponses }));
       
-      // Only show notification if it's been more than a minute since last interaction
+      requestAnimationFrame(() => scrollToBottom('smooth'));
+      
       const timeSinceLastInteraction = Date.now() - lastInteractionTime;
       window.electron.logInfo("last interaction:" + lastInteractionTime);
       if (timeSinceLastInteraction > 60000) { // 60000ms = 1 minute
@@ -135,16 +146,16 @@ function ChatContent({
 
   // Single effect to handle all scrolling
   useEffect(() => {
-    if (isLoading || messages.length > 0) {
+    if (isLoading || messages.length > 0 || working === Working.Working) {
       // Initial scroll
-      scrollToBottom(isLoading ? 'instant' : 'smooth');
+      scrollToBottom(isLoading || working === Working.Working ? 'instant' : 'smooth');
       
       // Additional scrolls to catch dynamic content
       [100, 300, 500].forEach(delay => {
         setTimeout(() => scrollToBottom('smooth'), delay);
       });
     }
-  }, [messages, isLoading]);
+  }, [messages, isLoading, working]);
 
   // Handle submit
   const handleSubmit = (e: React.FormEvent) => {
