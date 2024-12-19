@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use mcp_core::protocol::JsonRpcMessage;
-use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::{mpsc, oneshot};
 
@@ -52,10 +51,11 @@ pub trait Transport: Send + Sync + 'static {
 pub mod stdio;
 pub use stdio::StdioTransport;
 
-pub mod sse;
-pub use sse::SseTransport;
+// pub mod sse;
+// pub use sse::SseTransport;
 
 /// A router that handles message distribution for a transport
+#[derive(Clone)]
 pub struct MessageRouter {
     transport_tx: mpsc::Sender<TransportMessage>,
     shutdown_tx: mpsc::Sender<()>,

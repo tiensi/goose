@@ -1,16 +1,8 @@
 use anyhow::Result;
-use mcp_client::client::{
-    ClientCapabilities, ClientInfo, Error as ClientError, McpClient, McpClientImpl,
-};
-use mcp_client::{
-    service::{ServiceError, TransportService},
-    transport::StdioTransport,
-};
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::Mutex;
-use tower::timeout::TimeoutLayer;
-use tower::{ServiceBuilder, ServiceExt};
+use mcp_client::client::McpClient;
+use mcp_client::client::{ClientCapabilities, ClientInfo, Error as ClientError, McpClientImpl};
+use mcp_client::{service::TransportService, transport::StdioTransport};
+use tower::ServiceBuilder;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -24,20 +16,11 @@ async fn main() -> Result<(), ClientError> {
         )
         .init();
 
-    // Create the base transport as Arc<Mutex<StdioTransport>>
-    let transport = Arc::new(Mutex::new(StdioTransport::new("uvx", ["mcp-server-git"])));
+    // Create the transport
+    let transport = StdioTransport::new("uvx", vec!["mcp-server-git".to_string()]);
 
     // Build service with middleware including timeout
-    let service = ServiceBuilder::new()
-        .layer(TimeoutLayer::new(Duration::from_secs(30)))
-        .service(TransportService::new(Arc::clone(&transport)))
-        .map_err(|e: Box<dyn std::error::Error + Send + Sync>| {
-            if e.is::<tower::timeout::error::Elapsed>() {
-                ServiceError::Timeout(tower::timeout::error::Elapsed::new())
-            } else {
-                ServiceError::Other(e.to_string())
-            }
-        });
+    let service = ServiceBuilder::new().service(TransportService::new(transport));
 
     // Create client
     let mut client = McpClientImpl::new(service);
@@ -58,11 +41,13 @@ async fn main() -> Result<(), ClientError> {
     let tools = client.list_tools().await?;
     println!("Available tools: {tools:?}\n");
 
-    // Call tool 'git_status' wtih arguments = {"repo_path": "."}
+    // Call tool 'git_status' with arguments = {"repo_path": "."}
     let tool_result = client
         .call_tool("git_status", serde_json::json!({ "repo_path": "." }))
         .await?;
-    println!("Tool result: {tool_result:?}");
+    println!("Tool result: {tool_result:?}\n");
+
+    println!("Finishing up, will cleanup resources as we go out of scope\n");
 
     Ok(())
 }
