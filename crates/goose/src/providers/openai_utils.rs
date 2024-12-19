@@ -94,31 +94,26 @@ pub fn messages_to_openai_spec(
                                     }
                                 }
                             }
-                            match concat_tool_response_contents {
+                            let tool_response_content: Value = match concat_tool_response_contents {
                                 true => {
-                                    let concatenated_content = tool_content
+                                    json!(tool_content
                                         .iter()
                                         .map(|content| match content {
                                             Content::Text(text) => text.text.clone(),
                                             _ => String::new(),
                                         })
                                         .collect::<Vec<String>>()
-                                        .join(" ");
-                                    // First add the tool response with all content
-                                    output.push(json!({
-                                        "role": "tool",
-                                        "content": concatenated_content,
-                                        "tool_call_id": response.id
-                                    }));
+                                        .join(" "))
                                 }
-                                false => {
-                                    output.push(json!({
-                                        "role": "tool",
-                                        "content": tool_content,
-                                        "tool_call_id": response.id
-                                    }));
-                                }
+                                false => json!(tool_content),
                             };
+
+                            // First add the tool response with all content
+                            output.push(json!({
+                                "role": "tool",
+                                "content": tool_response_content,
+                                "tool_call_id": response.id
+                            }));
                             // Then add any image messages that need to follow
                             output.extend(image_messages);
                         }

@@ -69,7 +69,8 @@ impl Provider for OpenAiProvider {
         tools: &[Tool],
     ) -> Result<(Message, ProviderUsage)> {
         // Not checking for o1 model here since system message is not supported by o1
-        let payload = create_openai_request_payload(&self.config.model, system, messages, tools)?;
+        let payload =
+            create_openai_request_payload(&self.config.model, system, messages, tools, false)?;
 
         // Make request
         let response = self.post(payload).await?;

@@ -57,7 +57,8 @@ impl Provider for OllamaProvider {
         messages: &[Message],
         tools: &[Tool],
     ) -> Result<(Message, ProviderUsage)> {
-        let payload = create_openai_request_payload(&self.config.model, system, messages, tools)?;
+        let payload =
+            create_openai_request_payload(&self.config.model, system, messages, tools, false)?;
 
         let response = self.post(payload).await?;
 
