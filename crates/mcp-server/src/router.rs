@@ -2,25 +2,34 @@ use std::{
     future::Future,
     pin::Pin,
     task::{Context, Poll},
-    time::Duration,
 };
-use tokio::time::sleep;
 
 use mcp_core::{
-    content::Content, handler::{ResourceError, ToolError}, protocol::{
-        CallToolResult, Implementation, InitializeResult, JsonRpcRequest, JsonRpcResponse, ListResourcesResult, ListToolsResult, PromptsCapability, ReadResourceResult, ResourcesCapability, ServerCapabilities, ToolsCapability
-    }, ResourceContents
+    content::Content,
+    handler::{ResourceError, ToolError},
+    protocol::{
+        CallToolResult, Implementation, InitializeResult, JsonRpcRequest, JsonRpcResponse,
+        ListResourcesResult, ListToolsResult, PromptsCapability, ReadResourceResult,
+        ResourcesCapability, ServerCapabilities, ToolsCapability,
+    },
+    ResourceContents,
 };
-use tower_service::Service;
 use serde_json::Value;
+use tower_service::Service;
 
-use crate::{RouterError, BoxError};
+use crate::{BoxError, RouterError};
 
 /// Builder for configuring and constructing capabilities
 pub struct CapabilitiesBuilder {
     tools: Option<ToolsCapability>,
     prompts: Option<PromptsCapability>,
     resources: Option<ResourcesCapability>,
+}
+
+impl Default for CapabilitiesBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CapabilitiesBuilder {
@@ -33,8 +42,7 @@ impl CapabilitiesBuilder {
     }
 
     /// Add multiple tools to the router
-    pub fn with_tools(mut self, list_changed: bool) -> Self
-    {
+    pub fn with_tools(mut self, list_changed: bool) -> Self {
         self.tools = Some(ToolsCapability {
             list_changed: Some(list_changed),
         });
@@ -72,9 +80,16 @@ impl CapabilitiesBuilder {
 pub trait Router: Send + Sync + 'static {
     fn capabilities(&self) -> ServerCapabilities;
     fn list_tools(&self) -> Vec<mcp_core::tool::Tool>;
-    fn call_tool(&self, tool_name: &str, arguments: Value) -> Pin<Box<dyn Future<Output = Result<Value, ToolError>> + Send + 'static>>;
+    fn call_tool(
+        &self,
+        tool_name: &str,
+        arguments: Value,
+    ) -> Pin<Box<dyn Future<Output = Result<Value, ToolError>> + Send + 'static>>;
     fn list_resources(&self) -> Vec<mcp_core::resource::Resource>;
-    fn read_resource(&self, uri: &str) -> Pin<Box<dyn Future<Output = Result<String, ResourceError>> + Send + 'static>>;
+    fn read_resource(
+        &self,
+        uri: &str,
+    ) -> Pin<Box<dyn Future<Output = Result<String, ResourceError>> + Send + 'static>>;
 
     // Helper method to create base response
     fn create_response(&self, id: Option<u64>) -> JsonRpcResponse {
@@ -86,7 +101,10 @@ pub trait Router: Send + Sync + 'static {
         }
     }
 
-    fn handle_initialize(&self, req: JsonRpcRequest) -> impl Future<Output = Result<JsonRpcResponse, RouterError>> + Send {
+    fn handle_initialize(
+        &self,
+        req: JsonRpcRequest,
+    ) -> impl Future<Output = Result<JsonRpcResponse, RouterError>> + Send {
         async move {
             let result = InitializeResult {
                 protocol_version: "2024-11-05".to_string(),
@@ -98,37 +116,48 @@ pub trait Router: Send + Sync + 'static {
             };
 
             let mut response = self.create_response(req.id);
-            response.result = Some(serde_json::to_value(result)
-                .map_err(|e| RouterError::Internal(format!("JSON serialization error: {}", e)))?);
+            response.result =
+                Some(serde_json::to_value(result).map_err(|e| {
+                    RouterError::Internal(format!("JSON serialization error: {}", e))
+                })?);
 
             Ok(response)
         }
     }
 
-    fn handle_tools_list(&self, req: JsonRpcRequest) -> impl Future<Output = Result<JsonRpcResponse, RouterError>> + Send {
+    fn handle_tools_list(
+        &self,
+        req: JsonRpcRequest,
+    ) -> impl Future<Output = Result<JsonRpcResponse, RouterError>> + Send {
         async move {
             let tools = self.list_tools();
 
             let result = ListToolsResult { tools };
             let mut response = self.create_response(req.id);
-            response.result = Some(serde_json::to_value(result)
-                .map_err(|e| RouterError::Internal(format!("JSON serialization error: {}", e)))?);
+            response.result =
+                Some(serde_json::to_value(result).map_err(|e| {
+                    RouterError::Internal(format!("JSON serialization error: {}", e))
+                })?);
 
             Ok(response)
         }
     }
 
-    fn handle_tools_call(&self, req: JsonRpcRequest) -> impl Future<Output = Result<JsonRpcResponse, RouterError>> + Send {
+    fn handle_tools_call(
+        &self,
+        req: JsonRpcRequest,
+    ) -> impl Future<Output = Result<JsonRpcResponse, RouterError>> + Send {
         async move {
-            let params = req.params.ok_or_else(|| RouterError::InvalidParams("Missing parameters".into()))?;
+            let params = req
+                .params
+                .ok_or_else(|| RouterError::InvalidParams("Missing parameters".into()))?;
 
-            let name = params.get("name")
+            let name = params
+                .get("name")
                 .and_then(Value::as_str)
                 .ok_or_else(|| RouterError::InvalidParams("Missing tool name".into()))?;
 
-            let arguments = params.get("arguments")
-                .cloned()
-                .unwrap_or(Value::Null);
+            let arguments = params.get("arguments").cloned().unwrap_or(Value::Null);
 
             let result = match self.call_tool(name, arguments).await {
                 Ok(result) => CallToolResult {
@@ -138,25 +167,32 @@ pub trait Router: Send + Sync + 'static {
                 Err(err) => CallToolResult {
                     content: vec![Content::text(err.to_string())],
                     is_error: true,
-                }
+                },
             };
 
             let mut response = self.create_response(req.id);
-            response.result = Some(serde_json::to_value(result)
-                .map_err(|e| RouterError::Internal(format!("JSON serialization error: {}", e)))?);
+            response.result =
+                Some(serde_json::to_value(result).map_err(|e| {
+                    RouterError::Internal(format!("JSON serialization error: {}", e))
+                })?);
 
             Ok(response)
         }
     }
 
-    fn handle_resources_list(&self, req: JsonRpcRequest) -> impl Future<Output = Result<JsonRpcResponse, RouterError>> + Send {
+    fn handle_resources_list(
+        &self,
+        req: JsonRpcRequest,
+    ) -> impl Future<Output = Result<JsonRpcResponse, RouterError>> + Send {
         async move {
             let resources = self.list_resources();
 
             let result = ListResourcesResult { resources };
             let mut response = self.create_response(req.id);
-            response.result = Some(serde_json::to_value(result)
-                .map_err(|e| RouterError::Internal(format!("JSON serialization error: {}", e)))?);
+            response.result =
+                Some(serde_json::to_value(result).map_err(|e| {
+                    RouterError::Internal(format!("JSON serialization error: {}", e))
+                })?);
 
             Ok(response)
         }
@@ -197,7 +233,6 @@ pub trait Router: Send + Sync + 'static {
     }
 }
 
-// A wrapper type to implement the Service trait locally
 pub struct RouterService<T>(pub T);
 
 impl<T> Service<JsonRpcRequest> for RouterService<T>
@@ -217,12 +252,6 @@ where
 
         Box::pin(async move {
             let result = match req.method.as_str() {
-                "slow" => {
-                    sleep(Duration::from_secs(60)).await;
-                    let mut response = this.create_response(req.id);
-                    response.result = Some(Value::String("This should never be seen".to_string()));
-                    Ok(response)
-                },
                 "initialize" => this.handle_initialize(req).await,
                 "tools/list" => this.handle_tools_list(req).await,
                 "tools/call" => this.handle_tools_call(req).await,

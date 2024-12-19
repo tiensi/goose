@@ -3,14 +3,14 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::{Stream, Future};
-use mcp_core::protocol::{JsonRpcMessage, JsonRpcRequest, JsonRpcResponse, JsonRpcError};
+use futures::{Future, Stream};
+use mcp_core::protocol::{JsonRpcError, JsonRpcMessage, JsonRpcRequest, JsonRpcResponse};
 use pin_project::pin_project;
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tower_service::Service;
 
 mod errors;
-pub use errors::{TransportError, ServerError, RouterError, BoxError};
+pub use errors::{BoxError, RouterError, ServerError, TransportError};
 
 pub mod router;
 pub use router::Router;
@@ -45,7 +45,7 @@ where
         let mut this = self.project();
         let mut buf = Vec::new();
         let mut reader = BufReader::new(&mut this.reader);
-        
+
         let mut read_future = Box::pin(reader.read_until(b'\n', &mut buf));
         match read_future.as_mut().poll(cx) {
             Poll::Ready(Ok(0)) => Poll::Ready(None), // EOF
@@ -55,20 +55,24 @@ where
                     Ok(s) => s,
                     Err(e) => return Poll::Ready(Some(Err(TransportError::Utf8(e)))),
                 };
-                
+
                 // Parse JSON and validate message format
                 match serde_json::from_str::<serde_json::Value>(&line) {
                     Ok(value) => {
                         // Validate basic JSON-RPC structure
                         if !value.is_object() {
-                            return Poll::Ready(Some(Err(TransportError::InvalidMessage("Message must be a JSON object".into()))));
+                            return Poll::Ready(Some(Err(TransportError::InvalidMessage(
+                                "Message must be a JSON object".into(),
+                            ))));
                         }
-                        
+
                         let obj = value.as_object().unwrap(); // Safe due to check above
-                        
+
                         // Check jsonrpc version field
                         if !obj.contains_key("jsonrpc") || obj["jsonrpc"] != "2.0" {
-                            return Poll::Ready(Some(Err(TransportError::InvalidMessage("Missing or invalid jsonrpc version".into()))));
+                            return Poll::Ready(Some(Err(TransportError::InvalidMessage(
+                                "Missing or invalid jsonrpc version".into(),
+                            ))));
                         }
 
                         tracing::info!(
@@ -80,7 +84,7 @@ where
                             Ok(msg) => Poll::Ready(Some(Ok(msg))),
                             Err(e) => Poll::Ready(Some(Err(TransportError::Json(e)))),
                         }
-                    },
+                    }
                     Err(e) => Poll::Ready(Some(Err(TransportError::Json(e)))),
                 }
             }
@@ -97,7 +101,9 @@ where
 {
     pub async fn write_message(&mut self, msg: JsonRpcMessage) -> Result<(), std::io::Error> {
         let json = serde_json::to_string(&msg)?;
-        Pin::new(&mut self.writer).write_all(json.as_bytes()).await?;
+        Pin::new(&mut self.writer)
+            .write_all(json.as_bytes())
+            .await?;
         Pin::new(&mut self.writer).write_all(b"\n").await?;
         Pin::new(&mut self.writer).flush().await?;
         Ok(())
@@ -136,17 +142,17 @@ where
                     match msg {
                         JsonRpcMessage::Request(request) => {
                             // Serialize request for logging
-                            let id = request.id.clone();
+                            let id = request.id;
                             let request_json = serde_json::to_string(&request)
                                 .unwrap_or_else(|_| "Failed to serialize request".to_string());
-                            
+
                             tracing::info!(
                                 request_id = ?id,
                                 method = ?request.method,
                                 json = %request_json,
                                 "Received request"
                             );
-                            
+
                             // Process the request using our service
                             let response = match service.call(request).await {
                                 Ok(resp) => resp,
@@ -163,37 +169,44 @@ where
                                             data: None,
                                         }),
                                     }
-                                },
+                                }
                             };
-                            
+
                             // Serialize response for logging
                             let response_json = serde_json::to_string(&response)
                                 .unwrap_or_else(|_| "Failed to serialize response".to_string());
-                            
+
                             tracing::info!(
                                 response_id = ?response.id,
                                 json = %response_json,
                                 "Sending response"
                             );
                             // Send the response back
-                            if let Err(e) = transport.write_message(JsonRpcMessage::Response(response)).await {
+                            if let Err(e) = transport
+                                .write_message(JsonRpcMessage::Response(response))
+                                .await
+                            {
                                 return Err(ServerError::Transport(TransportError::Io(e)));
                             }
-                        },
-                        JsonRpcMessage::Response(_) | JsonRpcMessage::Notification(_) | JsonRpcMessage::Error(_) => {
+                        }
+                        JsonRpcMessage::Response(_)
+                        | JsonRpcMessage::Notification(_)
+                        | JsonRpcMessage::Error(_) => {
                             // Ignore responses and notifications for now
                             continue;
                         }
                     }
-                },
+                }
                 Err(e) => {
                     // Convert transport error to JSON-RPC error response
                     let error = match e {
-                        TransportError::Json(_) | TransportError::InvalidMessage(_) => mcp_core::protocol::ErrorData {
-                            code: mcp_core::protocol::PARSE_ERROR,
-                            message: e.to_string(),
-                            data: None,
-                        },
+                        TransportError::Json(_) | TransportError::InvalidMessage(_) => {
+                            mcp_core::protocol::ErrorData {
+                                code: mcp_core::protocol::PARSE_ERROR,
+                                message: e.to_string(),
+                                data: None,
+                            }
+                        }
                         TransportError::Protocol(_) => mcp_core::protocol::ErrorData {
                             code: mcp_core::protocol::INVALID_REQUEST,
                             message: e.to_string(),
@@ -218,7 +231,7 @@ where
                 }
             }
         }
-        
+
         Ok(())
     }
 }

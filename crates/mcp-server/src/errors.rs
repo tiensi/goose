@@ -6,13 +6,13 @@ pub type BoxError = Box<dyn std::error::Error + Sync + Send>;
 pub enum TransportError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
-    
+
     #[error("JSON serialization error: {0}")]
     Json(#[from] serde_json::Error),
-    
+
     #[error("Invalid UTF-8 sequence: {0}")]
     Utf8(#[from] std::string::FromUtf8Error),
-    
+
     #[error("Protocol error: {0}")]
     Protocol(String),
 
@@ -24,10 +24,10 @@ pub enum TransportError {
 pub enum ServerError {
     #[error("Transport error: {0}")]
     Transport(#[from] TransportError),
-    
+
     #[error("Service error: {0}")]
     Service(String),
-    
+
     #[error("Internal error: {0}")]
     Internal(String),
 
@@ -39,10 +39,10 @@ pub enum ServerError {
 pub enum RouterError {
     #[error("Method not found: {0}")]
     MethodNotFound(String),
-    
+
     #[error("Invalid parameters: {0}")]
     InvalidParams(String),
-    
+
     #[error("Internal error: {0}")]
     Internal(String),
 

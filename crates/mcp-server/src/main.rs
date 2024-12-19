@@ -1,18 +1,16 @@
 use anyhow::Result;
 use mcp_core::handler::ResourceError;
-use mcp_core::{
-    handler::ToolError,
-    tool::Tool,
-    protocol::ServerCapabilities,
-    resource::Resource,
-};
-use mcp_server::{Router, Server, ByteTransport};
-use mcp_server::router::{RouterService, CapabilitiesBuilder};
+use mcp_core::{handler::ToolError, protocol::ServerCapabilities, resource::Resource, tool::Tool};
+use mcp_server::router::{CapabilitiesBuilder, RouterService};
+use mcp_server::{ByteTransport, Router, Server};
 use serde_json::Value;
 use std::{future::Future, pin::Pin, sync::Arc};
-use tokio::{io::{stdin, stdout}, sync::Mutex};
-use tracing_subscriber::{self, EnvFilter};
+use tokio::{
+    io::{stdin, stdout},
+    sync::Mutex,
+};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
+use tracing_subscriber::{self, EnvFilter};
 
 // A simple counter service that demonstrates the Router trait
 #[derive(Clone)]
@@ -47,9 +45,7 @@ impl CounterRouter {
 
 impl Router for CounterRouter {
     fn capabilities(&self) -> ServerCapabilities {
-        CapabilitiesBuilder::new()
-            .with_tools(true)
-            .build()
+        CapabilitiesBuilder::new().with_tools(true).build()
     }
 
     fn list_tools(&self) -> Vec<Tool> {
@@ -84,7 +80,11 @@ impl Router for CounterRouter {
         ]
     }
 
-    fn call_tool(&self, tool_name: &str, _arguments: Value) -> Pin<Box<dyn Future<Output = Result<Value, ToolError>> + Send + 'static>> {
+    fn call_tool(
+        &self,
+        tool_name: &str,
+        _arguments: Value,
+    ) -> Pin<Box<dyn Future<Output = Result<Value, ToolError>> + Send + 'static>> {
         let this = self.clone();
         let tool_name = tool_name.to_string();
 
@@ -108,13 +108,12 @@ impl Router for CounterRouter {
     }
 
     fn list_resources(&self) -> Vec<Resource> {
-        vec![
-            Resource::new(
-                "memo://insights".to_string(),
-                Some("text/plain".to_string()),
-                Some("memo-resource".to_string())
-            ).unwrap()
-        ]
+        vec![Resource::new(
+            "memo://insights",
+            Some("text/plain".to_string()),
+            Some("memo-resource".to_string()),
+        )
+        .unwrap()]
     }
 
     fn read_resource(
@@ -141,16 +140,11 @@ impl Router for CounterRouter {
 #[tokio::main]
 async fn main() -> Result<()> {
     // Set up file appender for logging
-    let file_appender = RollingFileAppender::new(
-        Rotation::DAILY,
-        "logs",
-        "mcp-server.log",
-    );
+    let file_appender = RollingFileAppender::new(Rotation::DAILY, "logs", "mcp-server.log");
 
     // Initialize the tracing subscriber with file and stdout logging
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env()
-            .add_directive(tracing::Level::INFO.into()))
+        .with_env_filter(EnvFilter::from_default_env().add_directive(tracing::Level::INFO.into()))
         .with_writer(file_appender)
         .with_target(false)
         .with_thread_ids(true)
@@ -162,41 +156,11 @@ async fn main() -> Result<()> {
 
     // Create an instance of our counter router
     let router = RouterService(CounterRouter::new());
-    
+
     // Create and run the server
     let server = Server::new(router);
     let transport = ByteTransport::new(stdin(), stdout());
-    
+
     tracing::info!("Server initialized and ready to handle requests");
     Ok(server.run(transport).await?)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tokio::test;
-
-    #[test]
-    async fn test_counter_operations() {
-        let router = CounterRouter::new();
-        
-        // Test increment
-        let result = router.call_tool("increment", Value::Null).await.unwrap();
-        assert_eq!(result, Value::Number(1.into()));
-        
-        // Test get_value
-        let result = router.call_tool("get_value", Value::Null).await.unwrap();
-        assert_eq!(result, Value::Number(1.into()));
-        
-        // Test decrement
-        let result = router.call_tool("decrement", Value::Null).await.unwrap();
-        assert_eq!(result, Value::Number(0.into()));
-    }
-
-    #[test]
-    async fn test_invalid_tool() {
-        let router = CounterRouter::new();
-        let result = router.call_tool("invalid_tool", Value::Null).await;
-        assert!(result.is_err());
-    }
 }

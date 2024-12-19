@@ -1,10 +1,10 @@
-use mcp_core::handler::{ToolHandler, ToolError, Result};
+use mcp_core::handler::{Result, ToolError, ToolHandler};
 use mcp_macros::tool;
 
 #[tokio::main]
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     // Create an instance of our tool
-    let calculator = Calculator::default();
+    let calculator = Calculator;
 
     // Print tool information
     println!("Tool name: {}", calculator.name());
@@ -40,9 +40,7 @@ async fn calculator(x: i32, y: i32, operation: String) -> Result<i32> {
         "multiply" => Ok(x * y),
         "divide" => {
             if y == 0 {
-                Err(ToolError::ExecutionError(
-                    "Division by zero".into(),
-                ))
+                Err(ToolError::ExecutionError("Division by zero".into()))
             } else {
                 Ok(x / y)
             }

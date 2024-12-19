@@ -75,7 +75,7 @@ impl TryFrom<JsonRpcRaw> for JsonRpcMessage {
                 error: raw.error.unwrap(),
             }));
         }
-        
+
         // If it has a result field, it's a response
         if raw.result.is_some() {
             return Ok(JsonRpcMessage::Response(JsonRpcResponse {

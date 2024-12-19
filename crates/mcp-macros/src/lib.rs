@@ -1,3 +1,4 @@
+use convert_case::{Case, Casing};
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use std::collections::HashMap;
@@ -5,7 +6,6 @@ use syn::{
     parse::Parse, parse::ParseStream, parse_macro_input, punctuated::Punctuated, Expr, ExprLit,
     FnArg, ItemFn, Lit, Meta, Pat, PatType, Token,
 };
-use convert_case::{Case, Casing};
 
 struct MacroArgs {
     name: Option<String>,
@@ -76,9 +76,7 @@ pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
     let fn_name_str = fn_name.to_string();
 
     // Generate PascalCase struct name from the function name
-    let struct_name = format_ident!("{}", {
-        fn_name_str.to_case(Case::Pascal)
-    });
+    let struct_name = format_ident!("{}", { fn_name_str.to_case(Case::Pascal) });
 
     // Use provided name or function name as default
     let tool_name = args.name.unwrap_or(fn_name_str);
