@@ -13,7 +13,11 @@ use serde_json::{json, Value};
 /// Convert internal Message format to OpenAI's API message specification
 ///   some openai compatible endpoints use the anthropic image spec at the content level
 ///   even though the message structure is otherwise following openai, the enum switches this
-pub fn messages_to_openai_spec(messages: &[Message], image_format: &ImageFormat) -> Vec<Value> {
+pub fn messages_to_openai_spec(
+    messages: &[Message],
+    image_format: &ImageFormat,
+    concat_tool_response_contents: bool,
+) -> Vec<Value> {
     let mut messages_spec = Vec::new();
     for message in messages {
         let mut converted = json!({
@@ -90,20 +94,31 @@ pub fn messages_to_openai_spec(messages: &[Message], image_format: &ImageFormat)
                                     }
                                 }
                             }
-                            let concatenated_content = tool_content
-                                .iter()
-                                .map(|content| match content {
-                                    Content::Text(text) => text.text.clone(),
-                                    _ => String::new(),
-                                })
-                                .collect::<Vec<String>>()
-                                .join(" ");
-                            // First add the tool response with all content
-                            output.push(json!({
-                                "role": "tool",
-                                "content": concatenated_content,
-                                "tool_call_id": response.id
-                            }));
+                            match concat_tool_response_contents {
+                                true => {
+                                    let concatenated_content = tool_content
+                                        .iter()
+                                        .map(|content| match content {
+                                            Content::Text(text) => text.text.clone(),
+                                            _ => String::new(),
+                                        })
+                                        .collect::<Vec<String>>()
+                                        .join(" ");
+                                    // First add the tool response with all content
+                                    output.push(json!({
+                                        "role": "tool",
+                                        "content": concatenated_content,
+                                        "tool_call_id": response.id
+                                    }));
+                                }
+                                false => {
+                                    output.push(json!({
+                                        "role": "tool",
+                                        "content": tool_content,
+                                        "tool_call_id": response.id
+                                    }));
+                                }
+                            };
                             // Then add any image messages that need to follow
                             output.extend(image_messages);
                         }
@@ -246,13 +261,18 @@ pub fn create_openai_request_payload(
     system: &str,
     messages: &[Message],
     tools: &[Tool],
+    concat_tool_response_contents: bool,
 ) -> anyhow::Result<Value, Error> {
     let system_message = json!({
         "role": "system",
         "content": system
     });
 
-    let messages_spec = messages_to_openai_spec(messages, &ImageFormat::OpenAi);
+    let messages_spec = messages_to_openai_spec(
+        messages,
+        &ImageFormat::OpenAi,
+        concat_tool_response_contents,
+    );
     let tools_spec = tools_to_openai_spec(tools)?;
 
     let mut messages_array = vec![system_message];
@@ -327,7 +347,7 @@ mod tests {
     #[test]
     fn test_messages_to_openai_spec() -> anyhow::Result<()> {
         let message = Message::user().with_text("Hello");
-        let spec = messages_to_openai_spec(&[message], &ImageFormat::OpenAi);
+        let spec = messages_to_openai_spec(&[message], &ImageFormat::OpenAi, false);
 
         assert_eq!(spec.len(), 1);
         assert_eq!(spec[0]["role"], "user");
@@ -381,7 +401,7 @@ mod tests {
         messages
             .push(Message::user().with_tool_response(tool_id, Ok(vec![Content::text("Result")])));
 
-        let spec = messages_to_openai_spec(&messages, &ImageFormat::OpenAi);
+        let spec = messages_to_openai_spec(&messages, &ImageFormat::OpenAi, false);
 
         assert_eq!(spec.len(), 4);
         assert_eq!(spec[0]["role"], "assistant");
