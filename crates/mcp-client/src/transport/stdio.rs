@@ -1,101 +1,161 @@
-use super::{Error, Transport};
-use async_trait::async_trait;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::process::{Child, ChildStdin, ChildStdout, Command};
-use tokio::sync::Mutex;
+use std::io::{BufRead, BufReader, Write};
+use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::sync::Arc;
 
-/// A `StdioTransport` uses a child process’s stdin/stdout as a communication channel.
+use async_trait::async_trait;
+use mcp_core::protocol::JsonRpcMessage;
+use tokio::io::AsyncWriteExt;
+use tokio::sync::{mpsc, Mutex};
+use tokio::task::JoinHandle;
+
+use super::{Error, Transport, TransportMessage};
+
+/// A `StdioTransport` uses a child process's stdin/stdout as a communication channel.
 ///
-/// It starts the specified command with arguments and uses its stdin/stdout to send/receive
-/// JSON-RPC messages line by line. This is useful for running MCP servers as subprocesses.
+/// It uses channels for message passing and handles responses asynchronously through a background task.
 pub struct StdioTransport {
     command: String,
     args: Vec<String>,
-    child: Mutex<Option<Child>>,
-    stdin: Mutex<Option<ChildStdin>>,
-    stdout: Mutex<Option<BufReader<ChildStdout>>>,
+    process: Arc<Mutex<Option<Child>>>,
+    stdin: Arc<Mutex<Option<ChildStdin>>>,
+    reader_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
+    pending_requests: Arc<Mutex<std::collections::HashMap<String, oneshot::Sender<Result<JsonRpcMessage, Error>>>>>,
 }
 
 impl StdioTransport {
     /// Create a new `StdioTransport` configured to run the given command with arguments.
-    ///
-    /// The transport will not start until `start()` is called.
-    pub fn new<I, S>(command: S, args: I) -> Self
-    where
-        S: Into<String>,
-        I: IntoIterator<Item = S>,
-    {
+    pub fn new<S: Into<String>>(command: S, args: Vec<String>) -> Self {
         Self {
             command: command.into(),
-            args: args.into_iter().map(Into::into).collect(),
-            child: Mutex::new(None),
-            stdin: Mutex::new(None),
-            stdout: Mutex::new(None),
+            args,
+            process: Arc::new(Mutex::new(None)),
+            stdin: Arc::new(Mutex::new(None)),
+            reader_handle: Arc::new(Mutex::new(None)),
+            pending_requests: Arc::new(Mutex::new(std::collections::HashMap::new())),
         }
+    }
+
+    async fn spawn_process(&self) -> Result<(ChildStdin, ChildStdout), Error> {
+        let mut child = Command::new(&self.command)
+            .args(&self.args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()?;
+
+        let stdin = child.stdin.take().ok_or(Error::Other("Failed to get stdin".into()))?;
+        let stdout = child.stdout.take().ok_or(Error::Other("Failed to get stdout".into()))?;
+
+        *self.process.lock().await = Some(child);
+
+        Ok((stdin, stdout))
+    }
+
+    async fn handle_message(
+        message: JsonRpcMessage,
+        pending_requests: Arc<Mutex<std::collections::HashMap<String, oneshot::Sender<Result<JsonRpcMessage, Error>>>>>,
+    ) {
+        if let JsonRpcMessage::Response(response) = &message {
+            if let Some(tx) = pending_requests.lock().await.remove(&response.id) {
+                let _ = tx.send(Ok(message));
+            }
+        }
+    }
+
+    async fn process_messages(
+        mut message_rx: mpsc::Receiver<TransportMessage>,
+        mut stdin: ChildStdin,
+        stdout: ChildStdout,
+        pending_requests: Arc<Mutex<std::collections::HashMap<String, oneshot::Sender<Result<JsonRpcMessage, Error>>>>>,
+    ) {
+        // Spawn stdout reader task
+        let pending_clone = pending_requests.clone();
+        let reader_handle = tokio::spawn(async move {
+            let mut reader = BufReader::new(stdout);
+            let mut line = String::new();
+
+            loop {
+                line.clear();
+                match reader.read_line(&mut line) {
+                    Ok(0) => break, // EOF
+                    Ok(_) => {
+                        if let Ok(message) = serde_json::from_str::<JsonRpcMessage>(&line) {
+                            Self::handle_message(message, pending_clone.clone()).await;
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+        });
+
+        // Process incoming messages
+        while let Some(transport_msg) = message_rx.recv().await {
+            let message_str = serde_json::to_string(&transport_msg.message)
+                .map_err(|e| Error::Other(format!("Serialization error: {}", e)))
+                .unwrap_or_default();
+
+            // Store response channel if this is a request
+            if let Some(response_tx) = transport_msg.response_tx {
+                if let JsonRpcMessage::Request(request) = &transport_msg.message {
+                    pending_requests.lock().await.insert(request.id.clone(), response_tx);
+                }
+            }
+
+            // Write message to stdin
+            if let Err(e) = stdin.write_all(format!("{}\n", message_str).as_bytes()).await {
+                eprintln!("Failed to write to stdin: {}", e);
+                break;
+            }
+        }
+
+        // Clean up
+        reader_handle.abort();
     }
 }
 
 #[async_trait]
 impl Transport for StdioTransport {
-    async fn start(&self) -> Result<(), Error> {
-        if self.child.lock().await.is_some() {
-            return Ok(()); // Already started
-        }
+    async fn start(&self) -> Result<mpsc::Sender<TransportMessage>, Error> {
+        let (stdin, stdout) = self.spawn_process().await?;
+        *self.stdin.lock().await = Some(stdin.try_clone()?);
 
-        let mut cmd = Command::new(&self.command);
-        cmd.args(&self.args)
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::inherit());
+        let (message_tx, message_rx) = mpsc::channel(32);
+        
+        let pending_requests = self.pending_requests.clone();
+        let handle = tokio::spawn(Self::process_messages(
+            message_rx,
+            stdin,
+            stdout,
+            pending_requests,
+        ));
 
-        let mut child = cmd.spawn()?;
+        *self.reader_handle.lock().await = Some(handle);
 
-        let stdin = child.stdin.take().ok_or(Error::NotConnected)?;
-        let stdout = child.stdout.take().ok_or(Error::NotConnected)?;
-
-        *self.stdin.lock().await = Some(stdin);
-        *self.stdout.lock().await = Some(BufReader::new(stdout));
-        *self.child.lock().await = Some(child);
-
-        Ok(())
-    }
-
-    async fn send(&self, msg: String) -> Result<(), Error> {
-        let mut stdin = self.stdin.lock().await;
-        let stdin = stdin.as_mut().ok_or(Error::NotConnected)?;
-        // Write the message followed by a newline
-        stdin.write_all(msg.as_bytes()).await?;
-        stdin.write_all(b"\n").await?;
-        stdin.flush().await?;
-        Ok(())
-    }
-
-    async fn receive(&self) -> Result<String, Error> {
-        let mut stdout = self.stdout.lock().await;
-        let stdout = stdout.as_mut().ok_or(Error::NotConnected)?;
-        let mut line = String::new();
-        let n = stdout.read_line(&mut line).await?;
-        if n == 0 {
-            // End of stream
-            return Err(Error::NotConnected);
-        }
-        Ok(line)
+        Ok(message_tx)
     }
 
     async fn close(&self) -> Result<(), Error> {
-        let mut child = self.child.lock().await;
-        let mut stdin = self.stdin.lock().await;
-        let mut stdout = self.stdout.lock().await;
-
-        // Drop stdin to signal EOF
-        *stdin = None;
-        *stdout = None;
-
-        if let Some(mut c) = child.take() {
-            // Wait for child to exit
-            let _status = c.wait().await?;
+        // Kill the process
+        if let Some(mut process) = self.process.lock().await.take() {
+            let _ = process.kill();
         }
 
+        // Abort the reader task
+        if let Some(handle) = self.reader_handle.lock().await.take() {
+            handle.abort();
+        }
+
+        // Clear any pending requests
+        self.pending_requests.lock().await.clear();
+
         Ok(())
+    }
+}
+
+impl Drop for StdioTransport {
+    fn drop(&mut self) {
+        // Create a new runtime for cleanup if needed
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _ = rt.block_on(self.close());
     }
 }

@@ -1,7 +1,8 @@
 use async_trait::async_trait;
+use mcp_core::protocol::JsonRpcMessage;
 use std::sync::Arc;
 use thiserror::Error;
-use tokio::sync::Mutex;
+use tokio::sync::{mpsc, oneshot};
 
 /// A generic error type for transport operations.
 #[derive(Debug, Error)]
@@ -21,55 +22,31 @@ pub enum Error {
     #[error("Failed to send message")]
     SendFailed,
 
+    #[error("Channel closed")]
+    ChannelClosed,
+
     #[error("Unexpected transport error: {0}")]
     Other(String),
 }
 
-/// A generic asynchronous transport trait.
-///
-/// Implementations are expected to handle:
-/// - starting the underlying communication channel (e.g., launching a child process, connecting a socket)
-/// - sending JSON-RPC messages as strings
-/// - receiving JSON-RPC messages as strings
-/// - closing the transport cleanly
+/// A message that can be sent through the transport
+#[derive(Debug)]
+pub struct TransportMessage {
+    /// The JSON-RPC message to send
+    pub message: JsonRpcMessage,
+    /// Channel to receive the response on (None for notifications)
+    pub response_tx: Option<oneshot::Sender<Result<JsonRpcMessage, Error>>>,
+}
+
+/// A generic asynchronous transport trait with channel-based communication
 #[async_trait]
-pub trait Transport: Send + 'static {
+pub trait Transport: Send + Sync + 'static {
     /// Start the transport and establish the underlying connection.
-    async fn start(&self) -> Result<(), Error>;
-
-    /// Send a raw JSON-encoded message through the transport.
-    async fn send(&self, msg: String) -> Result<(), Error>;
-
-    /// Receive a raw JSON-encoded message from the transport.
-    ///
-    /// This should return a single line representing one JSON message.
-    async fn receive(&self) -> Result<String, Error>;
+    /// Returns channels for sending messages and receiving errors.
+    async fn start(&self) -> Result<mpsc::Sender<TransportMessage>, Error>;
 
     /// Close the transport and free any resources.
     async fn close(&self) -> Result<(), Error>;
-}
-
-#[async_trait]
-impl<T: Transport> Transport for Arc<Mutex<T>> {
-    async fn start(&self) -> Result<(), Error> {
-        let transport = self.lock().await;
-        transport.start().await
-    }
-
-    async fn send(&self, msg: String) -> Result<(), Error> {
-        let transport = self.lock().await;
-        transport.send(msg).await
-    }
-
-    async fn receive(&self) -> Result<String, Error> {
-        let transport = self.lock().await;
-        transport.receive().await
-    }
-
-    async fn close(&self) -> Result<(), Error> {
-        let transport = self.lock().await;
-        transport.close().await
-    }
 }
 
 pub mod stdio;
@@ -77,3 +54,55 @@ pub use stdio::StdioTransport;
 
 pub mod sse;
 pub use sse::SseTransport;
+
+/// A router that handles message distribution for a transport
+pub struct MessageRouter {
+    transport_tx: mpsc::Sender<TransportMessage>,
+    shutdown_tx: mpsc::Sender<()>,
+}
+
+impl MessageRouter {
+    pub fn new(
+        transport_tx: mpsc::Sender<TransportMessage>,
+        shutdown_tx: mpsc::Sender<()>,
+    ) -> Self {
+        Self {
+            transport_tx,
+            shutdown_tx,
+        }
+    }
+
+    /// Send a message and wait for a response
+    pub async fn send_request(&self, request: JsonRpcMessage) -> Result<JsonRpcMessage, Error> {
+        let (response_tx, response_rx) = oneshot::channel();
+
+        self.transport_tx
+            .send(TransportMessage {
+                message: request,
+                response_tx: Some(response_tx),
+            })
+            .await
+            .map_err(|_| Error::ChannelClosed)?;
+
+        response_rx.await.map_err(|_| Error::ChannelClosed)?
+    }
+
+    /// Send a notification (no response expected)
+    pub async fn send_notification(&self, notification: JsonRpcMessage) -> Result<(), Error> {
+        self.transport_tx
+            .send(TransportMessage {
+                message: notification,
+                response_tx: None,
+            })
+            .await
+            .map_err(|_| Error::ChannelClosed)
+    }
+
+    /// Request shutdown of the transport
+    pub async fn shutdown(&self) -> Result<(), Error> {
+        self.shutdown_tx
+            .send(())
+            .await
+            .map_err(|_| Error::ChannelClosed)
+    }
+}

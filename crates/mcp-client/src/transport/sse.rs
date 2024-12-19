@@ -1,155 +1,185 @@
-use super::{Error, Transport};
+use std::sync::Arc;
 use async_trait::async_trait;
 use futures_util::StreamExt;
-use reqwest::{Client, Url};
-use reqwest_eventsource::{Event, EventSource};
-use std::sync::Arc;
-use tokio::sync::{mpsc, Mutex};
-use tracing::{debug, error, info};
+use reqwest::{Client as HttpClient, Url};
+use tokio::sync::{mpsc, Mutex, oneshot};
+use tokio::task::JoinHandle;
+use eventsource_client::{Client as EventSourceClient, SSE};
 
+use super::{Error, Transport, TransportMessage};
+use mcp_core::protocol::JsonRpcMessage;
+
+/// A transport implementation that uses Server-Sent Events (SSE) for receiving messages
+/// and HTTP POST for sending messages.
 pub struct SseTransport {
-    connection_url: Url,
-    endpoint: Arc<Mutex<Option<Url>>>,
-    http_client: Client,
-    event_source: Arc<Mutex<Option<EventSource>>>,
-    message_rx: Arc<Mutex<Option<mpsc::Receiver<String>>>>,
-    message_tx: mpsc::Sender<String>,
+    sse_url: String,
+    http_client: HttpClient,
+    post_endpoint: Arc<Mutex<Option<String>>>,
+    sse_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
+    pending_requests: Arc<Mutex<std::collections::HashMap<String, oneshot::Sender<Result<JsonRpcMessage, Error>>>>>,
 }
 
 impl SseTransport {
-    pub fn new(url: &str) -> Result<Self, Error> {
-        let (message_tx, message_rx) = mpsc::channel(100);
-
-        Ok(Self {
-            connection_url: Url::parse(url).map_err(|_| Error::InvalidUrl)?,
-            endpoint: Arc::new(Mutex::new(None)),
-            http_client: Client::new(),
-            event_source: Arc::new(Mutex::new(None)),
-            message_rx: Arc::new(Mutex::new(Some(message_rx))),
-            message_tx,
-        })
+    /// Create a new SSE transport with the given SSE endpoint URL
+    pub fn new<S: Into<String>>(sse_url: S) -> Self {
+        Self {
+            sse_url: sse_url.into(),
+            http_client: HttpClient::new(),
+            post_endpoint: Arc::new(Mutex::new(None)),
+            sse_handle: Arc::new(Mutex::new(None)),
+            pending_requests: Arc::new(Mutex::new(std::collections::HashMap::new())),
+        }
     }
-}
 
-/// Constructs the endpoint URL by removing "/sse" from the connection URL
-/// and appending the given suffix.
-fn construct_endpoint_url(base_url: &Url, url_suffix: &str) -> Result<Url, url::ParseError> {
-    let trimmed_base = base_url.as_str().trim_end_matches("/sse");
-    let trimmed_base = trimmed_base.trim_end_matches('/');
-    let trimmed_suffix = url_suffix.trim_start_matches('/');
-    let full_url = format!("{}/{}", trimmed_base, trimmed_suffix);
-    Url::parse(&full_url)
-}
+    async fn handle_message(
+        message: JsonRpcMessage,
+        pending_requests: Arc<Mutex<std::collections::HashMap<String, oneshot::Sender<Result<JsonRpcMessage, Error>>>>>,
+    ) {
+        if let JsonRpcMessage::Response(response) = &message {
+            if let Some(tx) = pending_requests.lock().await.remove(&response.id) {
+                let _ = tx.send(Ok(message));
+            }
+        }
+    }
 
-#[async_trait]
-impl Transport for SseTransport {
-    async fn start(&self) -> Result<(), Error> {
-        if self.event_source.lock().await.is_some() {
-            return Ok(());
+    async fn process_messages(
+        mut message_rx: mpsc::Receiver<TransportMessage>,
+        http_client: HttpClient,
+        post_endpoint: Arc<Mutex<Option<String>>>,
+        sse_url: String,
+        pending_requests: Arc<Mutex<std::collections::HashMap<String, oneshot::Sender<Result<JsonRpcMessage, Error>>>>>,
+    ) {
+        // Set up SSE client
+        let client = match EventSourceClient::new(&sse_url) {
+            Ok(client) => client,
+            Err(e) => {
+                eprintln!("Failed to create SSE client: {}", e);
+                return;
+            }
+        };
+
+        let mut stream = client.stream();
+
+        // Wait for endpoint event to get POST URL
+        while let Some(event) = stream.next().await {
+            match event {
+                Ok(SSE::Event(event)) if event.event_type == "endpoint" => {
+                    if let Some(data) = event.data {
+                        *post_endpoint.lock().await = Some(data);
+                        break;
+                    }
+                }
+                Ok(_) => continue,
+                Err(e) => {
+                    eprintln!("SSE connection error: {}", e);
+                    return;
+                }
+            }
         }
 
-        let event_source = EventSource::get(self.connection_url.as_str());
-        let message_tx = self.message_tx.clone();
-        let endpoint = self.endpoint.clone();
-
-        // Store event source
-        *self.event_source.lock().await = Some(event_source);
-
-        // Create a new event source for the task
-        let mut stream = EventSource::get(self.connection_url.as_str());
-
-        let connection_url = self.connection_url.clone();
-        let cloned_connection_url = connection_url.clone();
-
-        // Spawn a task to handle incoming events
-        tokio::spawn(async move {
+        // Spawn SSE message handler
+        let pending_clone = pending_requests.clone();
+        let sse_handle = tokio::spawn(async move {
             while let Some(event) = stream.next().await {
                 match event {
-                    Ok(Event::Open) => {
-                        // Connection established
-                        info!("\nSSE connection opened");
-                    }
-                    Ok(Event::Message(message)) => {
-                        debug!("Received SSE event: {} - {}", message.event, message.data);
-                        // Check if this is an endpoint event
-                        if message.event == "endpoint" {
-                            let url_suffix = &message.data;
-                            debug!("Received endpoint URL suffix: {}", url_suffix);
-                            match construct_endpoint_url(&cloned_connection_url, url_suffix) {
-                                Ok(url) => {
-                                    info!("Endpoint URL: {}", url);
-                                    let mut endpoint_guard = endpoint.lock().await;
-                                    *endpoint_guard = Some(url);
-                                }
-                                Err(e) => {
-                                    error!("Failed to construct endpoint URL: {}", e);
-                                    // Optionally, handle the error (e.g., retry, notify, etc.)
-                                }
-                            }
-                        } else {
-                            // Regular message
-                            // Assuming message.data is the message payload
-                            if let Err(e) = message_tx.send(message.data).await {
-                                error!("Failed to send message: {}", e);
+                    Ok(SSE::Event(event)) if event.event_type == "message" => {
+                        if let Some(data) = event.data {
+                            if let Ok(message) = serde_json::from_str::<JsonRpcMessage>(&data) {
+                                Self::handle_message(message, pending_clone.clone()).await;
                             }
                         }
                     }
+                    Ok(_) => continue,
                     Err(e) => {
-                        error!("EventSource error: {}", e);
+                        eprintln!("SSE message error: {}", e);
                         break;
                     }
                 }
             }
         });
 
-        // Wait for endpoint URL: every 100ms, check if the endpoint is set upto 30s timeout
-        let timeout = tokio::time::sleep(std::time::Duration::from_secs(30));
-        tokio::pin!(timeout);
+        // Process outgoing messages
+        while let Some(transport_msg) = message_rx.recv().await {
+            let post_url = match post_endpoint.lock().await.as_ref() {
+                Some(url) => url.clone(),
+                None => {
+                    eprintln!("No POST endpoint available");
+                    continue;
+                }
+            };
 
-        loop {
-            tokio::select! {
-                _ = &mut timeout => {
-                    return Err(Error::Timeout);
+            // Store response channel if this is a request
+            if let Some(response_tx) = transport_msg.response_tx {
+                if let JsonRpcMessage::Request(request) = &transport_msg.message {
+                    pending_requests.lock().await.insert(request.id.clone(), response_tx);
                 }
-                _ = tokio::time::sleep(std::time::Duration::from_millis(100)) => {
-                    let endpoint_guard = self.endpoint.lock().await;
-                    if endpoint_guard.is_some() {
-                        break;
-                    }
+            }
+
+            // Send message via HTTP POST
+            let message_str = match serde_json::to_string(&transport_msg.message) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("Failed to serialize message: {}", e);
+                    continue;
                 }
+            };
+
+            if let Err(e) = http_client
+                .post(&post_url)
+                .header("Content-Type", "application/json")
+                .body(message_str)
+                .send()
+                .await
+            {
+                eprintln!("Failed to send message: {}", e);
             }
         }
 
-        Ok(())
+        // Clean up
+        sse_handle.abort();
     }
+}
 
-    async fn send(&self, msg: String) -> Result<(), Error> {
-        let endpoint = {
-            let endpoint_guard = self.endpoint.lock().await;
-            endpoint_guard.as_ref().ok_or(Error::NotConnected)?.clone()
-        };
+#[async_trait]
+impl Transport for SseTransport {
+    async fn start(&self) -> Result<mpsc::Sender<TransportMessage>, Error> {
+        let (message_tx, message_rx) = mpsc::channel(32);
+        
+        let http_client = self.http_client.clone();
+        let post_endpoint = self.post_endpoint.clone();
+        let sse_url = self.sse_url.clone();
+        let pending_requests = self.pending_requests.clone();
+        
+        let handle = tokio::spawn(Self::process_messages(
+            message_rx,
+            http_client,
+            post_endpoint,
+            sse_url,
+            pending_requests,
+        ));
 
-        self.http_client
-            .post(endpoint)
-            .header("Content-Type", "application/json")
-            .body(msg)
-            .send()
-            .await
-            .map_err(|_| Error::SendFailed)?;
+        *self.sse_handle.lock().await = Some(handle);
 
-        Ok(())
-    }
-
-    async fn receive(&self) -> Result<String, Error> {
-        let mut rx_guard = self.message_rx.lock().await;
-        let rx = rx_guard.as_mut().ok_or(Error::NotConnected)?;
-
-        rx.recv().await.ok_or(Error::NotConnected)
+        Ok(message_tx)
     }
 
     async fn close(&self) -> Result<(), Error> {
-        *self.event_source.lock().await = None;
-        *self.endpoint.lock().await = None;
+        // Abort the SSE handler task
+        if let Some(handle) = self.sse_handle.lock().await.take() {
+            handle.abort();
+        }
+
+        // Clear any pending requests
+        self.pending_requests.lock().await.clear();
+
         Ok(())
+    }
+}
+
+impl Drop for SseTransport {
+    fn drop(&mut self) {
+        // Create a new runtime for cleanup if needed
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _ = rt.block_on(self.close());
     }
 }
