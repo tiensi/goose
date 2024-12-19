@@ -16,6 +16,8 @@ use crate::providers::openai_utils::{
 };
 use mcp_core::tool::Tool;
 
+pub const DATABRICKS_DEFAULT_MODEL: &str = "claude-3-5-sonnet-2";
+
 pub struct DatabricksProvider {
     client: Client,
     config: DatabricksProviderConfig,

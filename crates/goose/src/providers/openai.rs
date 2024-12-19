@@ -18,6 +18,8 @@ use crate::providers::openai_utils::{
 };
 use mcp_core::tool::Tool;
 
+pub const OPEN_AI_DEFAULT_MODEL: &str = "gpt-4o";
+
 pub struct OpenAiProvider {
     client: Client,
     config: OpenAiProviderConfig,

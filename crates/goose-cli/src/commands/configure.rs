@@ -5,10 +5,13 @@ use cliclack::spinner;
 use console::style;
 use goose::key_manager::{get_keyring_secret, save_to_keyring, KeyRetrievalStrategy};
 use goose::message::Message;
+use goose::providers::anthropic::ANTHROPIC_DEFAULT_MODEL;
+use goose::providers::databricks::DATABRICKS_DEFAULT_MODEL;
 use goose::providers::factory;
 use goose::providers::google::GOOGLE_DEFAULT_MODEL;
 use goose::providers::groq::GROQ_DEFAULT_MODEL;
 use goose::providers::ollama::OLLAMA_MODEL;
+use goose::providers::openai::OPEN_AI_DEFAULT_MODEL;
 use std::error::Error;
 
 pub async fn handle_configure(
@@ -157,10 +160,10 @@ pub async fn handle_configure(
 
 pub fn get_recommended_model(provider_name: &str) -> &str {
     match provider_name {
-        "openai" => "gpt-4o",
-        "databricks" => "claude-3-5-sonnet-2",
+        "openai" => OPEN_AI_DEFAULT_MODEL,
+        "databricks" => DATABRICKS_DEFAULT_MODEL,
         "ollama" => OLLAMA_MODEL,
-        "anthropic" => "claude-3-5-sonnet-2",
+        "anthropic" => ANTHROPIC_DEFAULT_MODEL,
         "google" => GOOGLE_DEFAULT_MODEL,
         "groq" => GROQ_DEFAULT_MODEL,
         _ => panic!("Invalid provider name"),

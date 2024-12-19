@@ -1,6 +1,7 @@
 use crate::error::{to_env_var, ConfigError};
 use config::{Config, Environment};
 use goose::providers::configs::{GoogleProviderConfig, GroqProviderConfig};
+use goose::providers::openai::OPEN_AI_DEFAULT_MODEL;
 use goose::providers::{
     configs::{
         DatabricksAuth, DatabricksProviderConfig, ModelConfig, OllamaProviderConfig,
@@ -265,7 +266,7 @@ fn default_port() -> u16 {
 }
 
 fn default_model() -> String {
-    "gpt-4o".to_string()
+    OPEN_AI_DEFAULT_MODEL.to_string()
 }
 
 fn default_openai_host() -> String {

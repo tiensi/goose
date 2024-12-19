@@ -1,9 +1,8 @@
 use super::{
     anthropic::AnthropicProvider, base::Provider, configs::ProviderConfig,
-    databricks::DatabricksProvider, google::GoogleProvider, ollama::OllamaProvider,
-    openai::OpenAiProvider,
+    databricks::DatabricksProvider, google::GoogleProvider, groq::GroqProvider,
+    ollama::OllamaProvider, openai::OpenAiProvider,
 };
-use crate::providers::groq::GroqProvider;
 use anyhow::Result;
 use strum_macros::EnumIter;
 
