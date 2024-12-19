@@ -103,9 +103,7 @@ mod tests {
         TEST_OUTPUT_TOKENS, TEST_TOOL_FUNCTION_NAME, TEST_TOTAL_TOKENS,
     };
     use rust_decimal_macros::dec;
-    use serde_json::json;
-    use wiremock::matchers::{method, path};
-    use wiremock::{Mock, MockServer, ResponseTemplate};
+    use wiremock::MockServer;
 
     async fn _setup_mock_response(response_body: Value) -> (MockServer, OpenAiProvider) {
         let mock_server = setup_mock_server("/v1/chat/completions", response_body).await;
@@ -126,7 +124,7 @@ mod tests {
         let model_name = "gpt-4o";
         // Mock response for normal completion
         let response_body =
-            create_mock_open_ai_response("Hello! How can I assist you today?", model_name);
+            create_mock_open_ai_response(model_name, "Hello! How can I assist you today?");
 
         let (_, provider) = _setup_mock_response(response_body).await;
 

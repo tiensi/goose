@@ -194,7 +194,7 @@ mod tests {
         let mock_server = MockServer::start().await;
 
         // Mock response for completion
-        let mock_response = create_mock_open_ai_response("Hello!", "my-databricks-model");
+        let mock_response = create_mock_open_ai_response("my-databricks-model", "Hello!");
 
         // Expected request body
         let system = "You are a helpful assistant.";

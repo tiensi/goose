@@ -2,15 +2,12 @@ use super::base::ProviderUsage;
 use crate::message::Message;
 use crate::providers::base::{Provider, Usage};
 use crate::providers::configs::ModelConfig;
-use crate::providers::openai::OpenAiProvider;
 use anyhow::Result;
 use async_trait::async_trait;
 use mcp_core::tool::Tool;
 use rust_decimal_macros::dec;
-use serde_json::Value;
 use std::sync::Arc;
 use std::sync::Mutex;
-use wiremock::MockServer;
 
 /// A mock provider that returns pre-configured responses for testing
 pub struct MockProvider {

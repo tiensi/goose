@@ -1,3 +1,4 @@
+use axum::http::StatusCode;
 use mcp_core::Tool;
 use serde_json::{json, Value};
 use wiremock::matchers::{method, path};
@@ -19,6 +20,15 @@ pub async fn setup_mock_server(path_url: &str, response_body: Value) -> MockServ
     mock_server
 }
 
+pub async fn setup_mock_server_with_response_code(path_url: &str, response_code: u16) -> MockServer {
+    let mock_server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path(path_url))
+        .respond_with(ResponseTemplate::new(response_code))
+        .mount(&mock_server)
+        .await;
+    mock_server
+}
 pub fn create_mock_open_ai_response_with_tools(model_name: &str) -> Value {
     json!({
         "id": "chatcmpl-123",
@@ -48,7 +58,7 @@ pub fn create_mock_open_ai_response_with_tools(model_name: &str) -> Value {
     })
 }
 
-pub fn create_mock_open_ai_response(content: &str, model_name: &str) -> Value {
+pub fn create_mock_open_ai_response(model_name: &str, content: &str) -> Value {
     json!({
         "id": "chatcmpl-123",
         "object": "chat.completion",
