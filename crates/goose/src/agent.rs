@@ -2,10 +2,12 @@ use anyhow::Result;
 use async_stream;
 use futures::stream::BoxStream;
 use rust_decimal_macros::dec;
+use rust_decimal_macros::dec;
 use serde_json::json;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
 use tracing::{debug, info, instrument, warn};
+use tokio::sync::Mutex;
 
 use crate::errors::{AgentError, AgentResult};
 use crate::message::{Message, ToolRequest};
@@ -390,13 +392,14 @@ impl Agent {
             let _reply_guard = reply_span.enter();
             
             loop {
-                                let (response, usage) = self.provider.complete(
+                // Get completion from provider
+                let (response, usage) = self.provider.complete(
                     &system_prompt,
                     &messages,
                     &tools,
                 ).await?;
                 self.provider_usage.lock().await.push(usage);
-                
+
                 // The assistant's response is added in rewrite_messages_on_tool_response
                 // Yield the assistant's response
                 yield response.clone();
@@ -450,8 +453,7 @@ impl Agent {
                 messages.pop();
 
                 let pending = vec![response, message_tool_response];
-                messages = self.prepare_inference(&system_prompt, &tools, &messages, &pending, estimated_limit)
-                    .await?;
+                messages = self.prepare_inference(&system_prompt, &tools, &messages, &pending, estimated_limit).await?;
             }
         }))
     }
@@ -483,7 +485,6 @@ impl Agent {
         });
         Ok(usage_map.into_values().collect())
     }
-    
 }
 
 #[cfg(test)]

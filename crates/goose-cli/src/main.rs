@@ -25,6 +25,8 @@ use chrono::Local;
 
 mod log_usage;
 
+mod log_usage;
+
 #[cfg(test)]
 mod test_helpers;
 
