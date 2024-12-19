@@ -73,10 +73,15 @@ impl Provider for GroqProvider {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::message::MessageContent;
-    use crate::providers::mock_server::{create_mock_open_ai_response, create_mock_open_ai_response_with_tools, create_test_tool, get_expected_function_call_arguments, setup_mock_server, TEST_INPUT_TOKENS, TEST_OUTPUT_TOKENS, TEST_TOOL_FUNCTION_NAME, TEST_TOTAL_TOKENS};
+    use crate::providers::mock_server::{
+        create_mock_open_ai_response, create_mock_open_ai_response_with_tools, create_test_tool,
+        get_expected_function_call_arguments, setup_mock_server, TEST_INPUT_TOKENS,
+        TEST_OUTPUT_TOKENS, TEST_TOOL_FUNCTION_NAME, TEST_TOTAL_TOKENS,
+    };
     use wiremock::MockServer;
 
     async fn _setup_mock_server(response_body: Value) -> (MockServer, GroqProvider) {

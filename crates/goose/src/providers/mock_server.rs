@@ -19,7 +19,10 @@ pub async fn setup_mock_server(path_url: &str, response_body: Value) -> MockServ
     mock_server
 }
 
-pub async fn setup_mock_server_with_response_code(path_url: &str, response_code: u16) -> MockServer {
+pub async fn setup_mock_server_with_response_code(
+    path_url: &str,
+    response_code: u16,
+) -> MockServer {
     let mock_server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path(path_url))
@@ -54,6 +57,52 @@ pub fn create_mock_open_ai_response_with_tools(model_name: &str) -> Value {
             "total_tokens": TEST_TOTAL_TOKENS
         },
         "model": model_name
+    })
+}
+
+pub fn create_mock_google_ai_response_with_tools(model_name: &str) -> Value {
+    json!({
+        "candidates": [{
+            "content": {
+                "parts": [{
+                    "functionCall": {
+                        "name": TEST_TOOL_FUNCTION_NAME,
+                        "args":{
+                            "location": "San Francisco, CA"
+                        }
+
+                    }
+                }],
+                "role": "model"
+            },
+            "finishReason": "STOP"
+        }],
+        "modelVersion": model_name,
+        "usageMetadata": {
+            "candidatesTokenCount": TEST_OUTPUT_TOKENS,
+            "promptTokenCount": TEST_INPUT_TOKENS,
+            "totalTokenCount": TEST_TOTAL_TOKENS
+        }
+    })
+}
+
+pub fn create_mock_google_ai_response(model_name: &str, content: &str) -> Value {
+    json!({
+        "candidates": [{
+            "content": {
+                "parts": [{
+                    "text": content
+                }],
+                "role": "model"
+            },
+            "finishReason": "STOP"
+        }],
+        "modelVersion": model_name,
+        "usageMetadata": {
+            "candidatesTokenCount": TEST_OUTPUT_TOKENS,
+            "promptTokenCount": TEST_INPUT_TOKENS,
+            "totalTokenCount": TEST_TOTAL_TOKENS
+        }
     })
 }
 

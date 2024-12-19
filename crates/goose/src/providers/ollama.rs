@@ -75,7 +75,12 @@ impl Provider for OllamaProvider {
 mod tests {
     use super::*;
     use crate::message::MessageContent;
-    use crate::providers::mock_server::{create_mock_open_ai_response, create_mock_open_ai_response_with_tools, create_test_tool, get_expected_function_call_arguments, setup_mock_server, setup_mock_server_with_response_code, TEST_INPUT_TOKENS, TEST_OUTPUT_TOKENS, TEST_TOOL_FUNCTION_NAME, TEST_TOTAL_TOKENS};
+    use crate::providers::mock_server::{
+        create_mock_open_ai_response, create_mock_open_ai_response_with_tools, create_test_tool,
+        get_expected_function_call_arguments, setup_mock_server,
+        setup_mock_server_with_response_code, TEST_INPUT_TOKENS, TEST_OUTPUT_TOKENS,
+        TEST_TOOL_FUNCTION_NAME, TEST_TOTAL_TOKENS,
+    };
     use rust_decimal_macros::dec;
     use wiremock::MockServer;
 
