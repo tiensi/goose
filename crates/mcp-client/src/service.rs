@@ -7,7 +7,7 @@ use tokio::sync::Mutex;
 use tower::Service;
 
 use crate::transport::{Error as TransportError, Transport};
-use mcp_core::protocol::{JsonRpcMessage, JsonRpcResponse};
+use mcp_core::protocol::JsonRpcMessage;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ServiceError {
@@ -76,14 +76,7 @@ impl<T: Transport> Service<JsonRpcMessage> for TransportService<T> {
                     transport.send(msg).await?;
                     // For notifications, the protocol does not require a response
                     // So we return an empty response here and this is not checked upstream
-                    let response: JsonRpcMessage = JsonRpcMessage::Response(JsonRpcResponse {
-                        jsonrpc: "2.0".to_string(),
-                        id: None,
-                        result: None,
-                        error: None,
-                    });
-
-                    Ok(response)
+                    Ok(JsonRpcMessage::Nil)
                 }
                 JsonRpcMessage::Request(request) => {
                     // Serialize request & wait for response

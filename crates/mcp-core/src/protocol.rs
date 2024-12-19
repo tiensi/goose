@@ -41,6 +41,7 @@ pub enum JsonRpcMessage {
     Response(JsonRpcResponse),
     Notification(JsonRpcNotification),
     Error(JsonRpcError),
+    Nil, // used to respond to notifications
 }
 
 // Standard JSON-RPC error codes

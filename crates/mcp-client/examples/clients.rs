@@ -7,9 +7,7 @@ use mcp_client::{
     service::{ServiceError, TransportService},
     transport::{SseTransport, StdioTransport},
 };
-use mcp_core::protocol::JsonRpcMessage;
 use tower::timeout::TimeoutLayer;
-use tower::util::BoxService;
 use tower::{ServiceBuilder, ServiceExt};
 use tracing_subscriber::EnvFilter;
 
