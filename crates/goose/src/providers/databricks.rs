@@ -182,6 +182,9 @@ mod tests {
     use super::*;
     use crate::message::MessageContent;
     use crate::providers::configs::ModelConfig;
+    use crate::providers::mock_server::{
+        create_mock_open_ai_response, TEST_INPUT_TOKENS, TEST_OUTPUT_TOKENS, TEST_TOTAL_TOKENS,
+    };
     use wiremock::matchers::{body_json, header, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -191,19 +194,7 @@ mod tests {
         let mock_server = MockServer::start().await;
 
         // Mock response for completion
-        let mock_response = json!({
-            "choices": [{
-                "message": {
-                    "role": "assistant",
-                    "content": "Hello!"
-                }
-            }],
-            "usage": {
-                "prompt_tokens": 10,
-                "completion_tokens": 25,
-                "total_tokens": 35
-            }
-        });
+        let mock_response = create_mock_open_ai_response("Hello!", "my-databricks-model");
 
         // Expected request body
         let system = "You are a helpful assistant.";
@@ -247,9 +238,9 @@ mod tests {
         } else {
             panic!("Expected Text content");
         }
-        assert_eq!(reply_usage.usage.input_tokens, Some(10));
-        assert_eq!(reply_usage.usage.output_tokens, Some(25));
-        assert_eq!(reply_usage.usage.total_tokens, Some(35));
+        assert_eq!(reply_usage.usage.input_tokens, Some(TEST_INPUT_TOKENS));
+        assert_eq!(reply_usage.usage.output_tokens, Some(TEST_OUTPUT_TOKENS));
+        assert_eq!(reply_usage.usage.total_tokens, Some(TEST_TOTAL_TOKENS));
 
         Ok(())
     }
