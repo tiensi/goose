@@ -82,7 +82,6 @@ mod tests {
         setup_mock_server_with_response_code, TEST_INPUT_TOKENS, TEST_OUTPUT_TOKENS,
         TEST_TOOL_FUNCTION_NAME, TEST_TOTAL_TOKENS,
     };
-    use rust_decimal_macros::dec;
     use wiremock::MockServer;
 
     async fn _setup_mock_server(response_body: Value) -> (MockServer, OllamaProvider) {
