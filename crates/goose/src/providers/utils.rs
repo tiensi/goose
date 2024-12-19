@@ -1,13 +1,13 @@
 use anyhow::{anyhow, Result};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
 use crate::errors::AgentError;
-use crate::models::content::{Content, ImageContent};
-use crate::models::message::{Message, MessageContent};
-use crate::models::role::Role;
-use crate::models::tool::{Tool, ToolCall};
+use crate::message::{Message, MessageContent};
+use mcp_core::content::{Content, ImageContent};
+use mcp_core::role::Role;
+use mcp_core::tool::{Tool, ToolCall};
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum ImageFormat {
@@ -234,12 +234,12 @@ pub fn openai_response_to_message(response: Value) -> Result<Message> {
     })
 }
 
-fn sanitize_function_name(name: &str) -> String {
+pub fn sanitize_function_name(name: &str) -> String {
     let re = Regex::new(r"[^a-zA-Z0-9_-]").unwrap();
     re.replace_all(name, "_").to_string()
 }
 
-fn is_valid_function_name(name: &str) -> bool {
+pub fn is_valid_function_name(name: &str) -> bool {
     let re = Regex::new(r"^[a-zA-Z0-9_-]+$").unwrap();
     re.is_match(name)
 }
@@ -263,7 +263,10 @@ pub fn check_openai_context_length_error(error: &Value) -> Option<ContextLengthE
 }
 
 pub fn check_bedrock_context_length_error(error: &Value) -> Option<ContextLengthExceededError> {
-    let external_message = error.get("external_model_message")?.get("message")?.as_str()?;
+    let external_message = error
+        .get("external_model_message")?
+        .get("message")?
+        .as_str()?;
     if external_message.to_lowercase().contains("too long") {
         Some(ContextLengthExceededError(external_message.to_string()))
     } else {
@@ -271,10 +274,52 @@ pub fn check_bedrock_context_length_error(error: &Value) -> Option<ContextLength
     }
 }
 
+/// Extract the model name from a JSON object. Common with most providers to have this top level attribute.
+pub fn get_model(data: &Value) -> String {
+    if let Some(model) = data.get("model") {
+        if let Some(model_str) = model.as_str() {
+            model_str.to_string()
+        } else {
+            "Unknown".to_string()
+        }
+    } else {
+        "Unknown".to_string()
+    }
+}
+
+pub fn unescape_json_values(value: &Value) -> Value {
+    match value {
+        Value::Object(map) => {
+            let new_map: Map<String, Value> = map
+                .iter()
+                .map(|(k, v)| (k.clone(), unescape_json_values(v))) // Process each value
+                .collect();
+            Value::Object(new_map)
+        }
+        Value::Array(arr) => {
+            let new_array: Vec<Value> = arr.iter().map(|v| unescape_json_values(v)).collect();
+            Value::Array(new_array)
+        }
+        Value::String(s) => {
+            let unescaped = s
+                .replace("\\\\n", "\n")
+                .replace("\\\\t", "\t")
+                .replace("\\\\r", "\r")
+                .replace("\\\\\"", "\"")
+                .replace("\\n", "\n")
+                .replace("\\t", "\t")
+                .replace("\\r", "\r")
+                .replace("\\\"", "\"");
+            Value::String(unescaped)
+        }
+        _ => value.clone(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::content::Content;
+    use mcp_core::content::Content;
     use serde_json::json;
 
     const OPENAI_TOOL_USE_RESPONSE: &str = r#"{
@@ -574,5 +619,55 @@ mod tests {
 
         let result = check_bedrock_context_length_error(&error);
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn unescape_json_values_with_object() {
+        let value = json!({"text": "Hello\\nWorld"});
+        let unescaped_value = unescape_json_values(&value);
+        assert_eq!(unescaped_value, json!({"text": "Hello\nWorld"}));
+    }
+
+    #[test]
+    fn unescape_json_values_with_array() {
+        let value = json!(["Hello\\nWorld", "Goodbye\\tWorld"]);
+        let unescaped_value = unescape_json_values(&value);
+        assert_eq!(unescaped_value, json!(["Hello\nWorld", "Goodbye\tWorld"]));
+    }
+
+    #[test]
+    fn unescape_json_values_with_string() {
+        let value = json!("Hello\\nWorld");
+        let unescaped_value = unescape_json_values(&value);
+        assert_eq!(unescaped_value, json!("Hello\nWorld"));
+    }
+
+    #[test]
+    fn unescape_json_values_with_mixed_content() {
+        let value = json!({
+            "text": "Hello\\nWorld\\\\n!",
+            "array": ["Goodbye\\tWorld", "See you\\rlater"],
+            "nested": {
+                "inner_text": "Inner\\\"Quote\\\""
+            }
+        });
+        let unescaped_value = unescape_json_values(&value);
+        assert_eq!(
+            unescaped_value,
+            json!({
+                "text": "Hello\nWorld\n!",
+                "array": ["Goodbye\tWorld", "See you\rlater"],
+                "nested": {
+                    "inner_text": "Inner\"Quote\""
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn unescape_json_values_with_no_escapes() {
+        let value = json!({"text": "Hello World"});
+        let unescaped_value = unescape_json_values(&value);
+        assert_eq!(unescaped_value, json!({"text": "Hello World"}));
     }
 }

@@ -4,7 +4,7 @@ use crate::profile::{
 use cliclack::spinner;
 use console::style;
 use goose::key_manager::{get_keyring_secret, save_to_keyring, KeyRetrievalStrategy};
-use goose::models::message::Message;
+use goose::message::Message;
 use goose::providers::factory;
 use goose::providers::ollama::OLLAMA_MODEL;
 use std::error::Error;
@@ -46,7 +46,8 @@ pub async fn handle_configure(
                 ("openai", "OpenAI", "GPT-4o etc"),
                 ("databricks", "Databricks", "Models on AI Gateway"),
                 ("ollama", "Ollama", "Local open source models"),
-                ("anthropic", "Anthropic", "Claude models"),            
+                ("anthropic", "Anthropic", "Claude models"),
+                ("google", "Google Gemini", "Gemini models"),
             ])
             .interact()?
             .to_string()
@@ -68,7 +69,7 @@ pub async fn handle_configure(
         // If the key is in the env, ask if we want to save to keyring
         else if let Ok(value) = get_keyring_secret(key, KeyRetrievalStrategy::EnvironmentOnly) {
             let _ = cliclack::log::info(format!("Detected {} in env, we can use this from your environment.\nIt will need to continue to be set in future goose usage.", key));
-            if cliclack::confirm("Would you like to save it to your kerying?").interact()? {
+            if cliclack::confirm("Would you like to save it to your keyring?").interact()? {
                 save_to_keyring(key, &value)?;
             }
         }
@@ -110,10 +111,14 @@ pub async fn handle_configure(
         provider: provider_name.to_string(),
         model: model.clone(),
         additional_systems,
+        temperature: None,
+        context_limit: None,
+        max_tokens: None,
+        estimate_factor: None,
     };
 
     // Confirm everything is configured correctly by calling a model!
-    let provider_config = get_provider_config(&provider_name, model.clone());
+    let provider_config = get_provider_config(&provider_name, profile.clone());
     let spin = spinner();
     spin.start("Checking your configuration...");
     let provider = factory::get_provider(provider_config).unwrap();
@@ -153,6 +158,7 @@ pub fn get_recommended_model(provider_name: &str) -> &str {
         "databricks" => "claude-3-5-sonnet-2",
         "ollama" => OLLAMA_MODEL,
         "anthropic" => "claude-3-5-sonnet-2",
+        "google" => "gemini-1.5-flash",
         _ => panic!("Invalid provider name"),
     }
 }
@@ -162,7 +168,8 @@ pub fn get_required_keys(provider_name: &str) -> Vec<&'static str> {
         "openai" => vec!["OPENAI_API_KEY"],
         "databricks" => vec!["DATABRICKS_HOST"],
         "ollama" => vec!["OLLAMA_HOST"],
-        "anthropic" => vec!["ANTHROPIC_API_KEY"],  // Removed ANTHROPIC_HOST since we use a fixed endpoint
+        "anthropic" => vec!["ANTHROPIC_API_KEY"], // Removed ANTHROPIC_HOST since we use a fixed endpoint
+        "google" => vec!["GOOGLE_API_KEY"],
         _ => panic!("Invalid provider name"),
     }
 }

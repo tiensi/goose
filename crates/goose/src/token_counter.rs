@@ -1,9 +1,8 @@
+use crate::message::Message;
 use include_dir::{include_dir, Dir};
+use mcp_core::tool::Tool;
 use std::collections::HashMap;
 use tokenizers::tokenizer::Tokenizer;
-use crate::models::message::Message;
-use crate::models::tool::Tool;
-
 
 // Embed the tokenizer files directory
 static TOKENIZER_FILES: Dir = include_dir!("$CARGO_MANIFEST_DIR/../../tokenizer_files");
@@ -14,6 +13,7 @@ pub struct TokenCounter {
 
 const GPT_4O_TOKENIZER_KEY: &str = "Xenova--gpt-4o";
 const CLAUDE_TOKENIZER_KEY: &str = "Xenova--claude-tokenizer";
+const GOOGLE_TOKENIZER_KEY: &str = "Xenova--gemma-2-tokenizer";
 const QWEN_TOKENIZER_KEY: &str = "Qwen--Qwen2.5-Coder-32B-Instruct";
 
 impl Default for TokenCounter {
@@ -49,7 +49,11 @@ impl TokenCounter {
             tokenizers: HashMap::new(),
         };
         // Add default tokenizers
-        for tokenizer_key in [GPT_4O_TOKENIZER_KEY, CLAUDE_TOKENIZER_KEY] {
+        for tokenizer_key in [
+            GPT_4O_TOKENIZER_KEY,
+            CLAUDE_TOKENIZER_KEY,
+            GOOGLE_TOKENIZER_KEY,
+        ] {
             counter.load_tokenizer(tokenizer_key);
         }
         counter
@@ -65,6 +69,8 @@ impl TokenCounter {
             CLAUDE_TOKENIZER_KEY
         } else if model_name.contains("qwen") {
             QWEN_TOKENIZER_KEY
+        } else if model_name.contains("gemini") {
+            GOOGLE_TOKENIZER_KEY
         } else {
             // default
             GPT_4O_TOKENIZER_KEY
@@ -86,12 +92,12 @@ impl TokenCounter {
 
     fn count_tokens_for_tools(&self, tools: &[Tool], model_name: Option<&str>) -> usize {
         // Token counts for different function components
-        let func_init = 7;     // Tokens for function initialization
-        let prop_init = 3;     // Tokens for properties initialization
-        let prop_key = 3;      // Tokens for each property key
-        let enum_init: isize = -3;    // Tokens adjustment for enum list start
-        let enum_item = 3;     // Tokens for each enum item
-        let func_end = 12;     // Tokens for function ending
+        let func_init = 7; // Tokens for function initialization
+        let prop_init = 3; // Tokens for properties initialization
+        let prop_key = 3; // Tokens for each property key
+        let enum_init: isize = -3; // Tokens adjustment for enum list start
+        let enum_item = 3; // Tokens for each enum item
+        let func_end = 12; // Tokens for function ending
 
         let mut func_token_count = 0;
         if !tools.is_empty() {
@@ -116,7 +122,8 @@ impl TokenCounter {
                             let line = format!("{}:{}:{}", p_name, p_type, p_desc);
                             func_token_count += self.count_tokens(&line, model_name);
                             if let Some(enum_values) = value["enum"].as_array() {
-                                func_token_count = func_token_count.saturating_add_signed(enum_init); // Add tokens if property has enum list
+                                func_token_count =
+                                    func_token_count.saturating_add_signed(enum_init); // Add tokens if property has enum list
                                 for item in enum_values {
                                     if let Some(item_str) = item.as_str() {
                                         func_token_count += enum_item;
@@ -156,11 +163,14 @@ impl TokenCounter {
             for content in &message.content {
                 // content can either be text response or tool request
                 if let Some(content_text) = content.as_text() {
-                    num_tokens += self.count_tokens(&content_text, model_name);
+                    num_tokens += self.count_tokens(content_text, model_name);
                 } else if let Some(tool_request) = content.as_tool_request() {
                     // TODO: count tokens for tool request
                     let tool_call = tool_request.tool_call.as_ref().unwrap();
-                    let text = format!("{}:{}:{}", tool_request.id, tool_call.name, tool_call.arguments);
+                    let text = format!(
+                        "{}:{}:{}",
+                        tool_request.id, tool_call.name, tool_call.arguments
+                    );
                     num_tokens += self.count_tokens(&text, model_name);
                 } else if let Some(tool_response_text) = content.as_tool_response_text() {
                     num_tokens += self.count_tokens(&tool_response_text, model_name);
@@ -190,7 +200,6 @@ impl TokenCounter {
         resources: &[String],
         model_name: Option<&str>,
     ) -> usize {
-        
         let mut num_tokens = self.count_chat_tokens(system_prompt, messages, tools, model_name);
 
         if !resources.is_empty() {
@@ -200,8 +209,6 @@ impl TokenCounter {
         }
         num_tokens
     }
-
-
 }
 
 #[cfg(test)]
@@ -236,75 +243,72 @@ mod tests {
     }
 
     #[cfg(test)]
-mod tests {
-    use crate::models::{message::MessageContent, role::Role};
-    use super::*;
-    use serde_json::json;
+    mod tests {
+        use super::*;
+        use crate::message::MessageContent;
+        use mcp_core::role::Role;
+        use serde_json::json;
 
-    #[test]
-    fn test_count_chat_tokens() {
-        let token_counter = TokenCounter::new();
+        #[test]
+        fn test_count_chat_tokens() {
+            let token_counter = TokenCounter::new();
 
-        let system_prompt = "You are a helpful assistant that can answer questions about the weather.";
+            let system_prompt =
+                "You are a helpful assistant that can answer questions about the weather.";
 
-        let messages = vec![
-            Message {
-                role: Role::User,
-                created: 0,
-                content: vec![MessageContent::text("What's the weather like in San Francisco?")],
-            },
-            Message {
-                role: Role::Assistant,
-                created: 1,
-                content: vec![MessageContent::text("Looks like it's 60 degrees Fahrenheit in San Francisco.")],
-            },
-            Message {
-                role: Role::User,
-                created: 2,
-                content: vec![MessageContent::text("How about New York?")],
-            },
-        ];
-
-        let tools = vec![Tool {
-            name: "get_current_weather".to_string(),
-            description: "Get the current weather in a given location".to_string(),
-            input_schema: json!({
-                "properties": {
-                    "location": {
-                        "type": "string",
-                        "description": "The city and state, e.g. San Francisco, CA"
-                    },
-                    "unit": {
-                        "type": "string",
-                        "description": "The unit of temperature to return",
-                        "enum": ["celsius", "fahrenheit"]
-                    }
+            let messages = vec![
+                Message {
+                    role: Role::User,
+                    created: 0,
+                    content: vec![MessageContent::text(
+                        "What's the weather like in San Francisco?",
+                    )],
                 },
-                "required": ["location"]
-            }),
-        }];
+                Message {
+                    role: Role::Assistant,
+                    created: 1,
+                    content: vec![MessageContent::text(
+                        "Looks like it's 60 degrees Fahrenheit in San Francisco.",
+                    )],
+                },
+                Message {
+                    role: Role::User,
+                    created: 2,
+                    content: vec![MessageContent::text("How about New York?")],
+                },
+            ];
 
-        let token_count_without_tools = token_counter.count_chat_tokens(
-            system_prompt,
-            &messages,
-            &vec![],
-            Some("gpt-4o"),
-        );
-        println!("Total tokens without tools: {}", token_count_without_tools);
+            let tools = vec![Tool {
+                name: "get_current_weather".to_string(),
+                description: "Get the current weather in a given location".to_string(),
+                input_schema: json!({
+                    "properties": {
+                        "location": {
+                            "type": "string",
+                            "description": "The city and state, e.g. San Francisco, CA"
+                        },
+                        "unit": {
+                            "type": "string",
+                            "description": "The unit of temperature to return",
+                            "enum": ["celsius", "fahrenheit"]
+                        }
+                    },
+                    "required": ["location"]
+                }),
+            }];
 
-        let token_count_with_tools = token_counter.count_chat_tokens(
-            system_prompt,
-            &messages,
-            &tools,
-            Some("gpt-4o"),
-        );
-        println!("Total tokens with tools: {}", token_count_with_tools);
+            let token_count_without_tools =
+                token_counter.count_chat_tokens(system_prompt, &messages, &vec![], Some("gpt-4o"));
+            println!("Total tokens without tools: {}", token_count_without_tools);
 
-        // The token count for messages without tools is calculated using the tokenizer - https://tiktokenizer.vercel.app/
-        // The token count for messages with tools is taken from tiktoken github repo example (notebook)
-        assert_eq!(token_count_without_tools, 56);
-        assert_eq!(token_count_with_tools, 124);
+            let token_count_with_tools =
+                token_counter.count_chat_tokens(system_prompt, &messages, &tools, Some("gpt-4o"));
+            println!("Total tokens with tools: {}", token_count_with_tools);
+
+            // The token count for messages without tools is calculated using the tokenizer - https://tiktokenizer.vercel.app/
+            // The token count for messages with tools is taken from tiktoken github repo example (notebook)
+            assert_eq!(token_count_without_tools, 56);
+            assert_eq!(token_count_with_tools, 124);
+        }
     }
-}
-
 }

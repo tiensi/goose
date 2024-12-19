@@ -23,6 +23,8 @@ use tracing_subscriber::util::SubscriberInitExt;  // Add this import
 use std::fs::OpenOptions;
 use chrono::Local;
 
+mod log_usage;
+
 #[cfg(test)]
 mod test_helpers;
 

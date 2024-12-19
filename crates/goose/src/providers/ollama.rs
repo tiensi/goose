@@ -1,12 +1,13 @@
-use super::base::{Provider, Usage};
-use super::configs::OllamaProviderConfig;
+use super::base::{Provider, ProviderUsage, Usage};
+use super::configs::{ModelConfig, OllamaProviderConfig, ProviderModelConfig};
 use super::utils::{
-    messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec, ImageFormat,
+    get_model, messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec,
+    ImageFormat,
 };
-use crate::models::message::Message;
-use crate::models::tool::Tool;
+use crate::message::Message;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use mcp_core::tool::Tool;
 use reqwest::Client;
 use reqwest::StatusCode;
 use serde_json::{json, Value};
@@ -85,7 +86,7 @@ impl Provider for OllamaProvider {
         system: &str,
         messages: &[Message],
         tools: &[Tool],
-    ) -> Result<(Message, Usage)> {
+    ) -> Result<(Message, ProviderUsage)> {
         let system_message = json!({
             "role": "system",
             "content": system
@@ -98,7 +99,7 @@ impl Provider for OllamaProvider {
         messages_array.extend(messages_spec);
 
         let mut payload = json!({
-            "model": self.config.model,
+            "model": self.config.model.model_name,
             "messages": messages_array
         });
 
@@ -108,13 +109,13 @@ impl Provider for OllamaProvider {
                 .unwrap()
                 .insert("tools".to_string(), json!(tools_spec));
         }
-        if let Some(temp) = self.config.temperature {
+        if let Some(temp) = self.config.model.temperature {
             payload
                 .as_object_mut()
                 .unwrap()
                 .insert("temperature".to_string(), json!(temp));
         }
-        if let Some(tokens) = self.config.max_tokens {
+        if let Some(tokens) = self.config.model.max_tokens {
             payload
                 .as_object_mut()
                 .unwrap()
@@ -126,15 +127,21 @@ impl Provider for OllamaProvider {
         // Parse response
         let message = openai_response_to_message(response.clone())?;
         let usage = Self::get_usage(&response)?;
+        let model = get_model(&response);
+        let cost = None;
 
-        Ok((message, usage))
+        Ok((message, ProviderUsage::new(model, usage, cost)))
+    }
+
+    fn get_model_config(&self) -> &ModelConfig {
+        self.config.model_config()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::message::MessageContent;
+    use crate::message::MessageContent;
     use serde_json::json;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -150,9 +157,7 @@ mod tests {
         // Create the OllamaProvider with the mock server's URL as the host
         let config = OllamaProviderConfig {
             host: mock_server.uri(),
-            model: OLLAMA_MODEL.to_string(),
-            temperature: None,
-            max_tokens: None,
+            model: ModelConfig::new(OLLAMA_MODEL.to_string()),
         };
 
         let provider = OllamaProvider::new(config).unwrap();
@@ -197,9 +202,9 @@ mod tests {
         } else {
             panic!("Expected Text content");
         }
-        assert_eq!(usage.input_tokens, Some(12));
-        assert_eq!(usage.output_tokens, Some(15));
-        assert_eq!(usage.total_tokens, Some(27));
+        assert_eq!(usage.usage.input_tokens, Some(12));
+        assert_eq!(usage.usage.output_tokens, Some(15));
+        assert_eq!(usage.usage.total_tokens, Some(27));
 
         Ok(())
     }
@@ -268,9 +273,9 @@ mod tests {
             panic!("Expected ToolCall content");
         }
 
-        assert_eq!(usage.input_tokens, Some(63));
-        assert_eq!(usage.output_tokens, Some(70));
-        assert_eq!(usage.total_tokens, Some(133));
+        assert_eq!(usage.usage.input_tokens, Some(63));
+        assert_eq!(usage.usage.output_tokens, Some(70));
+        assert_eq!(usage.usage.total_tokens, Some(133));
 
         Ok(())
     }
@@ -286,9 +291,7 @@ mod tests {
 
         let config = OllamaProviderConfig {
             host: mock_server.uri(),
-            model: OLLAMA_MODEL.to_string(),
-            temperature: None,
-            max_tokens: None,
+            model: ModelConfig::new(OLLAMA_MODEL.to_string()),
         };
 
         let provider = OllamaProvider::new(config)?;

@@ -1,17 +1,14 @@
 use crate::errors::{AgentError, AgentResult};
-use crate::models::content::Content;
-use crate::models::tool::{Tool, ToolCall};
 use crate::systems::System;
 use anyhow::Result as AnyhowResult;
 use async_trait::async_trait;
 use indoc::formatdoc;
+use mcp_core::{Content, Resource, Tool, ToolCall};
 use serde_json::json;
 use std::collections::HashMap;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
-
-use crate::systems::Resource;
 
 #[derive(Debug, Default)]
 pub struct MemoryManager {
@@ -399,15 +396,17 @@ impl System for MemorySystem {
 
     async fn status(&self) -> AnyhowResult<Vec<Resource>> {
         // Convert active memories to resources
-        let resources: Vec<Resource> = self.active_memories
+        let resources: Vec<Resource> = self
+            .active_memories
             .iter()
             .filter_map(|(category, memories)| {
                 Resource::with_uri(
                     format!("str:///{}.txt", memories.join(" ")),
                     format!("{}.txt", category),
-                    0,
-                    Some("text".to_string())
-                ).ok()
+                    0.0,
+                    Some("text".to_string()),
+                )
+                .ok()
             })
             .collect();
         Ok(resources)

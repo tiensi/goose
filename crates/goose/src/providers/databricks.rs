@@ -4,15 +4,16 @@ use reqwest::{Client, StatusCode};
 use serde_json::{json, Value};
 use std::time::Duration;
 
-use super::base::{Provider, Usage};
-use super::configs::{DatabricksAuth, DatabricksProviderConfig};
+use super::base::{Provider, ProviderUsage, Usage};
+use super::configs::{DatabricksAuth, DatabricksProviderConfig, ModelConfig, ProviderModelConfig};
+use super::model_pricing::{cost, model_pricing_for};
 use super::oauth;
 use super::utils::{
-    check_openai_context_length_error, check_bedrock_context_length_error, messages_to_openai_spec, openai_response_to_message,
-    tools_to_openai_spec,
+    check_bedrock_context_length_error, check_openai_context_length_error, get_model,
+    messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec,
 };
-use crate::models::message::Message;
-use crate::models::tool::Tool;
+use crate::message::Message;
+use mcp_core::tool::Tool;
 
 pub struct DatabricksProvider {
     client: Client,
@@ -75,7 +76,7 @@ impl DatabricksProvider {
         let url = format!(
             "{}/serving-endpoints/{}/invocations",
             self.config.host.trim_end_matches('/'),
-            self.config.model
+            self.config.model.model_name
         );
 
         let auth_header = self.ensure_auth_header().await?;
@@ -104,13 +105,14 @@ impl DatabricksProvider {
 
 #[async_trait]
 impl Provider for DatabricksProvider {
-    #[tracing::instrument(skip(self, system, messages, tools), fields(model = self.config.model))]
+    #[tracing::instrument(skip(self, system, messages, tools), fields(model_config, input, output))]
     async fn complete(
         &self,
         system: &str,
         messages: &[Message],
         tools: &[Tool],
-    ) -> Result<(Message, Usage)> {
+    ) -> Result<(Message, ProviderUsage)> {
+        let span = tracing::Span::current();
         // Prepare messages and tools
         let messages_spec = messages_to_openai_spec(messages, &self.config.image_format);
         let tools_spec = if !tools.is_empty() {
@@ -129,10 +131,10 @@ impl Provider for DatabricksProvider {
         if !tools_spec.is_empty() {
             payload["tools"] = json!(tools_spec);
         }
-        if let Some(temp) = self.config.temperature {
+        if let Some(temp) = self.config.model.temperature {
             payload["temperature"] = json!(temp);
         }
-        if let Some(tokens) = self.config.max_tokens {
+        if let Some(tokens) = self.config.model.max_tokens {
             payload["max_tokens"] = json!(tokens);
         }
 
@@ -147,18 +149,13 @@ impl Provider for DatabricksProvider {
                 .collect(),
         );
 
-        tracing::info!(
-            kind = "input",
-            input = serde_json::to_string(&payload).unwrap_or_else(|_| "null".to_string())
-        );
+        span.record("model_config", serde_json::to_string_pretty(&self.config).unwrap_or_else(|_| "null".to_string()));
+        span.record("input", serde_json::to_string(&payload).unwrap_or_else(|_| "null".to_string()));
 
         // Make request
         let response = self.post(payload).await?;
-        
-        tracing::info!(
-            kind = "output",
-            output = serde_json::to_string(&response).unwrap_or_else(|_| "null".to_string())
-        );
+
+        span.record("output", serde_json::to_string(&response).unwrap_or_else(|_| "null".to_string()));
 
         // Raise specific error if context length is exceeded
         if let Some(error) = response.get("error") {
@@ -173,15 +170,22 @@ impl Provider for DatabricksProvider {
         // Parse response
         let message = openai_response_to_message(response.clone())?;
         let usage = Self::get_usage(&response)?;
+        let model = get_model(&response);
+        let cost = cost(&usage, &model_pricing_for(&model));
 
-        Ok((message, usage))
+        Ok((message, ProviderUsage::new(model, usage, cost)))
+    }
+
+    fn get_model_config(&self) -> &ModelConfig {
+        self.config.model_config()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::message::MessageContent;
+    use crate::message::MessageContent;
+    use crate::providers::configs::ModelConfig;
     use wiremock::matchers::{body_json, header, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -227,10 +231,8 @@ mod tests {
         // Create the DatabricksProvider with the mock server's URL as the host
         let config = DatabricksProviderConfig {
             host: mock_server.uri(),
-            model: "my-databricks-model".to_string(),
             auth: DatabricksAuth::Token("test_token".to_string()),
-            temperature: None,
-            max_tokens: None,
+            model: ModelConfig::new("my-databricks-model".to_string()),
             image_format: crate::providers::utils::ImageFormat::Anthropic,
         };
 
@@ -249,7 +251,9 @@ mod tests {
         } else {
             panic!("Expected Text content");
         }
-        assert_eq!(reply_usage.total_tokens, Some(35));
+        assert_eq!(reply_usage.usage.input_tokens, Some(10));
+        assert_eq!(reply_usage.usage.output_tokens, Some(25));
+        assert_eq!(reply_usage.usage.total_tokens, Some(35));
 
         Ok(())
     }
