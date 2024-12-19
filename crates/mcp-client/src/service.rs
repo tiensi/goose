@@ -120,13 +120,13 @@ impl<T: Transport> Service<JsonRpcMessage> for TransportService<T> {
             match message {
                 JsonRpcMessage::Notification(notification) => {
                     router
-                        .send_notification(JsonRpcMessage::Notification(notification))
+                        .send_notification(notification)
                         .await
                         .map_err(ServiceError::Transport)?;
                     Ok(JsonRpcMessage::Nil)
                 }
                 JsonRpcMessage::Request(request) => router
-                    .send_request(JsonRpcMessage::Request(request))
+                    .send_request(request)
                     .await
                     .map_err(ServiceError::Transport),
                 _ => Err(ServiceError::Other("Invalid message type".to_string())),
@@ -135,19 +135,13 @@ impl<T: Transport> Service<JsonRpcMessage> for TransportService<T> {
     }
 }
 
-impl<T: Transport> Drop for TransportServiceInner<T> {
-    fn drop(&mut self) {
-        if self.initialized.load(Ordering::SeqCst) {
-            // Create a new runtime for cleanup if needed
-            let rt = tokio::runtime::Runtime::new().unwrap();
-
-            // Request shutdown through the router if it exists
-            if let Some(router) = rt.block_on(self.router.lock()).as_ref() {
-                let _ = rt.block_on(router.shutdown());
-            }
-
-            // Close the transport
-            let _ = rt.block_on(self.transport.close());
-        }
-    }
-}
+// https://spec.modelcontextprotocol.io/specification/basic/lifecycle/#shutdown
+// impl<T: Transport> Drop for TransportServiceInner<T> {
+//     fn drop(&mut self) {
+//         if self.initialized.load(Ordering::SeqCst) {
+//             // Best effort cleanup in sync context
+//             // We can't create a new runtime here, so we'll just log a warning
+//             tracing::warn!("TransportService dropped while initialized - resources may leak");
+//         }
+//     }
+// }

@@ -1,6 +1,7 @@
 use anyhow::Result;
-use mcp_client::client::McpClient;
-use mcp_client::client::{ClientCapabilities, ClientInfo, Error as ClientError, McpClientImpl};
+use mcp_client::client::{
+    ClientCapabilities, ClientInfo, Error as ClientError, McpClient, McpClientImpl,
+};
 use mcp_client::{service::TransportService, transport::StdioTransport};
 use tower::ServiceBuilder;
 use tracing_subscriber::EnvFilter;
@@ -46,8 +47,6 @@ async fn main() -> Result<(), ClientError> {
         .call_tool("git_status", serde_json::json!({ "repo_path": "." }))
         .await?;
     println!("Tool result: {tool_result:?}\n");
-
-    println!("Finishing up, will cleanup resources as we go out of scope\n");
 
     Ok(())
 }

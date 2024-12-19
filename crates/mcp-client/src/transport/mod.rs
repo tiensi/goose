@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use mcp_core::protocol::JsonRpcMessage;
+use mcp_core::protocol::{JsonRpcMessage, JsonRpcNotification, JsonRpcRequest};
 use thiserror::Error;
 use tokio::sync::{mpsc, oneshot};
 
@@ -51,13 +51,11 @@ pub trait Transport: Send + Sync + 'static {
 pub mod stdio;
 pub use stdio::StdioTransport;
 
-// pub mod sse;
-// pub use sse::SseTransport;
-
 /// A router that handles message distribution for a transport
 #[derive(Clone)]
 pub struct MessageRouter {
     transport_tx: mpsc::Sender<TransportMessage>,
+    #[allow(dead_code)]
     shutdown_tx: mpsc::Sender<()>,
 }
 
@@ -73,12 +71,12 @@ impl MessageRouter {
     }
 
     /// Send a message and wait for a response
-    pub async fn send_request(&self, request: JsonRpcMessage) -> Result<JsonRpcMessage, Error> {
+    pub async fn send_request(&self, request: JsonRpcRequest) -> Result<JsonRpcMessage, Error> {
         let (response_tx, response_rx) = oneshot::channel();
 
         self.transport_tx
             .send(TransportMessage {
-                message: request,
+                message: JsonRpcMessage::Request(request),
                 response_tx: Some(response_tx),
             })
             .await
@@ -88,20 +86,12 @@ impl MessageRouter {
     }
 
     /// Send a notification (no response expected)
-    pub async fn send_notification(&self, notification: JsonRpcMessage) -> Result<(), Error> {
+    pub async fn send_notification(&self, notification: JsonRpcNotification) -> Result<(), Error> {
         self.transport_tx
             .send(TransportMessage {
-                message: notification,
+                message: JsonRpcMessage::Notification(notification),
                 response_tx: None,
             })
-            .await
-            .map_err(|_| Error::ChannelClosed)
-    }
-
-    /// Request shutdown of the transport
-    pub async fn shutdown(&self) -> Result<(), Error> {
-        self.shutdown_tx
-            .send(())
             .await
             .map_err(|_| Error::ChannelClosed)
     }

@@ -92,8 +92,8 @@ where
         }
     }
 
-    /// Send a JSON-RPC request and wait for a response.
-    async fn send_message<R>(&mut self, method: &str, params: Value) -> Result<R, Error>
+    /// Send a JSON-RPC request and check we don't get an error response.
+    async fn send_request<R>(&mut self, method: &str, params: Value) -> Result<R, Error>
     where
         R: for<'de> Deserialize<'de>,
     {
@@ -182,7 +182,7 @@ where
             capabilities,
         };
         let result: InitializeResult = self
-            .send_message("initialize", serde_json::to_value(params)?)
+            .send_request("initialize", serde_json::to_value(params)?)
             .await?;
 
         self.send_notification("notifications/initialized", serde_json::json!({}))
@@ -192,21 +192,21 @@ where
     }
 
     async fn list_resources(&mut self) -> Result<ListResourcesResult, Error> {
-        self.send_message("resources/list", serde_json::json!({}))
+        self.send_request("resources/list", serde_json::json!({}))
             .await
     }
 
     async fn read_resource(&mut self, uri: &str) -> Result<ReadResourceResult, Error> {
         let params = serde_json::json!({ "uri": uri });
-        self.send_message("resources/read", params).await
+        self.send_request("resources/read", params).await
     }
 
     async fn list_tools(&mut self) -> Result<ListToolsResult, Error> {
-        self.send_message("tools/list", serde_json::json!({})).await
+        self.send_request("tools/list", serde_json::json!({})).await
     }
 
     async fn call_tool(&mut self, name: &str, arguments: Value) -> Result<CallToolResult, Error> {
         let params = serde_json::json!({ "name": name, "arguments": arguments });
-        self.send_message("tools/call", params).await
+        self.send_request("tools/call", params).await
     }
 }

@@ -171,12 +171,13 @@ impl Transport for StdioTransport {
     async fn close(&self) -> Result<(), Error> {
         // Kill the process
         if let Some(mut process) = self.process.lock().await.take() {
-            let _ = process.kill();
+            let _ = process.kill().await;
         }
 
         // Abort the reader task
         if let Some(handle) = self.reader_handle.lock().await.take() {
             handle.abort();
+            let _ = handle.await;
         }
 
         // Clear any pending requests
@@ -186,10 +187,4 @@ impl Transport for StdioTransport {
     }
 }
 
-impl Drop for StdioTransport {
-    fn drop(&mut self) {
-        // Create a new runtime for cleanup if needed
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let _ = rt.block_on(self.close());
-    }
-}
+// No Drop implementation needed - we'll handle cleanup in the TransportService

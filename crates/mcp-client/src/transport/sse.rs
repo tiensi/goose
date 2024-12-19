@@ -173,11 +173,3 @@
 //         Ok(())
 //     }
 // }
-
-// impl Drop for SseTransport {
-//     fn drop(&mut self) {
-//         // Create a new runtime for cleanup if needed
-//         let rt = tokio::runtime::Runtime::new().unwrap();
-//         let _ = rt.block_on(self.close());
-//     }
-// }
