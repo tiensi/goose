@@ -35,6 +35,8 @@ export interface Chat {
   }>;
 }
 
+type ScrollBehavior = 'auto' | 'smooth' | 'instant';
+
 function ChatContent({
   chats,
   setChats,
@@ -150,10 +152,10 @@ function ChatContent({
       // Initial scroll
       scrollToBottom(isLoading || working === Working.Working ? 'instant' : 'smooth');
       
-      // Additional scrolls to catch dynamic content
-      [100, 300, 500].forEach(delay => {
-        setTimeout(() => scrollToBottom('smooth'), delay);
-      });
+      // // Additional scrolls to catch dynamic content
+      // [100, 300, 500].forEach(delay => {
+      //   setTimeout(() => scrollToBottom('smooth'), delay);
+      // });
     }
   }, [messages, isLoading, working]);
 
