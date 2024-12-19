@@ -396,7 +396,7 @@ mod tests {
         messages
             .push(Message::user().with_tool_response(tool_id, Ok(vec![Content::text("Result")])));
 
-        let spec = messages_to_openai_spec(&messages, &ImageFormat::OpenAi, false);
+        let spec = messages_to_openai_spec(&messages, &ImageFormat::OpenAi, true);
 
         assert_eq!(spec.len(), 4);
         assert_eq!(spec[0]["role"], "assistant");
@@ -408,6 +408,35 @@ mod tests {
         assert_eq!(spec[3]["role"], "tool");
         assert_eq!(spec[3]["content"], "Result");
         assert_eq!(spec[3]["tool_call_id"], spec[2]["tool_calls"][0]["id"]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_messages_to_openai_spec_not_concat_tool_response_content() -> anyhow::Result<()> {
+        let mut messages = vec![Message::assistant().with_tool_request(
+            "tool1",
+            Ok(ToolCall::new("example", json!({"param1": "value1"}))),
+        )];
+
+        // Get the ID from the tool request to use in the response
+        let tool_id = if let MessageContent::ToolRequest(request) = &messages[0].content[0] {
+            request.id.clone()
+        } else {
+            panic!("should be tool request");
+        };
+
+        messages
+            .push(Message::user().with_tool_response(tool_id, Ok(vec![Content::text("Result")])));
+
+        let spec = messages_to_openai_spec(&messages, &ImageFormat::OpenAi, false);
+
+        assert_eq!(spec.len(), 2);
+        assert_eq!(spec[0]["role"], "assistant");
+        assert!(spec[0]["tool_calls"].is_array());
+        assert_eq!(spec[1]["role"], "tool");
+        assert_eq!(spec[1]["content"][0]["text"], "Result");
+        assert_eq!(spec[1]["tool_call_id"], spec[0]["tool_calls"][0]["id"]);
 
         Ok(())
     }
