@@ -124,7 +124,7 @@ mod tests {
         assert_eq!(usage.usage.output_tokens, Some(TEST_OUTPUT_TOKENS));
         assert_eq!(usage.usage.total_tokens, Some(TEST_TOTAL_TOKENS));
         assert_eq!(usage.model, model_name);
-        assert_eq!(usage.cost, Some(dec!(0.00018)));
+        assert_eq!(usage.cost, None);
 
         Ok(())
     }
