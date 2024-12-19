@@ -97,18 +97,18 @@ mod tests {
     use super::*;
     use crate::message::MessageContent;
     use crate::providers::configs::ModelConfig;
+    use crate::providers::mock_server::{
+        create_mock_open_ai_response, create_mock_open_ai_response_with_tools, create_test_tool,
+        get_expected_function_call_arguments, setup_mock_server, TEST_INPUT_TOKENS,
+        TEST_OUTPUT_TOKENS, TEST_TOOL_FUNCTION_NAME, TEST_TOTAL_TOKENS,
+    };
     use rust_decimal_macros::dec;
     use serde_json::json;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
-    async fn _setup_mock_server(response_body: Value) -> (MockServer, OpenAiProvider) {
-        let mock_server = MockServer::start().await;
-        Mock::given(method("POST"))
-            .and(path("/v1/chat/completions"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(response_body))
-            .mount(&mock_server)
-            .await;
+    async fn _setup_mock_response(response_body: Value) -> (MockServer, OpenAiProvider) {
+        let mock_server = setup_mock_server("/v1/chat/completions", response_body).await;
 
         // Create the OpenAiProvider with the mock server's URL as the host
         let config = OpenAiProviderConfig {
@@ -123,28 +123,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_complete_basic() -> Result<()> {
+        let model_name = "gpt-4o";
         // Mock response for normal completion
-        let response_body = json!({
-            "id": "chatcmpl-123",
-            "object": "chat.completion",
-            "choices": [{
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": "Hello! How can I assist you today?",
-                    "tool_calls": null
-                },
-                "finish_reason": "stop"
-            }],
-            "usage": {
-                "prompt_tokens": 12,
-                "completion_tokens": 15,
-                "total_tokens": 27
-            },
-            "model": "gpt-4o"
-        });
+        let response_body =
+            create_mock_open_ai_response("Hello! How can I assist you today?", model_name);
 
-        let (_, provider) = _setup_mock_server(response_body).await;
+        let (_, provider) = _setup_mock_response(response_body).await;
 
         // Prepare input messages
         let messages = vec![Message::user().with_text("Hello?")];
@@ -160,10 +144,10 @@ mod tests {
         } else {
             panic!("Expected Text content");
         }
-        assert_eq!(usage.usage.input_tokens, Some(12));
-        assert_eq!(usage.usage.output_tokens, Some(15));
-        assert_eq!(usage.usage.total_tokens, Some(27));
-        assert_eq!(usage.model, "gpt-4o");
+        assert_eq!(usage.usage.input_tokens, Some(TEST_INPUT_TOKENS));
+        assert_eq!(usage.usage.output_tokens, Some(TEST_OUTPUT_TOKENS));
+        assert_eq!(usage.usage.total_tokens, Some(TEST_TOTAL_TOKENS));
+        assert_eq!(usage.model, model_name);
         assert_eq!(usage.cost, Some(dec!(0.00018)));
 
         Ok(())
@@ -172,73 +156,36 @@ mod tests {
     #[tokio::test]
     async fn test_complete_tool_request() -> Result<()> {
         // Mock response for tool calling
-        let response_body = json!({
-            "id": "chatcmpl-tool",
-            "object": "chat.completion",
-            "choices": [{
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": null,
-                    "tool_calls": [{
-                        "id": "call_123",
-                        "type": "function",
-                        "function": {
-                            "name": "get_weather",
-                            "arguments": "{\"location\":\"San Francisco, CA\"}"
-                        }
-                    }]
-                },
-                "finish_reason": "tool_calls"
-            }],
-            "usage": {
-                "prompt_tokens": 20,
-                "completion_tokens": 15,
-                "total_tokens": 35
-            }
-        });
+        let response_body = create_mock_open_ai_response_with_tools("gpt-4o");
 
-        let (_, provider) = _setup_mock_server(response_body).await;
+        let (_, provider) = _setup_mock_response(response_body).await;
 
         // Input messages
         let messages = vec![Message::user().with_text("What's the weather in San Francisco?")];
 
         // Define the tool using builder pattern
-        let tool = Tool::new(
-            "get_weather",
-            "Gets the current weather for a location",
-            json!({
-                "type": "object",
-                "properties": {
-                    "location": {
-                        "type": "string",
-                        "description": "The city and state, e.g. New York, NY"
-                    }
-                },
-                "required": ["location"]
-            }),
-        );
 
         // Call the complete method
         let (message, usage) = provider
-            .complete("You are a helpful assistant.", &messages, &[tool])
+            .complete(
+                "You are a helpful assistant.",
+                &messages,
+                &[create_test_tool()],
+            )
             .await?;
 
         // Assert the response
         if let MessageContent::ToolRequest(tool_request) = &message.content[0] {
             let tool_call = tool_request.tool_call.as_ref().unwrap();
-            assert_eq!(tool_call.name, "get_weather");
-            assert_eq!(
-                tool_call.arguments,
-                json!({"location": "San Francisco, CA"})
-            );
+            assert_eq!(tool_call.name, TEST_TOOL_FUNCTION_NAME);
+            assert_eq!(tool_call.arguments, get_expected_function_call_arguments());
         } else {
             panic!("Expected ToolCall content");
         }
 
-        assert_eq!(usage.usage.input_tokens, Some(20));
-        assert_eq!(usage.usage.output_tokens, Some(15));
-        assert_eq!(usage.usage.total_tokens, Some(35));
+        assert_eq!(usage.usage.input_tokens, Some(TEST_INPUT_TOKENS));
+        assert_eq!(usage.usage.output_tokens, Some(TEST_OUTPUT_TOKENS));
+        assert_eq!(usage.usage.total_tokens, Some(TEST_TOTAL_TOKENS));
 
         Ok(())
     }
