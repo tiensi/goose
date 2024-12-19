@@ -349,7 +349,11 @@ impl Provider for GoogleProvider {
 mod tests {
     use super::*;
     use crate::errors::AgentResult;
-    use crate::providers::mock_server::{create_mock_google_ai_response, create_mock_google_ai_response_with_tools, create_test_tool, get_expected_function_call_arguments, setup_mock_server, TEST_INPUT_TOKENS, TEST_OUTPUT_TOKENS, TEST_TOOL_FUNCTION_NAME, TEST_TOTAL_TOKENS};
+    use crate::providers::mock_server::{
+        create_mock_google_ai_response, create_mock_google_ai_response_with_tools,
+        create_test_tool, get_expected_function_call_arguments, setup_mock_server,
+        TEST_INPUT_TOKENS, TEST_OUTPUT_TOKENS, TEST_TOOL_FUNCTION_NAME, TEST_TOTAL_TOKENS,
+    };
     use wiremock::MockServer;
 
     fn set_up_provider() -> GoogleProvider {
@@ -609,7 +613,10 @@ mod tests {
         }
     }
 
-    async fn _setup_mock_server(model_name: &str, response_body: Value) -> (MockServer, GoogleProvider) {
+    async fn _setup_mock_server(
+        model_name: &str,
+        response_body: Value,
+    ) -> (MockServer, GoogleProvider) {
         let path_url = format!("/v1beta/models/{}:generateContent", model_name);
         let mock_server = setup_mock_server(&path_url, response_body).await;
         let config = GoogleProviderConfig {

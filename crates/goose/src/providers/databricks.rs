@@ -8,11 +8,11 @@ use super::base::{Provider, ProviderUsage, Usage};
 use super::configs::{DatabricksAuth, DatabricksProviderConfig, ModelConfig, ProviderModelConfig};
 use super::model_pricing::{cost, model_pricing_for};
 use super::oauth;
-use super::utils::{check_bedrock_context_length_error, get_model};
+use super::utils::{check_bedrock_context_length_error, get_model, handle_response};
 use crate::message::Message;
 use crate::providers::openai_utils::{
-    check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message,
-    tools_to_openai_spec,
+    check_openai_context_length_error, get_openai_usage, messages_to_openai_spec,
+    openai_response_to_message, tools_to_openai_spec,
 };
 use mcp_core::tool::Tool;
 
@@ -49,30 +49,7 @@ impl DatabricksProvider {
     }
 
     fn get_usage(data: &Value) -> Result<Usage> {
-        let usage = data
-            .get("usage")
-            .ok_or_else(|| anyhow!("No usage data in response"))?;
-
-        let input_tokens = usage
-            .get("prompt_tokens")
-            .and_then(|v| v.as_i64())
-            .map(|v| v as i32);
-
-        let output_tokens = usage
-            .get("completion_tokens")
-            .and_then(|v| v.as_i64())
-            .map(|v| v as i32);
-
-        let total_tokens = usage
-            .get("total_tokens")
-            .and_then(|v| v.as_i64())
-            .map(|v| v as i32)
-            .or_else(|| match (input_tokens, output_tokens) {
-                (Some(input), Some(output)) => Some(input + output),
-                _ => None,
-            });
-
-        Ok(Usage::new(input_tokens, output_tokens, total_tokens))
+        get_openai_usage(data)
     }
 
     async fn post(&self, payload: Value) -> Result<Value> {
@@ -91,18 +68,7 @@ impl DatabricksProvider {
             .send()
             .await?;
 
-        match response.status() {
-            StatusCode::OK => Ok(response.json().await?),
-            status if status == StatusCode::TOO_MANY_REQUESTS || status.is_server_error() => {
-                // Implement retry logic here if needed
-                Err(anyhow!("Server error: {}", status))
-            }
-            _ => {
-                let status = response.status();
-                let err_text = response.text().await.unwrap_or_default();
-                Err(anyhow!("Request failed: {}: {}", status, err_text))
-            }
-        }
+        handle_response(payload, response).await?
     }
 }
 
