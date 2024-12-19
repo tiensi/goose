@@ -2,12 +2,10 @@ use anyhow::Result;
 use async_stream;
 use futures::stream::BoxStream;
 use rust_decimal_macros::dec;
-use rust_decimal_macros::dec;
 use serde_json::json;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
-use tracing::{debug, info, instrument, warn};
-use tokio::sync::Mutex;
+use tracing::{debug, instrument, warn};
 
 use crate::errors::{AgentError, AgentResult};
 use crate::message::{Message, ToolRequest};
@@ -110,11 +108,12 @@ impl Agent {
     }
 
     /// Dispatch a single tool call to the appropriate system
-    #[instrument(skip(self, tool_call))]
+    #[instrument(skip(self, tool_call), fields(input, output))]
     async fn dispatch_tool_call(
         &self,
         tool_call: AgentResult<ToolCall>,
     ) -> AgentResult<Vec<Content>> {
+        let span = tracing::Span::current();
         let call = tool_call?;
 
         let system = self
@@ -128,27 +127,16 @@ impl Agent {
             .ok_or_else(|| AgentError::InvalidToolName(call.name.clone()))?;
         let system_tool_call = ToolCall::new(tool_name, call.arguments);
                 
-        info!(
-            kind = "input",
-            input = serde_json::to_string(&system_tool_call).unwrap(),
-        );
+        span.record("input", serde_json::to_string(&system_tool_call).unwrap());
 
         let result = system.call(system_tool_call).await;
 
         match &result {
             Ok(contents) => {
-                if let Ok(json_string) = serde_json::to_string(contents) {
-                    info!(
-                        kind = "output",
-                        output = json_string,
-                    );
-                }
+                span.record("output", serde_json::to_string(contents).unwrap());
             }
             Err(e) => {
-                info!(
-                    kind = "output",
-                    output = serde_json::to_string(&e).unwrap(),
-                );
+                span.record("output", serde_json::to_string(&e).unwrap());
             }
         }
 
