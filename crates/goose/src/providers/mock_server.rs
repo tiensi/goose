@@ -1,4 +1,3 @@
-use axum::http::StatusCode;
 use mcp_core::Tool;
 use serde_json::{json, Value};
 use wiremock::matchers::{method, path};

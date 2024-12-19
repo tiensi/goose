@@ -133,8 +133,6 @@ mod tests {
         // Input messages
         let messages = vec![Message::user().with_text("What's the weather in San Francisco?")];
 
-        // Define the tool using builder pattern
-
         // Call the complete method
         let (message, usage) = provider
             .complete(
