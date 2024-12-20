@@ -1,9 +1,10 @@
 use crate::message::{Message, MessageContent};
-use crate::providers::base::{Provider, ProviderUsage, Usage};
+use crate::providers::base::{Moderation, ModerationResult, Provider, ProviderUsage, Usage};
 use crate::providers::configs::{GoogleProviderConfig, ModelConfig, ProviderModelConfig};
 use crate::providers::utils::{
     handle_response, is_valid_function_name, sanitize_function_name, unescape_json_values,
 };
+use anyhow::Result;
 use async_trait::async_trait;
 use mcp_core::ToolError;
 use mcp_core::{Content, Role, Tool, ToolCall};
@@ -288,7 +289,7 @@ impl Provider for GoogleProvider {
             cost
         )
     )]
-    async fn complete(
+    async fn complete_internal(
         &self,
         system: &str,
         messages: &[Message],
@@ -353,6 +354,13 @@ impl Provider for GoogleProvider {
             // If no usage data, return None for all values
             Ok(Usage::new(None, None, None))
         }
+    }
+}
+
+#[async_trait]
+impl Moderation for GoogleProvider {
+    async fn moderate_content(&self, content: &str) -> Result<ModerationResult> {
+        Ok(ModerationResult::new(false, None, None))
     }
 }
 

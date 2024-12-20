@@ -4,7 +4,7 @@ use reqwest::Client;
 use serde_json::Value;
 use std::time::Duration;
 
-use super::base::ProviderUsage;
+use super::base::{Moderation, ModerationResult, ProviderUsage};
 use super::base::{Provider, Usage};
 use super::configs::OpenAiProviderConfig;
 use super::configs::{ModelConfig, ProviderModelConfig};
@@ -70,7 +70,7 @@ impl Provider for OpenAiProvider {
             cost
         )
     )]
-    async fn complete(
+    async fn complete_internal(
         &self,
         system: &str,
         messages: &[Message],
@@ -101,6 +101,13 @@ impl Provider for OpenAiProvider {
 
     fn get_usage(&self, data: &Value) -> Result<Usage> {
         get_openai_usage(data)
+    }
+}
+
+#[async_trait]
+impl Moderation for OpenAiProvider {
+    async fn moderate_content(&self, content: &str) -> Result<ModerationResult> {
+        Ok(ModerationResult::new(false, None, None))
     }
 }
 

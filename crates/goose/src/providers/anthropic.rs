@@ -6,8 +6,7 @@ use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::time::Duration;
 
-use super::base::ProviderUsage;
-use super::base::{Provider, Usage};
+use super::base::{Moderation, ModerationResult, Provider, ProviderUsage, Usage};
 use super::configs::{AnthropicProviderConfig, ModelConfig, ProviderModelConfig};
 use super::model_pricing::cost;
 use super::model_pricing::model_pricing_for;
@@ -205,7 +204,7 @@ impl Provider for AnthropicProvider {
             cost
         )
     )]
-    async fn complete(
+    async fn complete_internal(
         &self,
         system: &str,
         messages: &[Message],
@@ -282,6 +281,13 @@ impl Provider for AnthropicProvider {
             // If no usage data, return None for all values
             Ok(Usage::new(None, None, None))
         }
+    }
+}
+
+#[async_trait]
+impl Moderation for AnthropicProvider {
+    async fn moderate_content(&self, content: &str) -> Result<ModerationResult> {
+        Ok(ModerationResult::new(false, None, None))
     }
 }
 

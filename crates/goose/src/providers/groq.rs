@@ -1,5 +1,5 @@
 use crate::message::Message;
-use crate::providers::base::{Provider, ProviderUsage, Usage};
+use crate::providers::base::{Moderation, ModerationResult, Provider, ProviderUsage, Usage};
 use crate::providers::configs::{GroqProviderConfig, ModelConfig, ProviderModelConfig};
 use crate::providers::openai_utils::{
     create_openai_request_payload_with_concat_response_content, get_openai_usage,
@@ -11,6 +11,8 @@ use mcp_core::Tool;
 use reqwest::Client;
 use serde_json::Value;
 use std::time::Duration;
+use anyhow::Result;
+
 
 pub const GROQ_API_HOST: &str = "https://api.groq.com";
 pub const GROQ_DEFAULT_MODEL: &str = "llama-3.3-70b-versatile";
@@ -64,19 +66,7 @@ impl Provider for GroqProvider {
             cost
         )
     )]
-    #[tracing::instrument(
-        skip(self, system, messages, tools),
-        fields(
-            model_config,
-            input,
-            output,
-            input_tokens,
-            output_tokens,
-            total_tokens,
-            cost
-        )
-    )]
-    async fn complete(
+    async fn complete_internal(
         &self,
         system: &str,
         messages: &[Message],
@@ -100,6 +90,13 @@ impl Provider for GroqProvider {
 
     fn get_usage(&self, data: &Value) -> anyhow::Result<Usage> {
         get_openai_usage(data)
+    }
+}
+
+#[async_trait]
+impl Moderation for GroqProvider {
+    async fn moderate_content(&self, content: &str) -> Result<ModerationResult> {
+        Ok(ModerationResult::new(false, None, None))
     }
 }
 
