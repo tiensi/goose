@@ -81,7 +81,12 @@ impl Provider for DatabricksProvider {
         tools: &[Tool],
     ) -> Result<(Message, ProviderUsage)> {
         // Prepare messages and tools
-        let messages_spec = messages_to_openai_spec(messages, &self.config.image_format, false);
+        let concat_tool_response_contents = false;
+        let messages_spec = messages_to_openai_spec(
+            messages,
+            &self.config.image_format,
+            concat_tool_response_contents,
+        );
         let tools_spec = if !tools.is_empty() {
             tools_to_openai_spec(tools)?
         } else {
