@@ -29,10 +29,6 @@ impl GroqProvider {
         Ok(Self { client, config })
     }
 
-    fn get_usage(data: &Value) -> anyhow::Result<Usage> {
-        get_openai_usage(data)
-    }
-
     async fn post(&self, payload: Value) -> anyhow::Result<Value> {
         let url = format!(
             "{}/openai/v1/chat/completions",
@@ -72,10 +68,14 @@ impl Provider for GroqProvider {
         let response = self.post(payload).await?;
 
         let message = openai_response_to_message(response.clone())?;
-        let usage = Self::get_usage(&response)?;
+        let usage = self.get_usage(&response)?;
         let model = get_model(&response);
 
         Ok((message, ProviderUsage::new(model, usage, None)))
+    }
+
+    fn get_usage(&self, data: &Value) -> anyhow::Result<Usage> {
+        get_openai_usage(data)
     }
 }
 

@@ -34,10 +34,6 @@ impl OpenAiProvider {
         Ok(Self { client, config })
     }
 
-    fn get_usage(data: &Value) -> Result<Usage> {
-        get_openai_usage(data)
-    }
-
     async fn post(&self, payload: Value) -> Result<Value> {
         let url = format!(
             "{}/v1/chat/completions",
@@ -84,11 +80,15 @@ impl Provider for OpenAiProvider {
 
         // Parse response
         let message = openai_response_to_message(response.clone())?;
-        let usage = Self::get_usage(&response)?;
+        let usage = self.get_usage(&response)?;
         let model = get_model(&response);
         let cost = cost(&usage, &model_pricing_for(&model));
 
         Ok((message, ProviderUsage::new(model, usage, cost)))
+    }
+
+    fn get_usage(&self, data: &Value) -> Result<Usage> {
+        get_openai_usage(data)
     }
 }
 
