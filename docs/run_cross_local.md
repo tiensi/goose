@@ -60,7 +60,7 @@ docker pull --platform linux/amd64 debian:latest
 2. Run the container
 pwd is the directory contains the binary built in the previous step on your host machine
 ```sh
-docker run -it -v "$(pwd)":/app debian:latest /bin/bash
+docker run --platform linux/amd64 -it -v "$(pwd)":/app debian:latest /bin/bash
 ```
 
 3. Install dependencies in the container and set up api testing environment
