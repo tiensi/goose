@@ -10,9 +10,9 @@ interface GooseResponseFormProps {
   append: (value: any) => void;
 }
 
-export default function GooseResponseForm({ message, metadata, append }: GooseResponseFormProps) {
-  const [selectedOption, setSelectedOption] = useState(null);
-  const prevStatusRef = useRef(null);
+export default function GooseResponseForm({ message: _message, metadata, append }: GooseResponseFormProps) {
+  const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const prevStatusRef = useRef<string | null>(null);
 
   let isQuestion = false;
   let isOptions = false;
@@ -22,17 +22,16 @@ export default function GooseResponseForm({ message, metadata, append }: GooseRe
     window.electron.logInfo('metadata:'+ JSON.stringify(metadata, null, 2));
   }
 
+  // Process metadata outside of conditional
+  const currentStatus = metadata?.[0] ?? null;
+  isQuestion = currentStatus === "QUESTION";
+  isOptions = metadata?.[1] === "OPTIONS";
 
-
-  if (metadata) {
-    isQuestion = metadata[0] === "QUESTION";
-    isOptions = metadata[1] === "OPTIONS";
-
-    if (isQuestion && isOptions && metadata[2]) {
-      try {
-        let optionsData = metadata[2];
-        // Use a regular expression to extract the JSON block
-        const jsonBlockMatch = optionsData.match(/```json([\s\S]*?)```/);
+  if (isQuestion && isOptions && metadata?.[2]) {
+    try {
+      let optionsData = metadata[2];
+      // Use a regular expression to extract the JSON block
+      const jsonBlockMatch = optionsData.match(/```json([\s\S]*?)```/);
 
       // If a JSON block is found, extract and clean it
       if (jsonBlockMatch) {
@@ -41,54 +40,50 @@ export default function GooseResponseForm({ message, metadata, append }: GooseRe
         // Optionally, handle the case where there is no explicit ```json block
         console.warn("No JSON block found in the provided string.");
       }
-        options = JSON.parse(optionsData);
-        options = options.filter(
-          (opt) =>
-            typeof opt.optionTitle === 'string' &&
-            typeof opt.optionDescription === 'string'
-        );
-      } catch (err) {
-        console.error("Failed to parse options data:", err);
-        options = [];
-      }
+      options = JSON.parse(optionsData);
+      options = options.filter(
+        (opt) =>
+          typeof opt.optionTitle === 'string' &&
+          typeof opt.optionDescription === 'string'
+      );
+    } catch (err) {
+      console.error("Failed to parse options data:", err);
+      options = [];
     }
   }
 
+  // Move useEffect to top level
   useEffect(() => {
-    if (
-      (metadata && (metadata[0] === "QUESTION" || metadata[0] === "OPTIONS")) &&
-      prevStatusRef.current !== metadata[0]
-    ) {
+    const currentMetadataStatus = metadata?.[0];
+    const shouldNotify = 
+      currentMetadataStatus && 
+      (currentMetadataStatus === "QUESTION" || currentMetadataStatus === "OPTIONS") &&
+      prevStatusRef.current !== currentMetadataStatus;
+
+    if (shouldNotify) {
       window.electron.showNotification({
         title: 'Goose has a question for you',
         body: `Please check with Goose to approve the plan of action`,
       });
     }
-    prevStatusRef.current = metadata ? metadata[0] : null;
+
+    prevStatusRef.current = currentMetadataStatus ?? null;
   }, [metadata]);
 
-  const handleOptionClick = (index) => {
+  const handleOptionClick = (index: number) => {
     setSelectedOption(index);
   };
 
   const handleAccept = () => {
     const message = {
-      content: "Yes - execute this plan",
-      role: "user",
-    };
-    append(message);
-  };
-
-  const handleCancel = () => {
-    const message = {
-      content: "No - do not execute this plan",
+      content: "Yes - go ahead.",
       role: "user",
     };
     append(message);
   };
 
   const handleSubmit = () => {
-    if (selectedOption !== null) {
+    if (selectedOption !== null && options[selectedOption]) {
       const message = {
         content: `Yes - continue with: ${options[selectedOption].optionTitle}`,
         role: "user",
@@ -96,6 +91,10 @@ export default function GooseResponseForm({ message, metadata, append }: GooseRe
       append(message);
     }
   };
+
+  if (!metadata) {
+    return null;
+  }
 
   return (
     <div className="space-y-4">
@@ -108,14 +107,6 @@ export default function GooseResponseForm({ message, metadata, append }: GooseRe
           >
             <GPSIcon size={14} />
             Take flight with this plan
-          </Button>
-          <Button
-            onClick={handleCancel}
-            variant="destructive"
-            className="w-full sm:w-auto dark:bg-button-destructive-dark"
-          >
-            <GPSIcon size={14} />
-            Cancel
           </Button>
         </div>
       )}
@@ -132,8 +123,8 @@ export default function GooseResponseForm({ message, metadata, append }: GooseRe
                   : "bg-tool-card dark:bg-tool-card-dark hover:bg-accent dark:hover:bg-dark-accent"
               )}
             >
-              <h3 className="font-semibold text-lg mb-2 dark:text-gray-800">{opt.optionTitle}</h3>
-              <div className="prose prose-xs max-w-none">
+              <h3 className="font-semibold text-lg mb-2 dark:text-gray-100">{opt.optionTitle}</h3>
+              <div className="prose prose-xs max-w-none dark:text-gray-100">
                 <ReactMarkdown>{opt.optionDescription}</ReactMarkdown>
               </div>
             </div>

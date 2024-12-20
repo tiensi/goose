@@ -8,7 +8,9 @@ use super::{
 
 use anyhow::Result;
 use cliclack::spinner;
-use goose::models::message::Message;
+use goose::message::Message;
+use mcp_core::Role;
+use rustyline::{DefaultEditor, EventHandler, KeyCode, KeyEvent, Modifiers};
 
 const PROMPT: &str = "\x1b[1m\x1b[38;5;30m( O)> \x1b[0m";
 
@@ -16,6 +18,7 @@ pub struct RustylinePrompt {
     spinner: cliclack::ProgressBar,
     theme: Theme,
     renderers: HashMap<String, Box<dyn ToolRenderer>>,
+    editor: DefaultEditor,
 }
 
 impl RustylinePrompt {
@@ -27,6 +30,12 @@ impl RustylinePrompt {
         renderers.insert(
             bash_dev_system_renderer.tool_name(),
             Box::new(bash_dev_system_renderer),
+        );
+
+        let mut editor = DefaultEditor::new().expect("Failed to create editor");
+        editor.bind_sequence(
+            KeyEvent(KeyCode::Char('j'), Modifiers::CTRL),
+            EventHandler::Simple(rustyline::Cmd::Newline),
         );
 
         RustylinePrompt {
@@ -42,13 +51,14 @@ impl RustylinePrompt {
                 })
                 .unwrap_or(Theme::Dark),
             renderers,
+            editor,
         }
     }
 }
 
 impl Prompt for RustylinePrompt {
     fn render(&mut self, message: Box<Message>) {
-        render(message, &self.theme, self.renderers.clone());
+        render(&message, &self.theme, self.renderers.clone());
     }
 
     fn show_busy(&mut self) {
@@ -62,10 +72,15 @@ impl Prompt for RustylinePrompt {
     }
 
     fn get_input(&mut self) -> Result<Input> {
-        let mut editor = rustyline::DefaultEditor::new()?;
-        let input = editor.readline(PROMPT);
+        let input = self.editor.readline(PROMPT);
         let mut message_text = match input {
-            Ok(text) => text,
+            Ok(text) => {
+                // Add valid input to history
+                if let Err(e) = self.editor.add_history_entry(text.as_str()) {
+                    eprintln!("Failed to add to history: {}", e);
+                }
+                text
+            }
             Err(e) => {
                 match e {
                     rustyline::error::ReadlineError::Interrupted => (),
@@ -108,6 +123,8 @@ impl Prompt for RustylinePrompt {
             println!("/t - Toggle Light/Dark theme");
             println!("/? | /help - Display this help message");
             println!("Ctrl+C - Interrupt goose (resets the interaction to before the interrupted user request)");
+            println!("Ctrl+j - Adds a newline");
+            println!("Use Up/Down arrow keys to navigate through command history");
             return Ok(Input {
                 input_type: InputType::AskAgain,
                 content: None,
@@ -117,6 +134,18 @@ impl Prompt for RustylinePrompt {
                 input_type: InputType::Message,
                 content: Some(message_text.to_string()),
             });
+        }
+    }
+
+    fn load_user_message_history(&mut self, messages: Vec<Message>) {
+        for message in messages.into_iter().filter(|m| m.role == Role::User) {
+            for content in message.content {
+                if let Some(text) = content.as_text() {
+                    if let Err(e) = self.editor.add_history_entry(text) {
+                        eprintln!("Failed to add to history: {}", e);
+                    }
+                }
+            }
         }
     }
 

@@ -236,7 +236,7 @@ const buildRecentFilesMenu = () => {
   }));
 };
 
-const openDirectoryDialog = async (replaceWindow: Boolean = false) => {
+const openDirectoryDialog = async (replaceWindow: boolean = false) => {
   const result = await dialog.showOpenDialog({
     properties: ['openDirectory']
   });
@@ -294,7 +294,9 @@ app.whenReady().then(async () => {
   const { dirPath } = parseArgs();
   
   createTray();
-  createChat(app, undefined, dirPath);
+  const recentDirs = loadRecentDirs();
+  let openDir = dirPath || (recentDirs.length > 0 ? recentDirs[0] : null);
+  createChat(app, undefined, openDir);
 
   // Show launcher input on key combo
   globalShortcut.register('Control+Alt+Command+G', createLauncher);
@@ -354,7 +356,7 @@ app.whenReady().then(async () => {
     createChat(app, query);
   });
 
-  ipcMain.on('directory-chooser', (_, replace: Boolean = false) => {
+  ipcMain.on('directory-chooser', (_, replace: boolean = false) => {
     openDirectoryDialog(replace);
   });
 

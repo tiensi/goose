@@ -26,6 +26,7 @@ export default function App() {
     return <ErrorScreen error={fatalError} onReload={() => window.electron.reloadApp()} />;
   }
   
+
   if (targetWindow === 'launcher') {
     return <LauncherWindow />;
   } else if (targetWindow === 'featureFlags') {

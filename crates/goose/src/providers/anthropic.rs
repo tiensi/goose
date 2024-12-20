@@ -3,15 +3,21 @@ use async_trait::async_trait;
 use reqwest::Client;
 use reqwest::StatusCode;
 use serde_json::{json, Value};
-use std::time::Duration;
 use std::collections::HashSet;
+use std::time::Duration;
 
+use super::base::ProviderUsage;
 use super::base::{Provider, Usage};
-use super::configs::AnthropicProviderConfig;
-use crate::models::message::{Message, MessageContent};
-use crate::models::tool::{Tool, ToolCall};
-use crate::models::role::Role;
-use crate::models::content::{Content, TextContent};
+use super::configs::{AnthropicProviderConfig, ModelConfig, ProviderModelConfig};
+use super::model_pricing::cost;
+use super::model_pricing::model_pricing_for;
+use super::utils::get_model;
+use crate::message::{Message, MessageContent};
+use mcp_core::content::Content;
+use mcp_core::role::Role;
+use mcp_core::tool::{Tool, ToolCall};
+
+pub const ANTHROPIC_DEFAULT_MODEL: &str = "claude-3-5-sonnet-latest";
 
 pub struct AnthropicProvider {
     client: Client,
@@ -30,10 +36,12 @@ impl AnthropicProvider {
     fn get_usage(data: &Value) -> Result<Usage> {
         // Extract usage data if available
         if let Some(usage) = data.get("usage") {
-            let input_tokens = usage.get("input_tokens")
+            let input_tokens = usage
+                .get("input_tokens")
                 .and_then(|v| v.as_u64())
                 .map(|v| v as i32);
-            let output_tokens = usage.get("output_tokens")
+            let output_tokens = usage
+                .get("output_tokens")
                 .and_then(|v| v.as_u64())
                 .map(|v| v as i32);
             let total_tokens = match (input_tokens, output_tokens) {
@@ -96,7 +104,8 @@ impl AnthropicProvider {
                     }
                     MessageContent::ToolResponse(tool_response) => {
                         if let Ok(result) = &tool_response.tool_result {
-                            let text = result.iter()
+                            let text = result
+                                .iter()
                                 .filter_map(|c| match c {
                                     Content::Text(t) => Some(t.text.clone()),
                                     _ => None,
@@ -150,21 +159,22 @@ impl AnthropicProvider {
             match block.get("type").and_then(|t| t.as_str()) {
                 Some("text") => {
                     if let Some(text) = block.get("text").and_then(|t| t.as_str()) {
-                        message = message.with_content(MessageContent::Text(TextContent {
-                            text: text.to_string(),
-                            audience: None,
-                            priority: None,
-                        }));
+                        message = message.with_text(text.to_string());
                     }
                 }
                 Some("tool_use") => {
-                    let id = block.get("id").and_then(|i| i.as_str())
+                    let id = block
+                        .get("id")
+                        .and_then(|i| i.as_str())
                         .ok_or_else(|| anyhow!("Missing tool_use id"))?;
-                    let name = block.get("name").and_then(|n| n.as_str())
+                    let name = block
+                        .get("name")
+                        .and_then(|n| n.as_str())
                         .ok_or_else(|| anyhow!("Missing tool_use name"))?;
-                    let input = block.get("input")
+                    let input = block
+                        .get("input")
                         .ok_or_else(|| anyhow!("Missing tool_use input"))?;
-                    
+
                     let tool_call = ToolCall::new(name, input.clone());
                     message = message.with_tool_request(id, Ok(tool_call));
                 }
@@ -176,10 +186,7 @@ impl AnthropicProvider {
     }
 
     async fn post(&self, payload: Value) -> Result<Value> {
-        let url = format!(
-            "{}/v1/messages",
-            self.config.host.trim_end_matches('/')
-        );
+        let url = format!("{}/v1/messages", self.config.host.trim_end_matches('/'));
 
         let response = self
             .client
@@ -197,11 +204,7 @@ impl AnthropicProvider {
             }
             status => {
                 let error_text = response.text().await?;
-                Err(anyhow!(
-                    "Request failed: {} - {}",
-                    status,
-                    error_text
-                ))
+                Err(anyhow!("Request failed: {} - {}", status, error_text))
             }
         }
     }
@@ -214,7 +217,7 @@ impl Provider for AnthropicProvider {
         system: &str,
         messages: &[Message],
         tools: &[Tool],
-    ) -> Result<(Message, Usage)> {
+    ) -> Result<(Message, ProviderUsage)> {
         let anthropic_messages = Self::messages_to_anthropic_spec(messages);
         let tool_specs = Self::tools_to_anthropic_spec(tools);
 
@@ -224,26 +227,32 @@ impl Provider for AnthropicProvider {
         }
 
         let mut payload = json!({
-            "model": self.config.model,
+            "model": self.config.model.model_name,
             "messages": anthropic_messages,
-            "max_tokens": self.config.max_tokens.unwrap_or(4096)
+            "max_tokens": self.config.model.max_tokens.unwrap_or(4096)
         });
 
         // Add system message if present
         if !system.is_empty() {
-            payload.as_object_mut().unwrap()
+            payload
+                .as_object_mut()
+                .unwrap()
                 .insert("system".to_string(), json!(system));
         }
 
         // Add tools if present
         if !tool_specs.is_empty() {
-            payload.as_object_mut().unwrap()
+            payload
+                .as_object_mut()
+                .unwrap()
                 .insert("tools".to_string(), json!(tool_specs));
         }
 
         // Add temperature if specified
-        if let Some(temp) = self.config.temperature {
-            payload.as_object_mut().unwrap()
+        if let Some(temp) = self.config.model.temperature {
+            payload
+                .as_object_mut()
+                .unwrap()
                 .insert("temperature".to_string(), json!(temp));
         }
 
@@ -253,14 +262,23 @@ impl Provider for AnthropicProvider {
         // Parse response
         let message = Self::parse_anthropic_response(response.clone())?;
         let usage = Self::get_usage(&response)?;
+        let model = get_model(&response);
+        let cost = cost(&usage, &model_pricing_for(&model));
 
-        Ok((message, usage))
+        Ok((message, ProviderUsage::new(model, usage, cost)))
+    }
+
+    fn get_model_config(&self) -> &ModelConfig {
+        self.config.model_config()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::providers::configs::ModelConfig;
+
     use super::*;
+    use rust_decimal_macros::dec;
     use serde_json::json;
     use wiremock::matchers::{header, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -277,9 +295,9 @@ mod tests {
         let config = AnthropicProviderConfig {
             host: mock_server.uri(),
             api_key: "test_api_key".to_string(),
-            model: "claude-3-sonnet-20241022".to_string(),
-            temperature: Some(0.7),
-            max_tokens: None,
+            model: ModelConfig::new("claude-3-sonnet-20241022".to_string())
+                .with_temperature(Some(0.7))
+                .with_context_limit(Some(200_000)),
         };
 
         let provider = AnthropicProvider::new(config).unwrap();
@@ -296,7 +314,7 @@ mod tests {
                 "type": "text",
                 "text": "Hello! How can I assist you today?"
             }],
-            "model": "claude-3-sonnet-20240229",
+            "model": "claude-3-5-sonnet-latest",
             "stop_reason": "end_turn",
             "stop_sequence": null,
             "usage": {
@@ -319,9 +337,11 @@ mod tests {
             panic!("Expected Text content");
         }
 
-        assert_eq!(usage.input_tokens, Some(12));
-        assert_eq!(usage.output_tokens, Some(15));
-        assert_eq!(usage.total_tokens, Some(27));
+        assert_eq!(usage.usage.input_tokens, Some(12));
+        assert_eq!(usage.usage.output_tokens, Some(15));
+        assert_eq!(usage.usage.total_tokens, Some(27));
+        assert_eq!(usage.model, "claude-3-5-sonnet-latest");
+        assert_eq!(usage.cost, Some(dec!(0.000261)));
 
         Ok(())
     }
@@ -363,7 +383,7 @@ mod tests {
                         "description": "The mathematical expression to evaluate"
                     }
                 }
-            })
+            }),
         );
 
         let (message, usage) = provider
@@ -373,17 +393,14 @@ mod tests {
         if let MessageContent::ToolRequest(tool_request) = &message.content[0] {
             let tool_call = tool_request.tool_call.as_ref().unwrap();
             assert_eq!(tool_call.name, "calculator");
-            assert_eq!(
-                tool_call.arguments,
-                json!({"expression": "2 + 2"})
-            );
+            assert_eq!(tool_call.arguments, json!({"expression": "2 + 2"}));
         } else {
             panic!("Expected ToolRequest content");
         }
 
-        assert_eq!(usage.input_tokens, Some(15));
-        assert_eq!(usage.output_tokens, Some(20));
-        assert_eq!(usage.total_tokens, Some(35));
+        assert_eq!(usage.usage.input_tokens, Some(15));
+        assert_eq!(usage.usage.output_tokens, Some(20));
+        assert_eq!(usage.usage.total_tokens, Some(35));
 
         Ok(())
     }
