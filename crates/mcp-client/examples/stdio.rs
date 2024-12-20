@@ -20,7 +20,8 @@ async fn main() -> Result<(), ClientError> {
     // Create the transport
     let transport = StdioTransport::new("uvx", vec!["mcp-server-git".to_string()]);
 
-    // Build service with middleware including timeout
+    // Build service
+    // TODO: Add timeout middleware
     let service = ServiceBuilder::new().service(TransportService::new(transport));
 
     // Create client

@@ -51,6 +51,9 @@ pub trait Transport: Send + Sync + 'static {
 pub mod stdio;
 pub use stdio::StdioTransport;
 
+pub mod sse;
+pub use sse::SseTransport;
+
 /// A router that handles message distribution for a transport
 #[derive(Clone)]
 pub struct MessageRouter {
