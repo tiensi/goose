@@ -41,7 +41,7 @@ pub struct JsonRpcError {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[serde(untagged)]
+#[serde(untagged, try_from = "JsonRpcRaw")]
 pub enum JsonRpcMessage {
     Request(JsonRpcRequest),
     Response(JsonRpcResponse),
@@ -52,17 +52,17 @@ pub enum JsonRpcMessage {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct JsonRpcRaw {
-    pub jsonrpc: String,
+    jsonrpc: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<u64>,
+    id: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub method: Option<String>,
+    method: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub params: Option<Value>,
+    params: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub result: Option<Value>,
+    result: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<ErrorData>,
+    error: Option<ErrorData>,
 }
 
 impl TryFrom<JsonRpcRaw> for JsonRpcMessage {
