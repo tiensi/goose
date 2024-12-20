@@ -15,9 +15,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logging
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::from_default_env()
-                .add_directive("mcp_client=debug".parse().unwrap())
-                .add_directive("reqwest_eventsource=debug".parse().unwrap()),
+            EnvFilter::from_default_env().add_directive("mcp_client=debug".parse().unwrap()),
         )
         .init();
 
@@ -57,7 +55,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let clients = Arc::new(clients);
     let mut handles = vec![];
 
-    for i in 0..10 {
+    for i in 0..20 {
         let clients = Arc::clone(&clients);
         let handle = tokio::spawn(async move {
             // let mut rng = rand::thread_rng();
@@ -69,14 +67,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 0 => {
                     println!("\n{i}: Listing tools for client 1 (stdio)");
                     match clients[0].list_tools().await {
-                        Ok(tools) => println!("  {i}: -> Got {:?}", tools),
+                        Ok(tools) => {
+                            println!("  {i}: -> Got tools, first one: {:?}", tools.tools.first())
+                        }
                         Err(e) => println!("  {i}: -> Error: {}", e),
                     }
                 }
                 1 => {
                     println!("\n{i}: Listing tools for client 3 (sse)");
                     match clients[2].list_tools().await {
-                        Ok(tools) => println!("  {i}: -> Got {:?}", tools),
+                        Ok(tools) => {
+                            println!("  {i}: -> Got tools, first one: {:?}", tools.tools.first())
+                        }
                         Err(e) => println!("  {i}: -> Error: {}", e),
                     }
                 }
@@ -86,8 +88,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .call_tool("git_status", serde_json::json!({ "repo_path": "." }))
                         .await
                     {
-                        Ok(result) => println!("  {i}: → Tool execution result: {:?}", result),
-                        Err(e) => println!("  {i}: → Error: {}", e),
+                        Ok(result) => println!(
+                            "  {i}: -> Tool execution result, is_error: {:?}",
+                            result.is_error
+                        ),
+                        Err(e) => println!("  {i}: -> Error: {}", e),
                     }
                 }
                 3 => {
@@ -99,8 +104,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             )
                             .await
                         {
-                        Ok(result) => println!("  {i}: → Tool execution result: {:?}", result),
-                        Err(e) => println!("  {i}: → Error: {}", e),
+                        Ok(result) => println!("  {i}: -> Tool execution result, is_error: {:?}", result.is_error),
+                        Err(e) => println!("  {i}: -> Error: {}", e),
                     }
                 }
                 _ => unreachable!(),

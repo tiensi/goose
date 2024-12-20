@@ -13,7 +13,7 @@ async fn main() -> Result<(), ClientError> {
         .with_env_filter(
             EnvFilter::from_default_env()
                 .add_directive("mcp_client=debug".parse().unwrap())
-                .add_directive("reqwest_eventsource=debug".parse().unwrap()),
+                .add_directive("eventsource_client=debug".parse().unwrap()),
         )
         .init();
 

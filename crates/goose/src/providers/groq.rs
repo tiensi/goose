@@ -1,27 +1,26 @@
-use super::base::{Provider, ProviderUsage, Usage};
-use super::configs::{ModelConfig, OllamaProviderConfig, ProviderModelConfig};
-use super::utils::{get_model, handle_response};
 use crate::message::Message;
+use crate::providers::base::{Provider, ProviderUsage, Usage};
+use crate::providers::configs::{GroqProviderConfig, ModelConfig, ProviderModelConfig};
 use crate::providers::openai_utils::{
     create_openai_request_payload, get_openai_usage, openai_response_to_message,
 };
-use anyhow::Result;
+use crate::providers::utils::{get_model, handle_response};
 use async_trait::async_trait;
-use mcp_core::tool::Tool;
+use mcp_core::Tool;
 use reqwest::Client;
 use serde_json::Value;
 use std::time::Duration;
 
-pub const OLLAMA_HOST: &str = "http://localhost:11434";
-pub const OLLAMA_MODEL: &str = "qwen2.5";
+pub const GROQ_API_HOST: &str = "https://api.groq.com";
+pub const GROQ_DEFAULT_MODEL: &str = "llama-3.3-70b-versatile";
 
-pub struct OllamaProvider {
+pub struct GroqProvider {
     client: Client,
-    config: OllamaProviderConfig,
+    config: GroqProviderConfig,
 }
 
-impl OllamaProvider {
-    pub fn new(config: OllamaProviderConfig) -> Result<Self> {
+impl GroqProvider {
+    pub fn new(config: GroqProviderConfig) -> anyhow::Result<Self> {
         let client = Client::builder()
             .timeout(Duration::from_secs(600)) // 10 minutes timeout
             .build()?;
@@ -29,24 +28,29 @@ impl OllamaProvider {
         Ok(Self { client, config })
     }
 
-    fn get_usage(data: &Value) -> Result<Usage> {
+    fn get_usage(data: &Value) -> anyhow::Result<Usage> {
         get_openai_usage(data)
     }
 
-    async fn post(&self, payload: Value) -> Result<Value> {
+    async fn post(&self, payload: Value) -> anyhow::Result<Value> {
         let url = format!(
-            "{}/v1/chat/completions",
+            "{}/openai/v1/chat/completions",
             self.config.host.trim_end_matches('/')
         );
 
-        let response = self.client.post(&url).json(&payload).send().await?;
-
+        let response = self
+            .client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", self.config.api_key))
+            .json(&payload)
+            .send()
+            .await?;
         handle_response(payload, response).await?
     }
 }
 
 #[async_trait]
-impl Provider for OllamaProvider {
+impl Provider for GroqProvider {
     fn get_model_config(&self) -> &ModelConfig {
         self.config.model_config()
     }
@@ -56,19 +60,17 @@ impl Provider for OllamaProvider {
         system: &str,
         messages: &[Message],
         tools: &[Tool],
-    ) -> Result<(Message, ProviderUsage)> {
+    ) -> anyhow::Result<(Message, ProviderUsage)> {
         let payload =
-            create_openai_request_payload(&self.config.model, system, messages, tools, false)?;
+            create_openai_request_payload(&self.config.model, system, messages, tools, true)?;
 
         let response = self.post(payload).await?;
 
-        // Parse response
         let message = openai_response_to_message(response.clone())?;
         let usage = Self::get_usage(&response)?;
         let model = get_model(&response);
-        let cost = None;
 
-        Ok((message, ProviderUsage::new(model, usage, cost)))
+        Ok((message, ProviderUsage::new(model, usage, None)))
     }
 }
 
@@ -78,26 +80,25 @@ mod tests {
     use crate::message::MessageContent;
     use crate::providers::mock_server::{
         create_mock_open_ai_response, create_mock_open_ai_response_with_tools, create_test_tool,
-        get_expected_function_call_arguments, setup_mock_server,
-        setup_mock_server_with_response_code, TEST_INPUT_TOKENS, TEST_OUTPUT_TOKENS,
-        TEST_TOOL_FUNCTION_NAME, TEST_TOTAL_TOKENS,
+        get_expected_function_call_arguments, setup_mock_server, TEST_INPUT_TOKENS,
+        TEST_OUTPUT_TOKENS, TEST_TOOL_FUNCTION_NAME, TEST_TOTAL_TOKENS,
     };
     use wiremock::MockServer;
 
-    async fn _setup_mock_server(response_body: Value) -> (MockServer, OllamaProvider) {
-        let mock_server = setup_mock_server("/v1/chat/completions", response_body).await;
-        // Create the OllamaProvider with the mock server's URL as the host
-        let config = OllamaProviderConfig {
+    async fn _setup_mock_server(response_body: Value) -> (MockServer, GroqProvider) {
+        let mock_server = setup_mock_server("/openai/v1/chat/completions", response_body).await;
+        let config = GroqProviderConfig {
             host: mock_server.uri(),
-            model: ModelConfig::new(OLLAMA_MODEL.to_string()),
+            api_key: "test_api_key".to_string(),
+            model: ModelConfig::new(GROQ_DEFAULT_MODEL.to_string()),
         };
 
-        let provider = OllamaProvider::new(config).unwrap();
+        let provider = GroqProvider::new(config).unwrap();
         (mock_server, provider)
     }
 
     #[tokio::test]
-    async fn test_complete_basic() -> Result<()> {
+    async fn test_complete_basic() -> anyhow::Result<()> {
         let model_name = "gpt-4o";
         // Mock response for normal completion
         let response_body =
@@ -129,7 +130,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_complete_tool_request() -> Result<()> {
+    async fn test_complete_tool_request() -> anyhow::Result<()> {
         // Mock response for tool calling
         let response_body = create_mock_open_ai_response_with_tools("gpt-4o");
 
@@ -159,30 +160,6 @@ mod tests {
         assert_eq!(usage.usage.input_tokens, Some(TEST_INPUT_TOKENS));
         assert_eq!(usage.usage.output_tokens, Some(TEST_OUTPUT_TOKENS));
         assert_eq!(usage.usage.total_tokens, Some(TEST_TOTAL_TOKENS));
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_server_error() -> Result<()> {
-        let mock_server = setup_mock_server_with_response_code("/v1/chat/completions", 500).await;
-
-        let config = OllamaProviderConfig {
-            host: mock_server.uri(),
-            model: ModelConfig::new(OLLAMA_MODEL.to_string()),
-        };
-
-        let provider = OllamaProvider::new(config)?;
-        let messages = vec![Message::user().with_text("Hello?")];
-        let result = provider
-            .complete("You are a helpful assistant.", &messages, &[])
-            .await;
-
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Server error: 500"));
 
         Ok(())
     }
