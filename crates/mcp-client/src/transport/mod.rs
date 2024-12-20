@@ -58,6 +58,7 @@ pub use sse::SseTransport;
 #[derive(Clone)]
 pub struct MessageRouter {
     transport_tx: mpsc::Sender<TransportMessage>,
+    // shutdown_tx is unused, but we'll probably need it for shutdown
     #[allow(dead_code)]
     shutdown_tx: mpsc::Sender<()>,
 }

@@ -49,7 +49,7 @@ pub struct InitializeParams {
 
 /// The MCP client trait defining the interface for MCP operations.
 #[async_trait::async_trait]
-pub trait McpClient {
+pub trait McpClient: Send + Sync + 'static {
     /// Initialize the connection with the server.
     async fn initialize(
         &mut self,
@@ -168,7 +168,7 @@ where
             Response = JsonRpcMessage,
             Error = super::service::ServiceError,
         > + Send
-        + Sync,
+        + Sync + 'static,
     S::Future: Send,
 {
     async fn initialize(

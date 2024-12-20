@@ -23,6 +23,7 @@ tokio-retry = "0.3"
 tower = { version = "0.4", features = ["timeout", "util"] }
 tower-service = "0.3"
 tokio-util = { version = "0.7", features = ["io-util", "io"] }
+rand = "0.8"
 
 [dev-dependencies]
 warp = "0.3"
