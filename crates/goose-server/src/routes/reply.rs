@@ -9,6 +9,7 @@ use axum::{
 use bytes::Bytes;
 use futures::{stream::StreamExt, Stream};
 use goose::message::{Message, MessageContent};
+use goose::providers::base::{Moderation, ModerationResult};
 use mcp_core::{content::Content, role::Role};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -405,7 +406,7 @@ mod tests {
 
     #[async_trait::async_trait]
     impl Provider for MockProvider {
-        async fn complete(
+        async fn complete_internal(
             &self,
             _system_prompt: &str,
             _messages: &[Message],
@@ -423,6 +424,16 @@ mod tests {
 
         fn get_usage(&self, _data: &Value) -> anyhow::Result<Usage> {
             Ok(Usage::new(None, None, None))
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl Moderation for MockProvider {
+        async fn moderate_content(
+            &self,
+            _content: &str,
+        ) -> Result<ModerationResult, anyhow::Error> {
+            Ok(ModerationResult::new(false, None, None))
         }
     }
 
