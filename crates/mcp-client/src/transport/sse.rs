@@ -5,6 +5,7 @@ use reqwest::Client as HttpClient;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio::task::JoinHandle;
+use tracing::warn;
 
 use super::{Error, Transport, TransportMessage};
 use mcp_core::protocol::JsonRpcMessage;
@@ -65,7 +66,11 @@ impl SseTransport {
         let client = match eventsource_client::ClientBuilder::for_url(&sse_url) {
             Ok(builder) => builder.build(),
             Err(e) => {
-                eprintln!("Failed to create SSE client: {}", e);
+                // Properly handle initial connection error
+                let mut pending = pending_requests.lock().await;
+                for (_, tx) in pending.drain() {
+                    let _ = tx.send(Err(Error::SseConnection(e.to_string())));
+                }
                 return;
             }
         };
@@ -110,7 +115,20 @@ impl SseTransport {
             let post_url = match post_endpoint.lock().await.as_ref() {
                 Some(url) => url.clone(),
                 None => {
-                    eprintln!("No POST endpoint available");
+                    if let Some(response_tx) = transport_msg.response_tx {
+                        let _ = response_tx.send(Err(Error::NotConnected));
+                    }
+                    continue;
+                }
+            };
+
+            // Serialize message first
+            let message_str = match serde_json::to_string(&transport_msg.message) {
+                Ok(s) => s,
+                Err(e) => {
+                    if let Some(response_tx) = transport_msg.response_tx {
+                        let _ = response_tx.send(Err(Error::Serialization(e)));
+                    }
                     continue;
                 }
             };
@@ -128,22 +146,29 @@ impl SseTransport {
             }
 
             // Send message via HTTP POST
-            let message_str = match serde_json::to_string(&transport_msg.message) {
-                Ok(s) => s,
-                Err(e) => {
-                    eprintln!("Failed to serialize message: {}", e);
-                    continue;
-                }
-            };
-
-            if let Err(e) = http_client
+            match http_client
                 .post(&post_url)
                 .header("Content-Type", "application/json")
                 .body(message_str)
                 .send()
                 .await
             {
-                eprintln!("Failed to send message: {}", e);
+                Ok(response) => {
+                    if !response.status().is_success() {
+                        let error = Error::HttpError {
+                            status: response.status().as_u16(),
+                            message: response.status().to_string(),
+                        };
+                        // We don't handle the error directly as it will come through SSE,
+                        // but we log it for debugging purposes
+                        warn!("HTTP request failed with error: {}", error);
+                    }
+                }
+                Err(e) => {
+                    let error = Error::Other(format!("HTTP request failed: {}", e));
+                    // Transport errors will also be communicated through the SSE channel
+                    warn!("HTTP request failed with error: {}", error);
+                }
             }
         }
 

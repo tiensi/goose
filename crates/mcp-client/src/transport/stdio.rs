@@ -113,7 +113,9 @@ impl StdioTransport {
             let message_str = match serde_json::to_string(&transport_msg.message) {
                 Ok(s) => s,
                 Err(e) => {
-                    eprintln!("Failed to serialize message: {}", e);
+                    if let Some(tx) = transport_msg.response_tx {
+                        let _ = tx.send(Err(Error::Serialization(e)));
+                    }
                     continue;
                 }
             };
@@ -131,15 +133,23 @@ impl StdioTransport {
             }
 
             // Write message to stdin
-            if let Err(e) = stdin
+            if let Err(_) = stdin
                 .write_all(format!("{}\n", message_str).as_bytes())
                 .await
             {
-                eprintln!("Failed to write to stdin: {}", e);
+                // Break with a specific error indicating write failure
+                let mut pending = pending_requests.lock().await;
+                for (_, tx) in pending.drain() {
+                    let _ = tx.send(Err(Error::SendFailed));
+                }
                 break;
             }
-            if let Err(e) = stdin.flush().await {
-                eprintln!("Failed to flush stdin: {}", e);
+            if let Err(_) = stdin.flush().await {
+                // Break with a specific error indicating connection issues
+                let mut pending = pending_requests.lock().await;
+                for (_, tx) in pending.drain() {
+                    let _ = tx.send(Err(Error::ConnectionClosed));
+                }
                 break;
             }
         }

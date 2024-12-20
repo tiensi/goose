@@ -24,6 +24,18 @@ pub enum Error {
     #[error("Channel closed")]
     ChannelClosed,
 
+    #[error("Serialization error: {0}")]
+    Serialization(#[from] serde_json::Error),
+
+    #[error("HTTP error: {status} - {message}")]
+    HttpError { status: u16, message: String },
+
+    #[error("SSE connection error: {0}")]
+    SseConnection(String),
+
+    #[error("Connection closed by server")]
+    ConnectionClosed,
+
     #[error("Unexpected transport error: {0}")]
     Other(String),
 }
