@@ -16,20 +16,20 @@ CROSS_BUILD_OPTS="--platform linux/amd64 --no-cache" CROSS_CONTAINER_OPTS="--pla
 docker run --platform linux/amd64 -it <image-id> /bin/bash
 ```
 
-#### Testing the build
+#### Testing the binary
 
-1. download docker image for testing environment
+1. Download docker image for testing environment
 ```sh
 docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 docker pull arm64v8/ubuntu
 ```
-2. run the container
+2. Run the container
 pwd is the directory contains the binary built in the previous step on your host machine
 ```sh
 docker run -v $(pwd):/app -it arm64v8/ubuntu /bin/bash
 ```
 
-3. install dependencies in the container and set up api testing environment
+3. Install dependencies in the container and set up api testing environment
 ```sh 
 apt update
 apt install libxcb1 libxcb1-dev libdbus-1-3 nvi
@@ -40,7 +40,7 @@ mkdir -p ~/.config/goose
 
 ### x86_64-unknown-linux-gnu
 
-#### build release
+#### Build release
 ```sh   
 CROSS_BUILD_OPTS="--platform linux/amd64 --no-cache" CROSS_CONTAINER_OPTS="--platform linux/amd64" cross build --release --target x86_64-unknown-linux-gnu
 ```
@@ -49,7 +49,7 @@ CROSS_BUILD_OPTS="--platform linux/amd64 --no-cache" CROSS_CONTAINER_OPTS="--pla
 docker run --platform linux/amd64 -it <image-id> /bin/bash
 ```
 
-#### testing the build
+#### Testing the binary
 
 1. Download docker image for testing environment
 ```sh
@@ -78,8 +78,13 @@ mkdir -p ~/.config/goose
 ```sh   
 cross build --release --target aarch64-apple-darwin
 ```
-
 There is no docker image available for aarch64-apple-darwin. It will fall back to your host machine for building the binary if your host machine matches.
+
+#### testing the build
+If the binary is signed with a certificate, run
+```sh
+xattr -d com.apple.quarantine goose
+````
 
 ### x86_64-apple-darwin
 
@@ -90,3 +95,16 @@ cross build --release --target x86_64-apple-darwin
 
 There is no docker image available for x86_64-apple-darwin. It will fall back to your host machine for building the binary if your host machine matches.
 
+#### testing the build
+1. If the binary is signed with a certificate, run
+```sh
+xattr -d com.apple.quarantine goose
+````
+2. If you are on Apple Silicon (ARM), you can use Rosetta to test the binary
+```sh
+softwareupdate --install-rosetta # make sure Rosetta 2 is installed
+```
+
+```sh
+arch -x86_64 ./goose help
+```
