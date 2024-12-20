@@ -53,70 +53,67 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("\n\n----------------------------------\n\n");
 
-    // // Wrap clients in Arc before spawning tasks
-    // let clients = Arc::new(clients);
-    // let mut handles = vec![];
+    // Wrap clients in Arc before spawning tasks
+    let clients = Arc::new(clients);
+    let mut handles = vec![];
 
-    // for i in 0..50 {
-    //     let clients = Arc::clone(&clients);
-    //     let handle = tokio::spawn(async move {
-    //         // let mut rng = rand::thread_rng();
-    //         let mut rng = rand::rngs::StdRng::from_entropy();
-    //         tokio::time::sleep(Duration::from_millis(rng.gen_range(5..50))).await;
+    for i in 0..10 {
+        let clients = Arc::clone(&clients);
+        let handle = tokio::spawn(async move {
+            // let mut rng = rand::thread_rng();
+            let mut rng = rand::rngs::StdRng::from_entropy();
+            tokio::time::sleep(Duration::from_millis(rng.gen_range(5..50))).await;
 
-    //         // Randomly select an operation
-    //         match rng.gen_range(0..4) {
-    //             0 => {
-    //                 println!("{i}: Listing tools for client 1 (stdio)");
-    //                 match clients[0].list_tools().await {
-    //                     Ok(tools) => println!("  -> Got {:?}", tools),
-    //                     Err(e) => println!("  -> Error: {}", e),
-    //                 }
-    //             }
-    //             1 => {
-    //                 println!("{i}: Listing tools for client 3 (sse)");
-    //                 match clients[2].list_tools().await {
-    //                     Ok(tools) => println!("  -> Got {:?}", tools),
-    //                     Err(e) => println!("  -> Error: {}", e),
-    //                 }
-    //             }
-    //             2 => {
-    //                 println!("{i}: Calling tool for client 2 (stdio)");
-    //                 match clients[1]
-    //                     .call_tool(
-    //                         "echo",
-    //                         serde_json::json!({ "message": "Hello from client 2" }),
-    //                     )
-    //                     .await
-    //                 {
-    //                     Ok(result) => println!("  → Tool execution result: {:?}", result),
-    //                     Err(e) => println!("  → Error: {}", e),
-    //                 }
-    //             }
-    //             3 => {
-    //                 println!("{i}: Calling tool for client 3 (sse)");
-    //                 match clients[2]
-    //                         .call_tool(
-    //                             "echo_tool",
-    //                             serde_json::json!({ "message": "Client with SSE transport - calling a tool" }),
-    //                         )
-    //                         .await
-    //                     {
-    //                         Ok(result) => println!("  → Tool execution result: {:?}", result),
-    //                     Err(e) => println!("  -> Error: {}", e),
-    //                 }
-    //             }
-    //             _ => unreachable!(),
-    //         }
-    //         Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
-    //     });
-    //     handles.push(handle);
-    // }
+            // Randomly select an operation
+            match rng.gen_range(0..4) {
+                0 => {
+                    println!("\n{i}: Listing tools for client 1 (stdio)");
+                    match clients[0].list_tools().await {
+                        Ok(tools) => println!("  {i}: -> Got {:?}", tools),
+                        Err(e) => println!("  {i}: -> Error: {}", e),
+                    }
+                }
+                1 => {
+                    println!("\n{i}: Listing tools for client 3 (sse)");
+                    match clients[2].list_tools().await {
+                        Ok(tools) => println!("  {i}: -> Got {:?}", tools),
+                        Err(e) => println!("  {i}: -> Error: {}", e),
+                    }
+                }
+                2 => {
+                    println!("\n{i}: Calling tool for client 2 (stdio)");
+                    match clients[1]
+                        .call_tool("git_status", serde_json::json!({ "repo_path": "." }))
+                        .await
+                    {
+                        Ok(result) => println!("  {i}: → Tool execution result: {:?}", result),
+                        Err(e) => println!("  {i}: → Error: {}", e),
+                    }
+                }
+                3 => {
+                    println!("\n{i}: Calling tool for client 3 (sse)");
+                    match clients[2]
+                            .call_tool(
+                                "echo_tool",
+                                serde_json::json!({ "message": "Client with SSE transport - calling a tool" }),
+                            )
+                            .await
+                        {
+                        Ok(result) => println!("  {i}: → Tool execution result: {:?}", result),
+                        Err(e) => println!("  {i}: → Error: {}", e),
+                    }
+                }
+                _ => unreachable!(),
+            }
+            Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
+        });
+        handles.push(handle);
+    }
 
-    // // Wait for all tasks to complete
-    // for handle in handles {
-    //     handle.await.unwrap().unwrap();
-    // }
+    // Wait for all tasks to complete
+    for handle in handles {
+        handle.await.unwrap().unwrap();
+    }
 
     Ok(())
 }

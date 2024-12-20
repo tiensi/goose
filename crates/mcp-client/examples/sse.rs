@@ -24,7 +24,7 @@ async fn main() -> Result<()> {
     let service = ServiceBuilder::new().service(TransportService::new(transport));
 
     // Create client
-    let mut client = McpClientImpl::new(service);
+    let client = McpClientImpl::new(service);
     println!("Client created\n");
 
     // Initialize

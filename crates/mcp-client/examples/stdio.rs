@@ -25,7 +25,7 @@ async fn main() -> Result<(), ClientError> {
     let service = ServiceBuilder::new().service(TransportService::new(transport));
 
     // Create client
-    let mut client = McpClientImpl::new(service);
+    let client = McpClientImpl::new(service);
 
     // Initialize
     let server_info = client
