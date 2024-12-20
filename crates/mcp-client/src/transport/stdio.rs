@@ -40,6 +40,7 @@ impl StdioTransport {
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::inherit())
+            .kill_on_drop(true)
             .spawn()?;
 
         let stdin = child
