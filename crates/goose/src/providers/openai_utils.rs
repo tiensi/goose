@@ -283,7 +283,11 @@ fn create_openai_request_payload_handling_concat_response_content(
         &ImageFormat::OpenAi,
         concat_tool_response_contents,
     );
-    let tools_spec = tools_to_openai_spec(tools)?;
+    let tools_spec = if !tools.is_empty() {
+        tools_to_openai_spec(tools)?
+    } else {
+        vec![]
+    };
 
     let mut messages_array = vec![system_message];
     messages_array.extend(messages_spec);
