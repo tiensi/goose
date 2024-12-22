@@ -361,37 +361,48 @@ impl LangfuseLayer {
         if let Some(observation_id) = observation_id {
             let trace_id = self.ensure_trace_id().await;
     
+            let mut update = json!({
+                "id": observation_id,
+                "traceId": trace_id,
+                "type": "SPAN"
+            });
+
+            // Handle special fields
             if let Some(val) = metadata.get("input") {
-                let mut batch = self.batch_manager.lock().await;
-                batch.add_event("span-update", json!({
-                    "id": observation_id,
-                    "traceId": trace_id,
-                    "type": "SPAN",
-                    "input": val
-                })).await;
-                return;
+                update["input"] = val.clone();
             }
             
             if let Some(val) = metadata.get("output") {
-                let mut batch = self.batch_manager.lock().await;
-                batch.add_event("span-update", json!({
-                    "id": observation_id,
-                    "traceId": trace_id,
-                    "type": "SPAN",
-                    "output": val
-                })).await;
-                return;
+                update["output"] = val.clone();
             }
-    
-            // Handle other metadata
-            let flattened_metadata = BatchManager::flatten_metadata(metadata);
+
+            if let Some(val) = metadata.get("model_config") {
+                update["metadata"] = json!({ "model_config": val });
+            }
+
+            // Handle any remaining metadata
+            let remaining_metadata: serde_json::Map<String, Value> = metadata.iter()
+                .filter(|(k, _)| !["input", "output", "model_config"].contains(&k.as_str()))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
+
+            if !remaining_metadata.is_empty() {
+                let flattened = BatchManager::flatten_metadata(remaining_metadata);
+                if update.get("metadata").is_some() {
+                    // If metadata exists (from model_config), merge with it
+                    if let Some(obj) = update["metadata"].as_object_mut() {
+                        for (k, v) in flattened {
+                            obj.insert(k, v);
+                        }
+                    }
+                } else {
+                    // Otherwise set it directly
+                    update["metadata"] = json!(flattened);
+                }
+            }
+
             let mut batch = self.batch_manager.lock().await;
-            batch.add_event("observation-update", json!({
-                "id": observation_id,
-                "traceId": trace_id,
-                "metadata": flattened_metadata,
-                "type": "SPAN"
-            })).await;
+            batch.add_event("span-update", update).await;
         }
     }
 }
@@ -463,32 +474,6 @@ where
                 layer.handle_record(span_id, metadata).await
             });
         }
-    }
-
-    fn on_enter(&self, span: &Id, _ctx: Context<'_, S>) {
-        let span_id = span.into_u64();
-        
-        self.spawn_task(move |layer| async move {
-            if let Some(observation_id) = layer.span_tracker.lock().await.get_span(span_id).cloned() {
-                let mut batch = layer.batch_manager.lock().await;
-                batch.add_event("span-enter", json!({
-                    "id": observation_id
-                })).await;
-            }
-        });
-    }
-
-    fn on_exit(&self, span: &Id, _ctx: Context<'_, S>) {
-        let span_id = span.into_u64();
-        
-        self.spawn_task(move |layer| async move {
-            if let Some(observation_id) = layer.span_tracker.lock().await.get_span(span_id).cloned() {
-                let mut batch = layer.batch_manager.lock().await;
-                batch.add_event("span-exit", json!({
-                    "id": observation_id
-                })).await;
-            }
-        });
     }
 }
 
