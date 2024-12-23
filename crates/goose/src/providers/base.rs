@@ -252,6 +252,10 @@ mod tests {
 
         #[async_trait]
         impl Provider for TestProvider {
+            fn get_usage(&self, _data: &Value) -> Result<Usage> {
+                Ok(Usage::new(Some(1), Some(1), Some(2)))
+            }
+
             fn get_model_config(&self) -> &ModelConfig {
                 panic!("Should not be called");
             }
@@ -307,6 +311,10 @@ mod tests {
 
         #[async_trait]
         impl Provider for TestProvider {
+            fn get_usage(&self, _data: &Value) -> Result<Usage> {
+                Ok(Usage::new(Some(1), Some(1), Some(2)))
+            }
+
             fn get_model_config(&self) -> &ModelConfig {
                 panic!("Should not be called");
             }
@@ -367,6 +375,10 @@ mod tests {
 
         #[async_trait]
         impl Provider for TestProvider {
+            fn get_usage(&self, _data: &Value) -> Result<Usage> {
+                Ok(Usage::new(Some(1), Some(1), Some(2)))
+            }
+
             fn get_model_config(&self) -> &ModelConfig {
                 panic!("Should not be called");
             }
@@ -426,6 +438,10 @@ mod tests {
 
         #[async_trait]
         impl Provider for TestProvider {
+            fn get_usage(&self, _data: &Value) -> Result<Usage> {
+                Ok(Usage::new(Some(1), Some(1), Some(2)))
+            }
+
             fn get_model_config(&self) -> &ModelConfig {
                 panic!("Should not be called");
             }
