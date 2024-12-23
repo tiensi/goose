@@ -234,7 +234,8 @@ impl DeveloperSystem {
 
         let instructions = formatdoc! {r#"
             The developer system is loaded in the directory listed below.
-            You can use the shell tool to run any command that would work on the relevant operating system, such as api calls, web access/crawling and other things a developer would do from a command line.            
+            You can use the shell tool to run any command that would work on the relevant operating system, 
+            such as api calls, web access/crawling and other things a developer would do from a command line.
             Use the shell tool as needed to locate files or interact with the project. Only files
             that have been read or modified using the edit tools will show up in the active files list.
 
