@@ -6,7 +6,10 @@ mod commands {
 pub mod agents;
 mod profile;
 mod prompt;
-mod langfuse_layer;
+mod tracing {
+    pub mod langfuse_layer;
+    pub mod observation_layer;
+}
 pub mod session;
 
 mod systems;
@@ -18,12 +21,8 @@ use commands::session::build_session;
 use commands::version::print_version;
 use profile::has_no_profiles;
 use std::io::{self, Read};
-use tracing_subscriber::{
-    layer::SubscriberExt,
-    util::SubscriberInitExt,
-    EnvFilter,
-};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 mod log_usage;
 
@@ -221,16 +220,14 @@ fn setup_logging() -> Result<()> {
         .pretty();
 
     // Update filter to include debug level
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("goose=debug"));
+    let filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("goose=debug"));
 
     // Build the subscriber with all layers
-    let subscriber = tracing_subscriber::registry()
-        .with(fmt_layer)
-        .with(filter);
+    let subscriber = tracing_subscriber::registry().with(fmt_layer).with(filter);
 
     // Add langfuse layer if available and initialize
-    if let Some(langfuse_layer) = langfuse_layer::create_langfuse_layer() {
+    if let Some(langfuse_layer) = tracing::langfuse_layer::create_langfuse_observer() {
         subscriber.with(langfuse_layer).init();
     } else {
         subscriber.init();
