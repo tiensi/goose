@@ -5,7 +5,7 @@ use goose::{
     developer::DeveloperSystem,
     memory::MemorySystem,
     providers::{configs::ProviderConfig, factory},
-    systems::goose_hints::GooseHintsSystem,
+    systems::{goose_hints::GooseHintsSystem, os_hints::OsHintsSystem},
 };
 use std::{env, sync::Arc};
 use tokio::sync::Mutex;
@@ -32,6 +32,9 @@ impl AppState {
 
         let goosehints_system = Box::new(GooseHintsSystem::new());
         agent.add_system(goosehints_system);
+
+        let os_hints_system = Box::new(OsHintsSystem::new());
+        agent.add_system(os_hints_system);
 
         Ok(Self {
             provider_config,
