@@ -24,7 +24,7 @@ impl OsHintsSystem {
         let os_type = std::env::consts::OS;
         hints.push(format!("Operating System: {}", os_type));
 
-        hints.push("Follwing are some of the installed SDKs which can be used additionally to make one off scripts to aassist user tasks:".to_string());
+        hints.push("Following are some of the installed SDKs which can be used additionally to make one off scripts to assist user tasks:".to_string());
 
         // Add OS-specific detection logic
         match os_type {
