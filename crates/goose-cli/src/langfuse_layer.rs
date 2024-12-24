@@ -211,7 +211,7 @@ impl BatchManager {
 
 #[derive(Debug)]
 struct SpanTracker {
-    active_spans: HashMap<u64, String>, // span_id -> observation_id. span_id in Tracing is u64 whereas Langfuse requires UUID v4 strings
+    active_spans: HashMap<u64, (String, serde_json::Map<String, Value>)>, // span_id -> (observation_id, metadata)
     current_trace_id: Option<String>,
 }
 
@@ -223,15 +223,15 @@ impl SpanTracker {
         }
     }
 
-    fn add_span(&mut self, span_id: u64, observation_id: String) {
-        self.active_spans.insert(span_id, observation_id);
+    fn add_span(&mut self, span_id: u64, observation_id: String, metadata: serde_json::Map<String, Value>) {
+        self.active_spans.insert(span_id, (observation_id, metadata));
     }
 
-    fn get_span(&self, span_id: u64) -> Option<&String> {
+    fn get_span(&self, span_id: u64) -> Option<&(String, serde_json::Map<String, Value>)> {
         self.active_spans.get(&span_id)
     }
 
-    fn remove_span(&mut self, span_id: u64) -> Option<String> {
+    fn remove_span(&mut self, span_id: u64) -> Option<(String, serde_json::Map<String, Value>)> {
         self.active_spans.remove(&span_id)
     }
 }
@@ -284,48 +284,99 @@ impl LangfuseLayer {
         
         {
             let mut spans = self.span_tracker.lock().await;
-            spans.add_span(span_id, observation_id.clone());
+            spans.add_span(span_id, observation_id.clone(), span_data.metadata.clone());
         }
 
         // Get parent ID if it exists
         let parent_id = if let Some(parent_span_id) = span_data.parent_span_id {
             let spans = self.span_tracker.lock().await;
-            spans.get_span(parent_span_id).cloned()
+            spans.get_span(parent_span_id).map(|(id, _)| id.clone())
         } else {
             None
         };
 
         let trace_id = self.ensure_trace_id().await;
 
-        // Create the span observation
+        // Determine observation type based on event_type
+        let observation_type = if let Some(event_type) = span_data.metadata.get("event_type") {
+            match event_type.as_str() {
+                Some("GENERATION-CREATE") => "GENERATION",
+                _ => "SPAN"
+            }
+        } else {
+            "SPAN"
+        };
+
+        // Create the observation
         let mut batch = self.batch_manager.lock().await;
-        batch.add_event("observation-create", json!({
+        let mut observation = json!({
             "id": observation_id,
             "traceId": trace_id,
-            "type": "SPAN",
+            "type": observation_type,
             "name": span_data.name,
             "startTime": span_data.start_time,
             "parentObservationId": parent_id,
             "metadata": span_data.metadata,
             "level": span_data.level
-        })).await;
+        });
+
+        // Add usage data for GENERATION type
+        if observation_type == "GENERATION" {
+            if let Some(input_tokens) = span_data.metadata.get("input_tokens") {
+                if let Some(output_tokens) = span_data.metadata.get("output_tokens") {
+                    observation["usage"] = json!({
+                        "prompt_tokens": input_tokens,
+                        "completion_tokens": output_tokens,
+                        "total_tokens": span_data.metadata.get("total_tokens")
+                    });
+                }
+            }
+        }
+
+        batch.add_event("observation-create", observation).await;
     }
 
     async fn handle_span_close(&self, span_id: u64) {
-        let observation_id = {
+        let span_info = {
             let mut spans = self.span_tracker.lock().await;
             spans.remove_span(span_id)
         };
 
-        if let Some(observation_id) = observation_id {
+        if let Some((observation_id, metadata)) = span_info {
             let trace_id = self.ensure_trace_id().await;
             let mut batch = self.batch_manager.lock().await;
-            batch.add_event("observation-update", json!({
+
+            // Determine observation type based on event_type
+            let observation_type = if let Some(event_type) = metadata.get("event_type") {
+                match event_type.as_str() {
+                    Some("GENERATION-CREATE") => "GENERATION",
+                    _ => "SPAN"
+                }
+            } else {
+                "SPAN"
+            };
+
+            let mut update = json!({
                 "id": observation_id,
-                "type": "SPAN",
+                "type": observation_type,
                 "traceId": trace_id,
                 "endTime": Utc::now().to_rfc3339()
-            })).await;
+            });
+
+            // Add usage data for GENERATION type
+            if observation_type == "GENERATION" {
+                if let Some(input_tokens) = metadata.get("input_tokens") {
+                    if let Some(output_tokens) = metadata.get("output_tokens") {
+                        update["usage"] = json!({
+                            "prompt_tokens": input_tokens,
+                            "completion_tokens": output_tokens,
+                            "total_tokens": metadata.get("total_tokens")
+                        });
+                    }
+                }
+            }
+
+            batch.add_event("observation-update", update).await;
         }
     }
 
@@ -355,17 +406,40 @@ impl LangfuseLayer {
     async fn handle_record(&self, span_id: u64, metadata: serde_json::Map<String, Value>) {
         let observation_id = {
             let spans = self.span_tracker.lock().await;
-            spans.get_span(span_id).cloned()
+            spans.get_span(span_id).map(|(id, _)| id.clone())
         };
     
         if let Some(observation_id) = observation_id {
             let trace_id = self.ensure_trace_id().await;
     
+            // Determine observation type based on event_type
+            let observation_type = if let Some(event_type) = metadata.get("event_type") {
+                match event_type.as_str() {
+                    Some("GENERATION-CREATE") => "GENERATION",
+                    _ => "SPAN"
+                }
+            } else {
+                "SPAN"
+            };
+
             let mut update = json!({
                 "id": observation_id,
                 "traceId": trace_id,
-                "type": "SPAN"
+                "type": observation_type
             });
+
+            // Add usage data for GENERATION type
+            if observation_type == "GENERATION" {
+                if let Some(input_tokens) = metadata.get("input_tokens") {
+                    if let Some(output_tokens) = metadata.get("output_tokens") {
+                        update["usage"] = json!({
+                            "prompt_tokens": input_tokens,
+                            "completion_tokens": output_tokens,
+                            "total_tokens": metadata.get("total_tokens")
+                        });
+                    }
+                }
+            }
 
             // Handle special fields
             if let Some(val) = metadata.get("input") {
@@ -402,7 +476,7 @@ impl LangfuseLayer {
             }
 
             let mut batch = self.batch_manager.lock().await;
-            batch.add_event("span-update", update).await;
+            batch.add_event("observation-update", update).await;
         }
     }
 }

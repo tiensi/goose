@@ -105,7 +105,7 @@ impl DatabricksProvider {
 
 #[async_trait]
 impl Provider for DatabricksProvider {
-    #[tracing::instrument(skip(self, system, messages, tools), fields(model_config, input, output))]
+    #[tracing::instrument(skip(self, system, messages, tools), fields(event_type="GENERATION-CREATE",model_config, input, output, input_tokens, output_tokens, total_tokens, cost))]
     async fn complete(
         &self,
         system: &str,
@@ -150,12 +150,6 @@ impl Provider for DatabricksProvider {
 
         let response = self.post(payload.clone()).await?;
 
-        tracing::debug!(
-            model_config = %serde_json::to_string_pretty(&self.config).unwrap_or_default(),
-            input = %serde_json::to_string_pretty(&payload).unwrap_or_default(),
-            output = %serde_json::to_string_pretty(&response).unwrap_or_default()
-        );
-
         // Raise specific error if context length is exceeded
         if let Some(error) = response.get("error") {
             if let Some(err) = check_openai_context_length_error(error) {
@@ -171,7 +165,15 @@ impl Provider for DatabricksProvider {
         let usage = Self::get_usage(&response)?;
         let model = get_model(&response);
         let cost = cost(&usage, &model_pricing_for(&model));
-
+        tracing::debug!(
+            model_config = %serde_json::to_string_pretty(&self.config).unwrap_or_default(),
+            input = %serde_json::to_string_pretty(&payload).unwrap_or_default(),
+            output = %serde_json::to_string_pretty(&response).unwrap_or_default(),
+            input_tokens = ?usage.input_tokens.unwrap_or_default(),
+            output_tokens = ?usage.output_tokens.unwrap_or_default(),
+            total_tokens = ?usage.total_tokens.unwrap_or_default(),
+            cost = ?cost.unwrap_or_default()
+        );
         Ok((message, ProviderUsage::new(model, usage, cost)))
     }
 
