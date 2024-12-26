@@ -1,5 +1,4 @@
 use console::style;
-use goose::agent::Agent;
 use goose::providers::factory;
 use rand::{distributions::Alphanumeric, Rng};
 use std::path::{Path, PathBuf};
@@ -9,6 +8,7 @@ use crate::profile::{get_provider_config, load_profiles, Profile};
 use crate::prompt::rustyline::RustylinePrompt;
 use crate::prompt::Prompt;
 use crate::session::{ensure_session_dir, get_most_recent_session, Session};
+use crate::agents::agent::GooseAgent;
 
 pub fn build_session<'a>(
     session: Option<String>,
@@ -45,7 +45,7 @@ pub fn build_session<'a>(
 
     // TODO: Odd to be prepping the provider rather than having that done in the agent?
     let provider = factory::get_provider(provider_config).unwrap();
-    let agent = Box::new(Agent::new(provider));
+    let agent = Box::new(GooseAgent::new(provider));
     let prompt = match std::env::var("GOOSE_INPUT") {
         Ok(val) => match val.as_str() {
             "rustyline" => Box::new(RustylinePrompt::new()) as Box<dyn Prompt>,

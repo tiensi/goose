@@ -1,28 +1,49 @@
-use anyhow::Result;
+// use anyhow::Result;
 use async_trait::async_trait;
-use futures::stream::BoxStream;
+// use futures::stream::BoxStream;
+use tokio::sync::Mutex;
 use goose::{
-    agent::Agent as GooseAgent, message::Message, providers::base::ProviderUsage, systems::System,
+    agents::Agent, providers::base::ProviderUsage, systems::System, providers::base::Provider
 };
 
-#[async_trait]
-pub trait Agent {
-    fn add_system(&mut self, system: Box<dyn System>);
-    async fn reply(&self, messages: &[Message]) -> Result<BoxStream<'_, Result<Message>>>;
-    async fn usage(&self) -> Result<Vec<ProviderUsage>>;
+pub struct GooseAgent {
+    systems: Vec<Box<dyn System>>,
+    provider: Box<dyn Provider>,
+    provider_usage: Mutex<Vec<ProviderUsage>>,
+}
+
+impl GooseAgent {
+    pub fn new(provider: Box<dyn Provider>) -> Self {
+        Self {
+            systems: Vec::new(),
+            provider,
+            provider_usage: Mutex::new(Vec::new()),
+        }
+    }
 }
 
 #[async_trait]
 impl Agent for GooseAgent {
     fn add_system(&mut self, system: Box<dyn System>) {
-        self.add_system(system);
+        self.systems.push(system);
     }
 
-    async fn reply(&self, messages: &[Message]) -> Result<BoxStream<'_, Result<Message>>> {
-        self.reply(messages).await
+    fn get_systems(&self) -> &Vec<Box<dyn System>> {
+        &self.systems
     }
 
-    async fn usage(&self) -> Result<Vec<ProviderUsage>> {
-        self.usage().await
+    fn get_provider(&self) -> &Box<dyn Provider> {
+        &self.provider
     }
+
+    fn get_provider_usage(&self) -> &Mutex<Vec<ProviderUsage>> {
+        &self.provider_usage
+    }
+    // async fn reply(&self, messages: &[Message]) -> Result<BoxStream<'_, Result<Message>>> {
+    //     self.reply(messages).await
+    // }
+
+    // async fn usage(&self) -> Result<Vec<ProviderUsage>> {
+    //     self.usage().await
+    // }
 }

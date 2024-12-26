@@ -6,12 +6,13 @@ use std::fs::{self, File};
 use std::io::{self, BufRead, Write};
 use std::path::PathBuf;
 
-use crate::agents::agent::Agent;
+// use crate::agents::agent::Agent;
 use crate::log_usage::log_usage;
 use crate::prompt::{InputType, Prompt};
 use goose::developer::DeveloperSystem;
 use goose::message::{Message, MessageContent};
 use goose::systems::goose_hints::GooseHintsSystem;
+use goose::agents::Agent;
 use mcp_core::role::Role;
 
 // File management functions
@@ -361,14 +362,14 @@ mod tests {
     // Helper function to create a test session
     fn create_test_session() -> Session<'static> {
         let temp_file = NamedTempFile::new().unwrap();
-        let agent = Box::new(MockAgent {});
+        let agent = Box::new(MockAgent::new());
         let prompt = Box::new(MockPrompt::new());
         Session::new(agent, prompt, temp_file.path().to_path_buf())
     }
 
     fn create_test_session_with_prompt<'a>(prompt: Box<dyn Prompt + 'a>) -> Session<'a> {
         let temp_file = NamedTempFile::new().unwrap();
-        let agent = Box::new(MockAgent {});
+        let agent = Box::new(MockAgent::new());
         Session::new(agent, prompt, temp_file.path().to_path_buf())
     }
 
