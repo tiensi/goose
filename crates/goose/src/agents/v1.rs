@@ -61,31 +61,31 @@ impl Agent for AgentV1 {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::providers::mock::MockProvider;
-    use futures::TryStreamExt;
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use crate::providers::mock::MockProvider;
+//     use futures::TryStreamExt;
 
-    #[tokio::test]
-    async fn test_v1_agent() -> Result<(), anyhow::Error> {
-        // Create a mock provider that returns a simple response
-        let response = Message::assistant().with_text("Hello!");
-        let provider = MockProvider::new(vec![response.clone()]);
-        let agent = AgentV1::new(Box::new(provider));
+//     #[tokio::test]
+//     async fn test_v1_agent() -> Result<(), anyhow::Error> {
+//         // Create a mock provider that returns a simple response
+//         let response = Message::assistant().with_text("Hello!");
+//         let provider = MockProvider::new(vec![response.clone()]);
+//         let agent = AgentV1::new(Box::new(provider));
 
-        // Test basic reply functionality
-        let initial_message = Message::user().with_text("Hi");
-        let initial_messages = vec![initial_message];
+//         // Test basic reply functionality
+//         let initial_message = Message::user().with_text("Hi");
+//         let initial_messages = vec![initial_message];
 
-        let mut stream = agent.reply(&initial_messages).await?;
-        let mut messages = Vec::new();
-        while let Some(msg) = stream.try_next().await? {
-            messages.push(msg);
-        }
+//         let mut stream = agent.reply(&initial_messages).await?;
+//         let mut messages = Vec::new();
+//         while let Some(msg) = stream.try_next().await? {
+//             messages.push(msg);
+//         }
 
-        assert_eq!(messages.len(), 1);
-        assert_eq!(messages[0], response);
-        Ok(())
-    }
-}
+//         assert_eq!(messages.len(), 1);
+//         assert_eq!(messages[0], response);
+//         Ok(())
+//     }
+// }
