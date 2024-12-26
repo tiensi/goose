@@ -21,6 +21,7 @@ use std::{
 use tokio::sync::mpsc;
 use tokio::time::timeout;
 use tokio_stream::wrappers::ReceiverStream;
+use goose::agents::Agent;
 
 // Types matching the incoming JSON structure
 #[derive(Debug, Deserialize)]
@@ -390,7 +391,7 @@ pub fn routes(state: AppState) -> Router {
 mod tests {
     use super::*;
     use goose::{
-        agent::Agent,
+        agents::BaseAgent as Agent,
         providers::{
             base::{Provider, ProviderUsage, Usage},
             configs::{ModelConfig, OpenAiProviderConfig},

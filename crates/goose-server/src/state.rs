@@ -1,7 +1,7 @@
 use anyhow::Result;
 use goose::providers::configs::GroqProviderConfig;
 use goose::{
-    agent::Agent,
+    agents::BaseAgent as Agent,
     developer::DeveloperSystem,
     memory::MemorySystem,
     providers::{configs::ProviderConfig, factory},
