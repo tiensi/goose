@@ -3,6 +3,7 @@ use tokio::sync::Mutex;
 
 use super::Agent;
 use crate::providers::base::{Provider, ProviderUsage};
+use crate::register_agent;
 use crate::systems::System;
 
 /// Base implementation of an Agent
@@ -44,6 +45,8 @@ impl Agent for BaseAgent {
         &self.provider_usage
     }
 }
+
+register_agent!("base", BaseAgent);
 
 #[cfg(test)]
 mod tests {
