@@ -12,6 +12,7 @@ pub struct GooseAgent {
     provider_usage: Mutex<Vec<ProviderUsage>>,
 }
 
+#[allow(dead_code)]
 impl GooseAgent {
     pub fn new(provider: Box<dyn Provider>) -> Self {
         Self {
@@ -39,11 +40,4 @@ impl Agent for GooseAgent {
     fn get_provider_usage(&self) -> &Mutex<Vec<ProviderUsage>> {
         &self.provider_usage
     }
-    // async fn reply(&self, messages: &[Message]) -> Result<BoxStream<'_, Result<Message>>> {
-    //     self.reply(messages).await
-    // }
-
-    // async fn usage(&self) -> Result<Vec<ProviderUsage>> {
-    //     self.usage().await
-    // }
 }

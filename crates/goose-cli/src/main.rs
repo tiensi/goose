@@ -4,16 +4,16 @@ use goose::agents::AgentFactory;
 
 mod agents;
 mod commands;
+mod log_usage;
 mod profile;
 mod prompt;
 mod session;
 mod systems;
-mod log_usage;
 
+use commands::agent_version::AgentCommand;
 use commands::configure::handle_configure;
 use commands::session::build_session;
 use commands::version::print_version;
-use commands::agent_version::AgentCommand;
 use profile::has_no_profiles;
 use std::io::{self, Read};
 
@@ -27,10 +27,6 @@ use crate::systems::system_handler::{add_system, remove_system};
 struct Cli {
     #[arg(short = 'v', long = "version")]
     version: bool,
-
-    /// Agent version to use (e.g., 'base', 'v1')
-    #[arg(short = 'a', long = "agent", default_value_t = String::from("base"))]
-    agent: String,
 
     #[command(subcommand)]
     command: Option<Command>,
@@ -99,6 +95,15 @@ enum Command {
         )]
         profile: Option<String>,
 
+        /// Agent version to use (e.g., 'base', 'v1')
+        #[arg(
+            short,
+            long,
+            help = "Agent version to use (e.g., 'base', 'v1'), defaults to 'base'",
+            long_help = "Specify which agent version to use for this session."
+        )]
+        agent: Option<String>,
+
         /// Resume a previous session
         #[arg(
             short,
@@ -152,6 +157,15 @@ enum Command {
         )]
         name: Option<String>,
 
+        /// Agent version to use (e.g., 'base', 'v1')
+        #[arg(
+            short,
+            long,
+            help = "Agent version to use (e.g., 'base', 'v1')",
+            long_help = "Specify which agent version to use for this session."
+        )]
+        agent: Option<String>,
+
         /// Resume a previous run
         #[arg(
             short,
@@ -164,7 +178,7 @@ enum Command {
     },
 
     /// List available agent versions
-    Agent(AgentCommand),
+    Agents(AgentCommand),
 }
 
 #[derive(Subcommand)]
@@ -206,20 +220,6 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
-    // Validate agent version
-    if !AgentFactory::available_versions().contains(&cli.agent.as_str()) {
-        eprintln!("Error: Invalid agent version '{}'", cli.agent);
-        eprintln!("Available versions:");
-        for version in AgentFactory::available_versions() {
-            if version == AgentFactory::default_version() {
-                eprintln!("* {} (default)", version);
-            } else {
-                eprintln!("  {}", version);
-            }
-        }
-        std::process::exit(1);
-    }
-
     match cli.command {
         Some(Command::Configure {
             profile_name,
@@ -242,10 +242,25 @@ async fn main() -> Result<()> {
         Some(Command::Session {
             name,
             profile,
+            agent,
             resume,
         }) => {
-            let mut session = build_session(name, profile, resume);
-            session.agent_version = cli.agent;
+            if let Some(agent_version) = agent.clone() {
+                if !AgentFactory::available_versions().contains(&agent_version.as_str()) {
+                    eprintln!("Error: Invalid agent version '{}'", agent_version);
+                    eprintln!("Available versions:");
+                    for version in AgentFactory::available_versions() {
+                        if version == AgentFactory::default_version() {
+                            eprintln!("* {} (default)", version);
+                        } else {
+                            eprintln!("  {}", version);
+                        }
+                    }
+                    std::process::exit(1);
+                }
+            }
+
+            let mut session = build_session(name, profile, agent, resume);
             let _ = session.start().await;
             return Ok(());
         }
@@ -254,8 +269,24 @@ async fn main() -> Result<()> {
             input_text,
             profile,
             name,
+            agent,
             resume,
         }) => {
+            if let Some(agent_version) = agent.clone() {
+                if !AgentFactory::available_versions().contains(&agent_version.as_str()) {
+                    eprintln!("Error: Invalid agent version '{}'", agent_version);
+                    eprintln!("Available versions:");
+                    for version in AgentFactory::available_versions() {
+                        if version == AgentFactory::default_version() {
+                            eprintln!("* {} (default)", version);
+                        } else {
+                            eprintln!("  {}", version);
+                        }
+                    }
+                    std::process::exit(1);
+                }
+            }
+
             let contents = if let Some(file_name) = instructions {
                 let file_path = std::path::Path::new(&file_name);
                 std::fs::read_to_string(file_path).expect("Failed to read the instruction file")
@@ -268,12 +299,11 @@ async fn main() -> Result<()> {
                     .expect("Failed to read from stdin");
                 stdin
             };
-            let mut session = build_session(name, profile, resume);
-            session.agent_version = cli.agent;
+            let mut session = build_session(name, profile, agent, resume);
             let _ = session.headless_start(contents.clone()).await;
             return Ok(());
         }
-        Some(Command::Agent(cmd)) => {
+        Some(Command::Agents(cmd)) => {
             cmd.run()?;
             return Ok(());
         }

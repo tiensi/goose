@@ -102,6 +102,7 @@ pub struct Session<'a> {
     messages: Vec<Message>,
 }
 
+#[allow(dead_code)]
 impl<'a> Session<'a> {
     pub fn new(
         agent: Box<dyn Agent>,
