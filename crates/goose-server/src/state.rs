@@ -1,7 +1,8 @@
 use anyhow::Result;
 use goose::providers::configs::GroqProviderConfig;
 use goose::{
-    agents::BaseAgent as Agent,
+    agents::AgentFactory,
+    agents::Agent,
     developer::DeveloperSystem,
     memory::MemorySystem,
     providers::{configs::ProviderConfig, factory},
@@ -13,14 +14,16 @@ use tokio::sync::Mutex;
 /// Shared application state
 pub struct AppState {
     pub provider_config: ProviderConfig,
-    pub agent: Arc<Mutex<Agent>>,
+    pub agent: Arc<Mutex<Box<dyn Agent>>>,
     pub secret_key: String,
+    pub agent_version: String,
 }
 
 impl AppState {
-    pub fn new(provider_config: ProviderConfig, secret_key: String) -> Result<Self> {
+    pub fn new(provider_config: ProviderConfig, secret_key: String, agent_version: Option<String>) -> Result<Self> {
         let provider = factory::get_provider(provider_config.clone())?;
-        let mut agent = Agent::new(provider);
+        let mut agent = AgentFactory::create(agent_version.clone().unwrap_or(AgentFactory::default_version().to_string()).as_str(), provider)?;
+
         agent.add_system(Box::new(DeveloperSystem::new()));
 
         // Add memory system only if GOOSE_SERVER__MEMORY is set to "true"
@@ -37,6 +40,7 @@ impl AppState {
             provider_config,
             agent: Arc::new(Mutex::new(agent)),
             secret_key,
+            agent_version: agent_version.clone().unwrap_or(AgentFactory::default_version().to_string()),
         })
     }
 }
@@ -89,6 +93,7 @@ impl Clone for AppState {
             },
             agent: self.agent.clone(),
             secret_key: self.secret_key.clone(),
+            agent_version: self.agent_version.clone(),
         }
     }
 }
