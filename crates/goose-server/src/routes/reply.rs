@@ -8,6 +8,7 @@ use axum::{
 };
 use bytes::Bytes;
 use futures::{stream::StreamExt, Stream};
+use goose::agents::Agent;
 use goose::message::{Message, MessageContent};
 use mcp_core::{content::Content, role::Role};
 use serde::Deserialize;
@@ -21,7 +22,6 @@ use std::{
 use tokio::sync::mpsc;
 use tokio::time::timeout;
 use tokio_stream::wrappers::ReceiverStream;
-use goose::agents::Agent;
 
 // Types matching the incoming JSON structure
 #[derive(Debug, Deserialize)]

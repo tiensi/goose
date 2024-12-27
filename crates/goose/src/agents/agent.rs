@@ -74,10 +74,10 @@ pub trait Agent: Send + Sync {
 
     /// Get the systems this agent has access to
     fn get_systems(&self) -> &Vec<Box<dyn System>>;
-    
+
     /// Get the provider for this agent
     fn get_provider(&self) -> &Box<dyn Provider>;
-    
+
     /// Get the provider usage statistics
     fn get_provider_usage(&self) -> &Mutex<Vec<ProviderUsage>>;
 
@@ -122,9 +122,10 @@ pub trait Agent: Send + Sync {
             for (system_name, resources) in &resource_content {
                 let mut resource_counts = HashMap::new();
                 for (uri, (_resource, content)) in resources {
-                    let token_count = token_counter
-                        .count_tokens(&content, Some(&self.get_provider().get_model_config().model_name))
-                        as u32;
+                    let token_count = token_counter.count_tokens(
+                        &content,
+                        Some(&self.get_provider().get_model_config().model_name),
+                    ) as u32;
                     resource_counts.insert(uri.clone(), token_count);
                 }
                 system_token_counts.insert(system_name.clone(), resource_counts);
@@ -298,7 +299,7 @@ pub trait Agent: Send + Sync {
     async fn usage(&self) -> Result<Vec<ProviderUsage>> {
         let provider_usage = self.get_provider_usage().lock().await.clone();
         let mut usage_map: HashMap<String, ProviderUsage> = HashMap::new();
-        
+
         provider_usage.iter().for_each(|usage| {
             usage_map
                 .entry(usage.model.clone())
@@ -357,8 +358,7 @@ pub trait Agent: Send + Sync {
             .collect();
 
         context.insert("systems", systems_info);
-        load_prompt_file("system.md", &context)
-            .map_err(|e| AgentError::Internal(e.to_string()))
+        load_prompt_file("system.md", &context).map_err(|e| AgentError::Internal(e.to_string()))
     }
 
     /// Find the appropriate system for a tool call based on the prefixed name

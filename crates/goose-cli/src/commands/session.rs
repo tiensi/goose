@@ -4,11 +4,11 @@ use rand::{distributions::Alphanumeric, Rng};
 use std::path::{Path, PathBuf};
 use std::process;
 
+use crate::agents::agent::GooseAgent;
 use crate::profile::{get_provider_config, load_profiles, Profile};
 use crate::prompt::rustyline::RustylinePrompt;
 use crate::prompt::Prompt;
 use crate::session::{ensure_session_dir, get_most_recent_session, Session};
-use crate::agents::agent::GooseAgent;
 
 pub fn build_session<'a>(
     session: Option<String>,

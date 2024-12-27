@@ -3,11 +3,14 @@ use std::vec;
 use anyhow::Result;
 use async_trait::async_trait;
 use futures::stream::BoxStream;
-use goose::{agents::Agent, message::Message, providers::base::{Provider, ProviderUsage}, systems::System};
 use goose::providers::mock::MockProvider;
+use goose::{
+    agents::Agent,
+    message::Message,
+    providers::base::{Provider, ProviderUsage},
+    systems::System,
+};
 use tokio::sync::Mutex;
-
-
 
 pub struct MockAgent {
     systems: Vec<Box<dyn System>>,

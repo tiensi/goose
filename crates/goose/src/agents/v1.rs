@@ -1,6 +1,6 @@
+use anyhow::Result;
 use async_trait::async_trait;
 use tokio::sync::Mutex;
-use anyhow::Result;
 
 use super::Agent;
 use crate::errors::AgentResult;

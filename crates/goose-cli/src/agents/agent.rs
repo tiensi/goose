@@ -1,10 +1,10 @@
 // use anyhow::Result;
 use async_trait::async_trait;
 // use futures::stream::BoxStream;
-use tokio::sync::Mutex;
 use goose::{
-    agents::Agent, providers::base::ProviderUsage, systems::System, providers::base::Provider
+    agents::Agent, providers::base::Provider, providers::base::ProviderUsage, systems::System,
 };
+use tokio::sync::Mutex;
 
 pub struct GooseAgent {
     systems: Vec<Box<dyn System>>,

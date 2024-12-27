@@ -129,7 +129,10 @@ mod tests {
 
         async fn read_resource(&self, uri: &str) -> crate::errors::AgentResult<String> {
             self.resource_content.get(uri).cloned().ok_or_else(|| {
-                crate::errors::AgentError::InvalidParameters(format!("Resource {} could not be found", uri))
+                crate::errors::AgentError::InvalidParameters(format!(
+                    "Resource {} could not be found",
+                    uri
+                ))
             })
         }
     }

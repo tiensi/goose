@@ -9,10 +9,10 @@ use std::path::PathBuf;
 // use crate::agents::agent::Agent;
 use crate::log_usage::log_usage;
 use crate::prompt::{InputType, Prompt};
+use goose::agents::Agent;
 use goose::developer::DeveloperSystem;
 use goose::message::{Message, MessageContent};
 use goose::systems::goose_hints::GooseHintsSystem;
-use goose::agents::Agent;
 use mcp_core::role::Role;
 
 // File management functions
