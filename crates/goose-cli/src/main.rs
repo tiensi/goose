@@ -1,24 +1,21 @@
-mod commands {
-    pub mod configure;
-    pub mod session;
-    pub mod version;
-}
-pub mod agents;
-mod profile;
-mod prompt;
-pub mod session;
-
-mod systems;
-
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use goose::agents::AgentFactory;
+
+mod agents;
+mod commands;
+mod profile;
+mod prompt;
+mod session;
+mod systems;
+mod log_usage;
+
 use commands::configure::handle_configure;
 use commands::session::build_session;
 use commands::version::print_version;
+use commands::agent_version::AgentCommand;
 use profile::has_no_profiles;
 use std::io::{self, Read};
-
-mod log_usage;
 
 #[cfg(test)]
 mod test_helpers;
@@ -30,6 +27,10 @@ use crate::systems::system_handler::{add_system, remove_system};
 struct Cli {
     #[arg(short = 'v', long = "version")]
     version: bool,
+
+    /// Agent version to use (e.g., 'base', 'v1')
+    #[arg(short = 'a', long = "agent", default_value_t = String::from("base"))]
+    agent: String,
 
     #[command(subcommand)]
     command: Option<Command>,
@@ -161,6 +162,9 @@ enum Command {
         )]
         resume: bool,
     },
+
+    /// List available agent versions
+    Agent(AgentCommand),
 }
 
 #[derive(Subcommand)]
@@ -202,6 +206,20 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
+    // Validate agent version
+    if !AgentFactory::available_versions().contains(&cli.agent.as_str()) {
+        eprintln!("Error: Invalid agent version '{}'", cli.agent);
+        eprintln!("Available versions:");
+        for version in AgentFactory::available_versions() {
+            if version == AgentFactory::default_version() {
+                eprintln!("* {} (default)", version);
+            } else {
+                eprintln!("  {}", version);
+            }
+        }
+        std::process::exit(1);
+    }
+
     match cli.command {
         Some(Command::Configure {
             profile_name,
@@ -227,6 +245,7 @@ async fn main() -> Result<()> {
             resume,
         }) => {
             let mut session = build_session(name, profile, resume);
+            session.agent_version = cli.agent;
             let _ = session.start().await;
             return Ok(());
         }
@@ -250,7 +269,12 @@ async fn main() -> Result<()> {
                 stdin
             };
             let mut session = build_session(name, profile, resume);
+            session.agent_version = cli.agent;
             let _ = session.headless_start(contents.clone()).await;
+            return Ok(());
+        }
+        Some(Command::Agent(cmd)) => {
+            cmd.run()?;
             return Ok(());
         }
         None => {
