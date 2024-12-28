@@ -58,7 +58,7 @@ const checkServerStatus = async (port: number, maxAttempts: number = 30, interva
   return false;
 };
 
-export const startGoosed = async (app, dir=null): Promise<[number, string, string]> => {
+export const startGoosed = async (app, dir=null, env={}): Promise<[number, string, string]> => {
   // In will use this later to determine if we should start process
   const isDev = process.env.NODE_ENV === 'development';
 
@@ -93,13 +93,16 @@ export const startGoosed = async (app, dir=null): Promise<[number, string, strin
     GOOSE_SERVER__PORT: String(port),
 
     GOOSE_SERVER__SECRET_KEY: process.env.GOOSE_SERVER__SECRET_KEY,
+    
+    // Add any additional environment variables passed in
+    ...env
   };
 
   // Merge parent environment with additional environment variables
-  const env = { ...process.env, ...additionalEnv };
+  const processEnv = { ...process.env, ...additionalEnv };
 
   // Spawn the goosed process with the user's home directory as cwd
-  const goosedProcess = spawn(goosedPath, ["agent"], { cwd: dir, env: env, stdio: ["ignore", "pipe", "pipe"] });
+  const goosedProcess = spawn(goosedPath, [], { cwd: dir, env: processEnv, stdio: ["ignore", "pipe", "pipe"] });
 
   goosedProcess.stdout.on('data', (data) => {
     log.info(`goosed stdout for port ${port} and dir ${dir}: ${data.toString()}`);

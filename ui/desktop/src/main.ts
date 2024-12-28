@@ -115,12 +115,13 @@ const createLauncher = () => {
   });
 };
 
-
 // Track windows by ID
 let windowCounter = 0;
 const windowMap = new Map<number, BrowserWindow>();
 
-const createChat = async (app, query?: string, dir?: string) => {
+const createChat = async (app, query?: string, dir?: string, version?: string) => {
+  const env = version ? { GOOSE_AGENT_VERSION: version } : {};
+
   // Apply current environment settings before creating chat
   updateEnvironmentVariables(envToggles);
 
@@ -133,6 +134,7 @@ const createChat = async (app, query?: string, dir?: string) => {
   }
 
   const [port, working_dir, agentVersion] = await maybeStartGoosed();
+
   const mainWindow = new BrowserWindow({
     titleBarStyle: 'hidden',
     trafficLightPosition: { x: 16, y: 10 },
@@ -213,7 +215,6 @@ const createTray = () => {
   tray.setToolTip('Goose');
   tray.setContextMenu(contextMenu);
 };
-
 
 const showWindow = () => {
   const windows = BrowserWindow.getAllWindows();
@@ -380,8 +381,8 @@ app.whenReady().then(async () => {
     }
   });
 
-  ipcMain.on('create-chat-window', (_, query) => {
-    createChat(app, query);
+  ipcMain.on('create-chat-window', (_, query, dir, version) => {
+    createChat(app, query, dir, version);
   });
 
   ipcMain.on('directory-chooser', (_, replace: boolean = false) => {

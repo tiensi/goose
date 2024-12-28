@@ -1,11 +1,14 @@
-import React, {useState, useEffect} from 'react';
-import {Popover, PopoverContent, PopoverTrigger} from './ui/popover';
-import VertDots from './ui/VertDots';
-import {FaSun, FaMoon} from 'react-icons/fa';
+import { useEffect, useState } from 'react';
 
+interface VersionInfo {
+    current_version: string;
+    available_versions: string[];
+}
 
 export default function MoreMenu() {
     const [open, setOpen] = useState(false);
+    const [versions, setVersions] = useState<VersionInfo | null>(null);
+    const [showVersions, setShowVersions] = useState(false);
 
     const [useSystemTheme, setUseSystemTheme] = useState(() =>
         localStorage.getItem('use_system_theme') === 'true'
@@ -19,6 +22,27 @@ export default function MoreMenu() {
         const savedTheme = localStorage.getItem('theme');
         return savedTheme ? savedTheme === 'dark' : systemPrefersDark;
     });
+
+    useEffect(() => {
+        // Fetch available versions when the menu opens
+        const fetchVersions = async () => {
+            try {
+                const port = window.appConfig.get("GOOSE_SERVER__PORT");
+                const response = await fetch(`http://127.0.0.1:${port}/api/agent/versions`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                setVersions(data);
+            } catch (error) {
+                console.error('Failed to fetch versions:', error);
+            }
+        };
+        
+        if (open) {
+            fetchVersions();
+        }
+    }, [open]);
 
     useEffect(() => {
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -76,6 +100,13 @@ export default function MoreMenu() {
         // If disabling system theme, keep current theme state but don't update localStorage yet
     };
 
+    const handleVersionSelect = (version: string) => {
+        setOpen(false);
+        setShowVersions(false);
+        // Create a new chat window with the selected version
+        window.electron.createChatWindow(undefined, undefined, version);
+    };
+
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
@@ -84,7 +115,7 @@ export default function MoreMenu() {
                     <VertDots size={18}/>
                 </button>
             </PopoverTrigger>
-            <PopoverContent className="w-48 rounded-md">
+            <PopoverContent className="w-48 rounded-md" align="end">
                 <div className="flex flex-col bg-black text-white dark:bg-gray-800 rounded-md">
                     <div className="flex items-center justify-between p-2">
                         <span className="text-sm">Use System Theme</span>
@@ -101,21 +132,50 @@ export default function MoreMenu() {
                                 ? 'bg-gray-600 border-gray-600'
                                 : 'bg-yellow-300 border-yellow-300'}`}
                             onClick={() => toggleTheme()}>
-              <span
-                  className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform ${isDarkMode
-                      ? 'translate-x-6' : 'translate-x-1'}`}
-              >
-                {isDarkMode ? <FaMoon className="text-gray-200"/> : <FaSun
-                    className="text-yellow-500"/>}
-              </span>
+                            <span
+                                className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform ${isDarkMode
+                                    ? 'translate-x-6' : 'translate-x-1'}`}
+                            >
+                                {isDarkMode ? <FaMoon className="text-gray-200"/> : <FaSun
+                                    className="text-yellow-500"/>}
+                            </span>
                         </button>
                     </div>)}
+                    
+                    {/* Versions Menu */}
+                    {versions && versions.available_versions.length > 0 && (
+                        <>
+                            <button
+                                onClick={() => setShowVersions(!showVersions)}
+                                className="w-full text-left px-2 py-1.5 text-sm hover:bg-gray-700 flex justify-between items-center"
+                            >
+                                <span>Versions</span>
+                                <span className="text-xs">{showVersions ? '▼' : '▶'}</span>
+                            </button>
+                            {showVersions && (
+                                <div className="pl-2 bg-gray-900">
+                                    {versions.available_versions.map((version) => (
+                                        <button
+                                            key={version}
+                                            onClick={() => handleVersionSelect(version)}
+                                            className={`w-full text-left px-2 py-1.5 text-sm hover:bg-gray-700 ${
+                                                version === versions.current_version ? 'text-green-400' : ''
+                                            }`}
+                                        >
+                                            {version} {version === versions.current_version && '(current)'}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </>
+                    )}
+                    
                     <button
                         onClick={() => {
                             setOpen(false);
                             window.electron.directoryChooser();
                         }}
-                        className="w-full text-left px-2 py-1.5 text-sm"
+                        className="w-full text-left px-2 py-1.5 text-sm hover:bg-gray-700"
                     >
                         Open Directory (cmd+O)
                     </button>
@@ -124,7 +184,7 @@ export default function MoreMenu() {
                             setOpen(false);
                             window.electron.createChatWindow();
                         }}
-                        className="w-full text-left px-2 py-1.5 text-sm"
+                        className="w-full text-left px-2 py-1.5 text-sm hover:bg-gray-700"
                     >
                         New Session (cmd+N)
                     </button>
