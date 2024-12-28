@@ -1,8 +1,8 @@
 use anyhow::Result;
 use goose::providers::configs::GroqProviderConfig;
 use goose::{
-    agents::AgentFactory,
     agents::Agent,
+    agents::AgentFactory,
     developer::DeveloperSystem,
     memory::MemorySystem,
     providers::{configs::ProviderConfig, factory},
@@ -20,9 +20,19 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(provider_config: ProviderConfig, secret_key: String, agent_version: Option<String>) -> Result<Self> {
+    pub fn new(
+        provider_config: ProviderConfig,
+        secret_key: String,
+        agent_version: Option<String>,
+    ) -> Result<Self> {
         let provider = factory::get_provider(provider_config.clone())?;
-        let mut agent = AgentFactory::create(agent_version.clone().unwrap_or(AgentFactory::default_version().to_string()).as_str(), provider)?;
+        let mut agent = AgentFactory::create(
+            agent_version
+                .clone()
+                .unwrap_or(AgentFactory::default_version().to_string())
+                .as_str(),
+            provider,
+        )?;
 
         agent.add_system(Box::new(DeveloperSystem::new()));
 
@@ -40,7 +50,9 @@ impl AppState {
             provider_config,
             agent: Arc::new(Mutex::new(agent)),
             secret_key,
-            agent_version: agent_version.clone().unwrap_or(AgentFactory::default_version().to_string()),
+            agent_version: agent_version
+                .clone()
+                .unwrap_or(AgentFactory::default_version().to_string()),
         })
     }
 }

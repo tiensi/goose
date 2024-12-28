@@ -224,7 +224,7 @@ pub struct Settings {
 }
 
 fn default_agent_version() -> Option<String> {
-    None  // Will use AgentFactory::default_version() when None
+    None // Will use AgentFactory::default_version() when None
 }
 
 impl Settings {
