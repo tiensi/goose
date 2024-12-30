@@ -41,6 +41,10 @@ impl CounterRouter {
         let counter = self.counter.lock().await;
         Ok(*counter)
     }
+
+    fn _create_resource_text(&self, uri: &str, name: &str) -> Resource {
+        Resource::new(uri, Some("text/plain".to_string()), Some(name.to_string())).unwrap()
+    }
 }
 
 impl Router for CounterRouter {
@@ -112,12 +116,10 @@ impl Router for CounterRouter {
     }
 
     fn list_resources(&self) -> Vec<Resource> {
-        vec![Resource::new(
-            "memo://insights",
-            Some("text/plain".to_string()),
-            Some("memo-resource".to_string()),
-        )
-        .unwrap()]
+        vec![
+            self._create_resource_text("str:////Users/to/some/path/", "cwd"),
+            self._create_resource_text("memo://insights", "memo-name"),
+        ]
     }
 
     fn read_resource(
@@ -127,6 +129,10 @@ impl Router for CounterRouter {
         let uri = uri.to_string();
         Box::pin(async move {
             match uri.as_str() {
+                "str:////Users/to/some/path/" => {
+                    let cwd = "/Users/to/some/path/";
+                    Ok(cwd.to_string())
+                }
                 "memo://insights" => {
                     let memo =
                         "Business Intelligence Memo\n\nAnalysis has revealed 5 key insights ...";

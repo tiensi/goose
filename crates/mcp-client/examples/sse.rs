@@ -12,7 +12,7 @@ async fn main() -> Result<()> {
         .with_env_filter(
             EnvFilter::from_default_env()
                 .add_directive("mcp_client=debug".parse().unwrap())
-                .add_directive("eventsource_client=debug".parse().unwrap()),
+                .add_directive("eventsource_client=info".parse().unwrap()),
         )
         .init();
 
@@ -53,7 +53,15 @@ async fn main() -> Result<()> {
             serde_json::json!({ "message": "Client with SSE transport - calling a tool" }),
         )
         .await?;
-    println!("Tool result: {tool_result:?}");
+    println!("Tool result: {tool_result:?}\n");
+
+    // List resources
+    let resources = client.list_resources().await?;
+    println!("Resources: {resources:?}\n");
+
+    // // Read resource
+    // let resource = client.read_resource("echo://fixedresource").await?;
+    // println!("Resource: {resource:?}\n");
 
     Ok(())
 }

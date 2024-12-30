@@ -69,5 +69,13 @@ async fn main() -> Result<(), ClientError> {
     let get_value_result = client.call_tool("get_value", serde_json::json!({})).await?;
     println!("Tool result for 'get_value': {get_value_result:?}\n");
 
+    // List resources
+    let resources = client.list_resources().await?;
+    println!("Resources: {resources:?}\n");
+
+    // Read resource
+    let resource = client.read_resource("memo://insights").await?;
+    println!("Resource: {resource:?}\n");
+
     Ok(())
 }
