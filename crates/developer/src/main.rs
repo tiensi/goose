@@ -541,9 +541,9 @@ impl DeveloperRouter {
     }
 
     // Implement window listing functionality
-    async fn list_windows(&self, _params: Value) -> AgentResult<Vec<Content>> {
+    async fn list_windows(&self, _params: Value) -> Result<Vec<Content>, ToolError> {
         let windows = Window::all()
-            .map_err(|_| AgentError::ExecutionError("Failed to list windows".into()))?;
+            .map_err(|_| ToolError::ExecutionError("Failed to list windows".into()))?;
 
         let window_titles: Vec<String> = windows
             .into_iter()
@@ -558,24 +558,24 @@ impl DeveloperRouter {
         ])
     }
 
-    async fn screen_capture(&self, params: Value) -> AgentResult<Vec<Content>> {
+    async fn screen_capture(&self, params: Value) -> Result<Vec<Content>, ToolError> {
         let mut image = if let Some(window_title) = params.get("window_title").and_then(|v| v.as_str()) {
             // Try to find and capture the specified window
             let windows = Window::all()
-                .map_err(|_| AgentError::ExecutionError("Failed to list windows".into()))?;
+                .map_err(|_| ToolError::ExecutionError("Failed to list windows".into()))?;
 
             let window = windows
                 .into_iter()
                 .find(|w| w.title() == window_title)
                 .ok_or_else(|| {
-                    AgentError::ExecutionError(format!(
+                    ToolError::ExecutionError(format!(
                         "No window found with title '{}'",
                         window_title
                     ))
                 })?;
 
             window.capture_image().map_err(|e| {
-                AgentError::ExecutionError(format!(
+                ToolError::ExecutionError(format!(
                     "Failed to capture window '{}': {}",
                     window_title, e
                 ))
@@ -585,9 +585,9 @@ impl DeveloperRouter {
             let display = params.get("display").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
 
             let monitors = Monitor::all()
-                .map_err(|_| AgentError::ExecutionError("Failed to access monitors".into()))?;
+                .map_err(|_| ToolError::ExecutionError("Failed to access monitors".into()))?;
             let monitor = monitors.get(display).ok_or_else(|| {
-                AgentError::ExecutionError(format!(
+                ToolError::ExecutionError(format!(
                     "{} was not an available monitor, {} found.",
                     display,
                     monitors.len()
@@ -595,7 +595,7 @@ impl DeveloperRouter {
             })?;
 
             monitor.capture_image().map_err(|e| {
-                AgentError::ExecutionError(format!("Failed to capture display {}: {}", display, e))
+                ToolError::ExecutionError(format!("Failed to capture display {}: {}", display, e))
             })?
         };
 
@@ -616,7 +616,7 @@ impl DeveloperRouter {
         image
             .write_to(&mut Cursor::new(&mut bytes), xcap::image::ImageFormat::Png)
             .map_err(|e| {
-                AgentError::ExecutionError(format!("Failed to write image buffer {}", e))
+                ToolError::ExecutionError(format!("Failed to write image buffer {}", e))
             })?;
 
         // Convert to base64
@@ -701,12 +701,12 @@ impl DeveloperRouter {
     // Add this helper function similar to the other tool calls
     async fn call_list_windows(&self, args: Value) -> Result<Value, ToolError> {
         let result = self.list_windows(args).await;
-        self.map_agent_result_to_value(result)
+        self.map_result_to_value(result)
     }
 
     async fn call_screen_capture(&self, args: Value) -> Result<Value, ToolError> {
         let result = self.screen_capture(args).await;
-        self.map_agent_result_to_value(result)
+        self.map_result_to_value(result)
     }
 }
 
