@@ -1,4 +1,4 @@
-mod errors;
+
 mod lang;
 mod process_store;
 
@@ -25,7 +25,7 @@ use mcp_core::{
 };
 use mcp_server::router::{CapabilitiesBuilder, RouterService};
 
-use crate::errors::{AgentError, AgentResult};
+
 use mcp_core::content::Content;
 use mcp_core::role::Role;
 
@@ -134,21 +134,10 @@ impl DeveloperRouter {
         }
     }
 
-    // Example utility function to call the underlying logic
-    async fn call_bash(&self, args: Value) -> Result<Value, ToolError> {
-        let result = self.bash(args).await; // adapt your logic from DeveloperSystem
-        self.map_agent_result_to_value(result)
-    }
-
-    async fn call_text_editor(&self, args: Value) -> Result<Value, ToolError> {
-        let result = self.text_editor(args).await; // adapt from DeveloperSystem
-        self.map_agent_result_to_value(result)
-    }
-
-    // Convert AgentResult<Vec<Content>> to Result<Value, ToolError>
-    fn map_agent_result_to_value(
+    /// Helper method to map the result of a tool call to a JSON value
+    fn map_result_to_value(
         &self,
-        result: AgentResult<Vec<Content>>,
+        result: Result<Vec<Content>, ToolError>,
     ) -> Result<Value, ToolError> {
         match result {
             Ok(contents) => {
@@ -164,12 +153,22 @@ impl DeveloperRouter {
                     .collect();
                 Ok(json!({"messages": messages}))
             }
-            Err(e) => Err(e.into()),
+            Err(e) => Err(e),
         }
     }
 
+    async fn call_bash(&self, args: Value) -> Result<Value, ToolError> {
+        let result = self.bash(args).await;
+        self.map_result_to_value(result)
+    }
+
+    async fn call_text_editor(&self, args: Value) -> Result<Value, ToolError> {
+        let result = self.text_editor(args).await;
+        self.map_result_to_value(result)
+    }
+
     // Helper method to resolve a path relative to cwd
-    fn resolve_path(&self, path_str: &str) -> AgentResult<PathBuf> {
+    fn resolve_path(&self, path_str: &str) -> Result<PathBuf, ToolError> {
         let cwd = self.cwd.lock().unwrap();
         let expanded = shellexpand::tilde(path_str);
         let path = Path::new(expanded.as_ref());
@@ -183,18 +182,18 @@ impl DeveloperRouter {
     }
 
     // Implement bash tool functionality
-    async fn bash(&self, params: Value) -> AgentResult<Vec<Content>> {
+    async fn bash(&self, params: Value) -> Result<Vec<Content>, ToolError> {
         let command =
             params
                 .get("command")
                 .and_then(|v| v.as_str())
-                .ok_or(AgentError::InvalidParameters(
-                    "The command string is required".into(),
+                .ok_or(ToolError::InvalidParameters(
+                    "The command string is required".to_string(),
                 ))?;
 
         // Disallow commands that should use other tools
         if command.trim_start().starts_with("cat") {
-            return Err(AgentError::InvalidParameters(
+            return Err(ToolError::InvalidParameters(
                 "Do not use `cat` to read files, use the view mode on the text editor tool"
                     .to_string(),
             ));
@@ -212,7 +211,7 @@ impl DeveloperRouter {
             .arg("-c")
             .arg(cmd_with_redirect)
             .spawn()
-            .map_err(|e| AgentError::ExecutionError(e.to_string()))?;
+            .map_err(|e| ToolError::ExecutionError(e.to_string()))?;
 
         // Store the process ID with the command as the key
         let pid: Option<u32> = child.id();
@@ -224,7 +223,7 @@ impl DeveloperRouter {
         let output = child
             .wait_with_output()
             .await
-            .map_err(|e| AgentError::ExecutionError(e.to_string()))?;
+            .map_err(|e| ToolError::ExecutionError(e.to_string()))?;
 
         // Remove the process ID from the store
         if let Some(pid) = pid {
@@ -245,16 +244,16 @@ impl DeveloperRouter {
     }
 
     // Implement text_editor tool functionality
-    async fn text_editor(&self, params: Value) -> AgentResult<Vec<Content>> {
+    async fn text_editor(&self, params: Value) -> Result<Vec<Content>, ToolError> {
         let command = params
             .get("command")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| AgentError::InvalidParameters("Missing 'command' parameter".into()))?;
+            .ok_or_else(|| ToolError::InvalidParameters("Missing 'command' parameter".to_string()))?;
 
         let path_str = params
             .get("path")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| AgentError::InvalidParameters("Missing 'path' parameter".into()))?;
+            .ok_or_else(|| ToolError::InvalidParameters("Missing 'path' parameter".into()))?;
 
         let path = self.resolve_path(path_str)?;
 
@@ -265,7 +264,7 @@ impl DeveloperRouter {
                     .get("file_text")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| {
-                        AgentError::InvalidParameters("Missing 'file_text' parameter".into())
+                        ToolError::InvalidParameters("Missing 'file_text' parameter".into())
                     })?;
 
                 self.text_editor_write(&path, file_text).await
@@ -275,26 +274,26 @@ impl DeveloperRouter {
                     .get("old_str")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| {
-                        AgentError::InvalidParameters("Missing 'old_str' parameter".into())
+                        ToolError::InvalidParameters("Missing 'old_str' parameter".into())
                     })?;
                 let new_str = params
                     .get("new_str")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| {
-                        AgentError::InvalidParameters("Missing 'new_str' parameter".into())
+                        ToolError::InvalidParameters("Missing 'new_str' parameter".into())
                     })?;
 
                 self.text_editor_replace(&path, old_str, new_str).await
             }
             "undo_edit" => self.text_editor_undo(&path).await,
-            _ => Err(AgentError::InvalidParameters(format!(
+            _ => Err(ToolError::InvalidParameters(format!(
                 "Unknown command '{}'",
                 command
             ))),
         }
     }
 
-    async fn text_editor_view(&self, path: &PathBuf) -> AgentResult<Vec<Content>> {
+    async fn text_editor_view(&self, path: &PathBuf) -> Result<Vec<Content>, ToolError> {
         if path.is_file() {
             // Check file size first (2MB limit)
             const MAX_FILE_SIZE: u64 = 2 * 1024 * 1024; // 2MB in bytes
@@ -302,12 +301,12 @@ impl DeveloperRouter {
 
             let file_size = std::fs::metadata(path)
                 .map_err(|e| {
-                    AgentError::ExecutionError(format!("Failed to get file metadata: {}", e))
+                    ToolError::ExecutionError(format!("Failed to get file metadata: {}", e))
                 })?
                 .len();
 
             if file_size > MAX_FILE_SIZE {
-                return Err(AgentError::ExecutionError(format!(
+                return Err(ToolError::ExecutionError(format!(
                     "File '{}' is too large ({:.2}MB). Maximum size is 2MB to prevent memory issues.",
                     path.display(),
                     file_size as f64 / 1024.0 / 1024.0
@@ -316,16 +315,16 @@ impl DeveloperRouter {
 
             // Create a new resource and add it to active_resources
             let uri = Url::from_file_path(path)
-                .map_err(|_| AgentError::ExecutionError("Invalid file path".into()))?
+                .map_err(|_| ToolError::ExecutionError("Invalid file path".into()))?
                 .to_string();
 
             // Read the content once
             let content = std::fs::read_to_string(path)
-                .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?;
+                .map_err(|e| ToolError::ExecutionError(format!("Failed to read file: {}", e)))?;
 
             let char_count = content.chars().count();
             if char_count > MAX_CHAR_COUNT {
-                return Err(AgentError::ExecutionError(format!(
+                return Err(ToolError::ExecutionError(format!(
                     "File '{}' has too many characters ({}). Maximum character count is {}.",
                     path.display(),
                     char_count,
@@ -336,7 +335,7 @@ impl DeveloperRouter {
             // Create and store the resource
             let resource =
                 Resource::new(uri.clone(), Some("text".to_string()), None).map_err(|e| {
-                    AgentError::ExecutionError(format!("Failed to create resource: {}", e))
+                    ToolError::ExecutionError(format!("Failed to create resource: {}", e))
                 })?;
 
             self.active_resources.lock().unwrap().insert(uri, resource);
@@ -366,7 +365,7 @@ impl DeveloperRouter {
                     .with_priority(0.0),
             ])
         } else {
-            Err(AgentError::ExecutionError(format!(
+            Err(ToolError::ExecutionError(format!(
                 "The path '{}' does not exist or is not a file.",
                 path.display()
             )))
@@ -377,15 +376,15 @@ impl DeveloperRouter {
         &self,
         path: &PathBuf,
         file_text: &str,
-    ) -> AgentResult<Vec<Content>> {
+    ) -> Result<Vec<Content>, ToolError> {
         // Get the URI for the file
         let uri = Url::from_file_path(path)
-            .map_err(|_| AgentError::ExecutionError("Invalid file path".into()))?
+            .map_err(|_| ToolError::ExecutionError("Invalid file path".into()))?
             .to_string();
 
         // Check if file already exists and is active
         if path.exists() && !self.active_resources.lock().unwrap().contains_key(&uri) {
-            return Err(AgentError::InvalidParameters(format!(
+            return Err(ToolError::InvalidParameters(format!(
                 "File '{}' exists but is not active. View it first before overwriting.",
                 path.display()
             )));
@@ -396,12 +395,12 @@ impl DeveloperRouter {
 
         // Write to the file
         std::fs::write(path, file_text)
-            .map_err(|e| AgentError::ExecutionError(format!("Failed to write file: {}", e)))?;
+            .map_err(|e| ToolError::ExecutionError(format!("Failed to write file: {}", e)))?;
 
         // Create and store resource
 
         let resource = Resource::new(uri.clone(), Some("text".to_string()), None)
-            .map_err(|e| AgentError::ExecutionError(e.to_string()))?;
+            .map_err(|e| ToolError::ExecutionError(e.to_string()))?;
         self.active_resources.lock().unwrap().insert(uri, resource);
 
         // Try to detect the language from the file extension
@@ -430,21 +429,21 @@ impl DeveloperRouter {
         path: &PathBuf,
         old_str: &str,
         new_str: &str,
-    ) -> AgentResult<Vec<Content>> {
+    ) -> Result<Vec<Content>, ToolError> {
         // Get the URI for the file
         let uri = Url::from_file_path(path)
-            .map_err(|_| AgentError::ExecutionError("Invalid file path".into()))?
+            .map_err(|_| ToolError::ExecutionError("Invalid file path".into()))?
             .to_string();
 
         // Check if file exists and is active
         if !path.exists() {
-            return Err(AgentError::InvalidParameters(format!(
+            return Err(ToolError::InvalidParameters(format!(
                 "File '{}' does not exist",
                 path.display()
             )));
         }
         if !self.active_resources.lock().unwrap().contains_key(&uri) {
-            return Err(AgentError::InvalidParameters(format!(
+            return Err(ToolError::InvalidParameters(format!(
                 "You must view '{}' before editing it",
                 path.display()
             )));
@@ -452,17 +451,17 @@ impl DeveloperRouter {
 
         // Read content
         let content = std::fs::read_to_string(path)
-            .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?;
+            .map_err(|e| ToolError::ExecutionError(format!("Failed to read file: {}", e)))?;
 
         // Ensure 'old_str' appears exactly once
         if content.matches(old_str).count() > 1 {
-            return Err(AgentError::InvalidParameters(
+            return Err(ToolError::InvalidParameters(
                 "'old_str' must appear exactly once in the file, but it appears multiple times"
                     .into(),
             ));
         }
         if content.matches(old_str).count() == 0 {
-            return Err(AgentError::InvalidParameters(
+            return Err(ToolError::InvalidParameters(
                 "'old_str' must appear exactly once in the file, but it does not appear in the file. Make sure the string exactly matches existing file content, including spacing.".into(),
             ));
         }
@@ -473,7 +472,7 @@ impl DeveloperRouter {
         // Replace and write back
         let new_content = content.replace(old_str, new_str);
         std::fs::write(path, &new_content)
-            .map_err(|e| AgentError::ExecutionError(format!("Failed to write file: {}", e)))?;
+            .map_err(|e| ToolError::ExecutionError(format!("Failed to write file: {}", e)))?;
 
         // Update resource
         if let Some(resource) = self.active_resources.lock().unwrap().get_mut(&uri) {
@@ -508,32 +507,32 @@ impl DeveloperRouter {
         ])
     }
 
-    async fn text_editor_undo(&self, path: &PathBuf) -> AgentResult<Vec<Content>> {
+    async fn text_editor_undo(&self, path: &PathBuf) -> Result<Vec<Content>, ToolError> {
         let mut history = self.file_history.lock().unwrap();
         if let Some(contents) = history.get_mut(path) {
             if let Some(previous_content) = contents.pop() {
                 // Write previous content back to file
                 std::fs::write(path, previous_content).map_err(|e| {
-                    AgentError::ExecutionError(format!("Failed to write file: {}", e))
+                    ToolError::ExecutionError(format!("Failed to write file: {}", e))
                 })?;
                 Ok(vec![Content::text("Undid the last edit")])
             } else {
-                Err(AgentError::InvalidParameters(
+                Err(ToolError::InvalidParameters(
                     "No edit history available to undo".into(),
                 ))
             }
         } else {
-            Err(AgentError::InvalidParameters(
+            Err(ToolError::InvalidParameters(
                 "No edit history available to undo".into(),
             ))
         }
     }
 
-    fn save_file_history(&self, path: &PathBuf) -> AgentResult<()> {
+    fn save_file_history(&self, path: &PathBuf) -> Result<(), ToolError> {
         let mut history = self.file_history.lock().unwrap();
         let content = if path.exists() {
             std::fs::read_to_string(path)
-                .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?
+                .map_err(|e| ToolError::ExecutionError(format!("Failed to read file: {}", e)))?
         } else {
             String::new()
         };
@@ -631,26 +630,26 @@ impl DeveloperRouter {
         ])
     }
 
-    async fn read_resource_internal(&self, uri: &str) -> AgentResult<String> {
+    async fn read_resource_internal(&self, uri: &str) -> Result<String, ResourceError> {
         // Ensure the resource exists in the active resources map
         let active_resources = self.active_resources.lock().unwrap();
         let resource = active_resources
             .get(uri)
-            .ok_or_else(|| AgentError::ToolNotFound(format!("Resource '{}' not found", uri)))?;
+            .ok_or_else(|| ResourceError::NotFound(format!("Resource '{}' not found", uri)))?;
 
         let url = Url::parse(uri)
-            .map_err(|e| AgentError::InvalidParameters(format!("Invalid URI: {}", e)))?;
+            .map_err(|e| ResourceError::NotFound(format!("Invalid URI: {}", e)))?;
 
         // Read content based on scheme and mime_type
         match url.scheme() {
             "file" => {
                 let path = url.to_file_path().map_err(|_| {
-                    AgentError::InvalidParameters("Invalid file path in URI".into())
+                    ResourceError::NotFound("Invalid file path in URI".into())
                 })?;
 
                 // Ensure file exists
                 if !path.exists() {
-                    return Err(AgentError::ExecutionError(format!(
+                    return Err(ResourceError::NotFound(format!(
                         "File does not exist: {}",
                         path.display()
                     )));
@@ -660,17 +659,17 @@ impl DeveloperRouter {
                     "text" => {
                         // Read the file as UTF-8 text
                         fs::read_to_string(&path).map_err(|e| {
-                            AgentError::ExecutionError(format!("Failed to read file: {}", e))
+                            ResourceError::ExecutionError(format!("Failed to read file: {}", e))
                         })
                     }
                     "blob" => {
                         // Read as bytes, base64 encode
                         let bytes = fs::read(&path).map_err(|e| {
-                            AgentError::ExecutionError(format!("Failed to read file: {}", e))
+                            ResourceError::ExecutionError(format!("Failed to read file: {}", e))
                         })?;
                         Ok(base64::prelude::BASE64_STANDARD.encode(bytes))
                     }
-                    mime_type => Err(AgentError::InvalidParameters(format!(
+                    mime_type => Err(ResourceError::ExecutionError(format!(
                         "Unsupported mime type: {}",
                         mime_type
                     ))),
@@ -679,7 +678,7 @@ impl DeveloperRouter {
             "str" => {
                 // For str:// URIs, we only support text
                 if resource.mime_type != "text" {
-                    return Err(AgentError::InvalidParameters(format!(
+                    return Err(ResourceError::ExecutionError(format!(
                         "str:// URI only supports text mime type, got {}",
                         resource.mime_type
                     )));
@@ -688,11 +687,11 @@ impl DeveloperRouter {
                 // The `Url::path()` gives us the portion after `str:///`
                 let content_encoded = url.path().trim_start_matches('/');
                 let decoded = urlencoding::decode(content_encoded).map_err(|e| {
-                    AgentError::ExecutionError(format!("Failed to decode str:// content: {}", e))
+                    ResourceError::ExecutionError(format!("Failed to decode str:// content: {}", e))
                 })?;
                 Ok(decoded.into_owned())
             }
-            scheme => Err(AgentError::InvalidParameters(format!(
+            scheme => Err(ResourceError::NotFound(format!(
                 "Unsupported URI scheme: {}",
                 scheme
             ))),
