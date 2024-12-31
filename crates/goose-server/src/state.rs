@@ -20,7 +20,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(
+    pub async fn new(
         provider_config: ProviderConfig,
         secret_key: String,
         agent_version: Option<String>,
@@ -34,17 +34,17 @@ impl AppState {
             provider,
         )?;
 
-        agent.add_system(Box::new(DeveloperSystem::new()));
+        agent.add_system(Box::new(DeveloperSystem::new())).await?;
 
         // Add memory system only if GOOSE_SERVER__MEMORY is set to "true"
         if let Ok(memory_enabled) = env::var("GOOSE_SERVER__MEMORY") {
             if memory_enabled.to_lowercase() == "true" {
-                agent.add_system(Box::new(MemorySystem::new()));
+                agent.add_system(Box::new(MemorySystem::new())).await?;
             }
         }
 
         let goosehints_system = Box::new(GooseHintsSystem::new());
-        agent.add_system(goosehints_system);
+        agent.add_system(goosehints_system).await?;
 
         Ok(Self {
             provider_config,

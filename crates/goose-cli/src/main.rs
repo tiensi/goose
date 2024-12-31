@@ -95,11 +95,11 @@ enum Command {
         )]
         profile: Option<String>,
 
-        /// Agent version to use (e.g., 'base', 'v1')
+        /// Agent version to use (e.g., 'default', 'v1')
         #[arg(
             short,
             long,
-            help = "Agent version to use (e.g., 'base', 'v1'), defaults to 'base'",
+            help = "Agent version to use (e.g., 'default', 'v1'), defaults to 'default'",
             long_help = "Specify which agent version to use for this session."
         )]
         agent: Option<String>,
@@ -157,11 +157,11 @@ enum Command {
         )]
         name: Option<String>,
 
-        /// Agent version to use (e.g., 'base', 'v1')
+        /// Agent version to use (e.g., 'default', 'v1')
         #[arg(
             short,
             long,
-            help = "Agent version to use (e.g., 'base', 'v1')",
+            help = "Agent version to use (e.g., 'default', 'v1')",
             long_help = "Specify which agent version to use for this session."
         )]
         agent: Option<String>,

@@ -1,15 +1,14 @@
-use std::vec;
-
-use anyhow::Result;
 use async_trait::async_trait;
 use futures::stream::BoxStream;
 use goose::providers::mock::MockProvider;
 use goose::{
     agents::Agent,
+    errors::AgentResult,
     message::Message,
     providers::base::{Provider, ProviderUsage},
     systems::System,
 };
+use serde_json::Value;
 use tokio::sync::Mutex;
 
 pub struct MockAgent {
@@ -30,27 +29,31 @@ impl MockAgent {
 
 #[async_trait]
 impl Agent for MockAgent {
-    fn add_system(&mut self, system: Box<dyn System>) {
+    async fn add_system(&mut self, system: Box<dyn System>) -> AgentResult<()> {
         self.systems.push(system);
+        Ok(())
     }
 
-    fn get_systems(&self) -> &Vec<Box<dyn System>> {
-        &self.systems
+    async fn remove_system(&mut self, name: &str) -> AgentResult<()> {
+        self.systems.retain(|s| s.name() != name);
+        Ok(())
     }
 
-    fn get_provider(&self) -> &Box<dyn Provider> {
-        &self.provider
+    async fn list_systems(&self) -> AgentResult<Vec<(String, String)>> {
+        Ok(self.systems.iter()
+            .map(|s| (s.name().to_string(), s.description().to_string()))
+            .collect())
     }
 
-    fn get_provider_usage(&self) -> &Mutex<Vec<ProviderUsage>> {
-        &self.provider_usage
+    async fn passthrough(&self, _system: &str, _request: Value) -> AgentResult<Value> {
+        Ok(Value::Null)
     }
 
-    async fn reply(&self, _messages: &[Message]) -> Result<BoxStream<'_, Result<Message>>> {
+    async fn reply(&self, _messages: &[Message]) -> anyhow::Result<BoxStream<'_, anyhow::Result<Message>>> {
         Ok(Box::pin(futures::stream::empty()))
     }
 
-    async fn usage(&self) -> Result<Vec<ProviderUsage>> {
+    async fn usage(&self) -> AgentResult<Vec<ProviderUsage>> {
         Ok(vec![ProviderUsage::new(
             "mock".to_string(),
             Default::default(),

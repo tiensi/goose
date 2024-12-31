@@ -1,9 +1,9 @@
 mod agent;
-mod base;
+mod default;
 mod factory;
-mod v1;
+mod mcp_manager;
 
 pub use agent::Agent;
-pub use base::BaseAgent;
+pub use default::DefaultAgent;
 pub use factory::{register_agent, AgentFactory};
-pub use v1::AgentV1;
+pub use mcp_manager::MCPManager;

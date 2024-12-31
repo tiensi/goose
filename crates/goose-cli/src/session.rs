@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use crate::log_usage::log_usage;
 use crate::prompt::{InputType, Prompt};
 use goose::agents::Agent;
+use goose::errors::AgentResult;
 use goose::developer::DeveloperSystem;
 use goose::message::{Message, MessageContent};
 use goose::systems::goose_hints::GooseHintsSystem;
@@ -134,7 +135,7 @@ impl<'a> Session<'a> {
     }
 
     pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.setup_session();
+        self.setup_session().await?;
         self.prompt.goose_ready();
 
         loop {
@@ -162,7 +163,7 @@ impl<'a> Session<'a> {
         &mut self,
         initial_message: String,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        self.setup_session();
+        self.setup_session().await?;
 
         self.messages
             .push(Message::user().with_text(initial_message.as_str()));
@@ -313,11 +314,12 @@ We've removed the conversation up to the most recent user message
         }
     }
 
-    fn setup_session(&mut self) {
+    async fn setup_session(&mut self) -> AgentResult<()> {
         let system = Box::new(DeveloperSystem::new());
-        self.agent.add_system(system);
+        self.agent.add_system(system).await?;
         let goosehints_system = Box::new(GooseHintsSystem::new());
-        self.agent.add_system(goosehints_system);
+        self.agent.add_system(goosehints_system).await?;
+        Ok(())
     }
 
     async fn close_session(&mut self) {
@@ -329,6 +331,7 @@ We've removed the conversation up to the most recent user message
             .as_str(),
         ));
         self.prompt.close();
+        
         match self.agent.usage().await {
             Ok(usage) => log_usage(self.session_file.to_string_lossy().to_string(), usage),
             Err(e) => eprintln!("Failed to collect total provider usage: {}", e),

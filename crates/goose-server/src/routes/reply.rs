@@ -390,7 +390,7 @@ pub fn routes(state: AppState) -> Router {
 mod tests {
     use super::*;
     use goose::{
-        agents::BaseAgent as Agent,
+        agents::DefaultAgent as Agent,
         providers::{
             base::{Provider, ProviderUsage, Usage},
             configs::{ModelConfig, OpenAiProviderConfig},

@@ -58,7 +58,7 @@ impl AgentFactory {
 
     /// Get the default version name
     pub fn default_version() -> &'static str {
-        "base"
+        "default"
     }
 }
 
@@ -81,45 +81,57 @@ macro_rules! register_agent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::providers::base::ProviderUsage;
+    use crate::message::Message;
     use crate::providers::mock::MockProvider;
+    use crate::providers::base::ProviderUsage;
+    use crate::errors::AgentResult;
     use crate::systems::System;
     use async_trait::async_trait;
+    use futures::stream::BoxStream;
+    use serde_json::Value;
     use tokio::sync::Mutex;
 
     // Test agent implementation
     struct TestAgent {
-        systems: Vec<Box<dyn System>>,
-        provider: Box<dyn Provider>,
-        provider_usage: Mutex<Vec<ProviderUsage>>,
+        mcp_manager: Mutex<super::super::MCPManager>,
     }
 
     impl TestAgent {
         fn new(provider: Box<dyn Provider>) -> Self {
             Self {
-                systems: Vec::new(),
-                provider,
-                provider_usage: Mutex::new(Vec::new()),
+                mcp_manager: Mutex::new(super::super::MCPManager::new(provider)),
             }
         }
     }
 
     #[async_trait]
     impl Agent for TestAgent {
-        fn add_system(&mut self, system: Box<dyn System>) {
-            self.systems.push(system);
+        async fn add_system(&mut self, system: Box<dyn System>) -> AgentResult<()> {
+            let mut manager = self.mcp_manager.lock().await;
+            manager.add_system(system);
+            Ok(())
         }
 
-        fn get_systems(&self) -> &Vec<Box<dyn System>> {
-            &self.systems
+        async fn remove_system(&mut self, name: &str) -> AgentResult<()> {
+            let mut manager = self.mcp_manager.lock().await;
+            manager.remove_system(name)
         }
 
-        fn get_provider(&self) -> &Box<dyn Provider> {
-            &self.provider
+        async fn list_systems(&self) -> AgentResult<Vec<(String, String)>> {
+            let manager = self.mcp_manager.lock().await;
+            manager.list_systems().await
         }
 
-        fn get_provider_usage(&self) -> &Mutex<Vec<ProviderUsage>> {
-            &self.provider_usage
+        async fn passthrough(&self, _system: &str, _request: Value) -> AgentResult<Value> {
+            Ok(Value::Null)
+        }
+
+        async fn reply(&self, _messages: &[Message]) -> anyhow::Result<BoxStream<'_, anyhow::Result<Message>>> {
+            Ok(Box::pin(futures::stream::empty()))
+        }
+
+        async fn usage(&self) -> AgentResult<Vec<ProviderUsage>> {
+            Ok(vec![])
         }
     }
 
@@ -175,19 +187,5 @@ mod tests {
 
         // Should still work, last registration wins
         assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_agent_with_provider() {
-        register_agent!("test_provider_check", TestAgent);
-
-        // Create a mock provider with specific configuration
-        let provider = Box::new(MockProvider::new(vec![]));
-
-        // Create an agent instance
-        let agent = AgentFactory::create("test_provider_check", provider).unwrap();
-
-        // Verify the provider is correctly passed to the agent
-        assert_eq!(agent.get_provider().get_model_config().model_name, "mock");
     }
 }
