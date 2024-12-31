@@ -10,6 +10,7 @@ use std::{
     collections::HashMap,
     fs,
     future::Future,
+    io::Cursor,
     path::{Path, PathBuf},
     pin::Pin,
 };
@@ -35,6 +36,7 @@ use tokio::io::{stdin, stdout};
 use tracing::info;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{self, EnvFilter};
+use xcap::{Monitor, Window};
 
 pub struct DeveloperRouter {
     tools: Vec<Tool>,
@@ -79,6 +81,37 @@ impl DeveloperRouter {
             }),
         );
 
+        let list_windows_tool = Tool::new(
+            "list_windows".to_string(),
+            "List all open windows".to_string(),
+            json!({
+                "type": "object",
+                "required": [],
+                "properties": {}
+            }),
+        );
+
+        let screen_capture_tool = Tool::new(
+            "screen_capture".to_string(),
+            "Capture a screenshot of a specified display or window.\nYou can capture either:\n1. A full display (monitor) using the display parameter\n2. A specific window by its title using the window_title parameter\n\nOnly one of display or window_title should be specified.".to_string(),
+            json!({
+                "type": "object",
+                "required": [],
+                "properties": {
+                    "display": {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "The display number to capture (0 is main display)"
+                    },
+                    "window_title": {
+                        "type": "string",
+                        "default": null,
+                        "description": "Optional: the exact title of the window to capture. use the list_windows tool to find the available windows."
+                    }
+                }
+            }),
+        );
+
         let instructions = "Developer instructions...".to_string(); // Reuse from original code
 
         let cwd = std::env::current_dir().unwrap();
@@ -93,7 +126,7 @@ impl DeveloperRouter {
         resources.insert(uri, resource);
 
         Self {
-            tools: vec![bash_tool, text_editor_tool],
+            tools: vec![bash_tool, text_editor_tool, list_windows_tool, screen_capture_tool],
             cwd: Arc::new(Mutex::new(cwd)),
             active_resources: Arc::new(Mutex::new(resources)),
             file_history: Arc::new(Mutex::new(HashMap::new())),
@@ -507,6 +540,96 @@ impl DeveloperRouter {
         Ok(())
     }
 
+    // Implement window listing functionality
+    async fn list_windows(&self, _params: Value) -> Result<Vec<Content>, ToolError> {
+        let windows = Window::all()
+            .map_err(|_| ToolError::ExecutionError("Failed to list windows".into()))?;
+
+        let window_titles: Vec<String> = windows
+            .into_iter()
+            .map(|w| w.title().to_string())
+            .collect();
+
+        Ok(vec![
+            Content::text("The following windows are available.").with_audience(vec![Role::Assistant]),
+            Content::text(format!("Available windows:\n{}", window_titles.join("\n")))
+                .with_audience(vec![Role::User])
+                .with_priority(0.0),
+        ])
+    }
+
+    async fn screen_capture(&self, params: Value) -> Result<Vec<Content>, ToolError> {
+        let mut image = if let Some(window_title) = params.get("window_title").and_then(|v| v.as_str()) {
+            // Try to find and capture the specified window
+            let windows = Window::all()
+                .map_err(|_| ToolError::ExecutionError("Failed to list windows".into()))?;
+
+            let window = windows
+                .into_iter()
+                .find(|w| w.title() == window_title)
+                .ok_or_else(|| {
+                    ToolError::ExecutionError(format!(
+                        "No window found with title '{}'",
+                        window_title
+                    ))
+                })?;
+
+            window.capture_image().map_err(|e| {
+                ToolError::ExecutionError(format!(
+                    "Failed to capture window '{}': {}",
+                    window_title, e
+                ))
+            })?
+        } else {
+            // Default to display capture if no window title is specified
+            let display = params.get("display").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+
+            let monitors = Monitor::all()
+                .map_err(|_| ToolError::ExecutionError("Failed to access monitors".into()))?;
+            let monitor = monitors.get(display).ok_or_else(|| {
+                ToolError::ExecutionError(format!(
+                    "{} was not an available monitor, {} found.",
+                    display,
+                    monitors.len()
+                ))
+            })?;
+
+            monitor.capture_image().map_err(|e| {
+                ToolError::ExecutionError(format!("Failed to capture display {}: {}", display, e))
+            })?
+        };
+
+        // Resize the image to a reasonable width while maintaining aspect ratio
+        let max_width = 768;
+        if image.width() > max_width {
+            let scale = max_width as f32 / image.width() as f32;
+            let new_height = (image.height() as f32 * scale) as u32;
+            image = xcap::image::imageops::resize(
+                &image,
+                max_width,
+                new_height,
+                xcap::image::imageops::FilterType::Lanczos3,
+            )
+        };
+
+        let mut bytes: Vec<u8> = Vec::new();
+        image
+            .write_to(&mut Cursor::new(&mut bytes), xcap::image::ImageFormat::Png)
+            .map_err(|e| {
+                ToolError::ExecutionError(format!("Failed to write image buffer {}", e))
+            })?;
+
+        // Convert to base64
+        let data = base64::prelude::BASE64_STANDARD.encode(bytes);
+
+        Ok(vec![
+            Content::text("Screenshot captured").with_audience(vec![Role::Assistant]),
+            Content::image(data, "image/png")
+                .with_audience(vec![Role::User])
+                .with_priority(0.0)
+        ])
+    }
+
     async fn read_resource_internal(&self, uri: &str) -> Result<String, ResourceError> {
         // Ensure the resource exists in the active resources map
         let active_resources = self.active_resources.lock().unwrap();
@@ -574,6 +697,17 @@ impl DeveloperRouter {
             ))),
         }
     }
+
+    // Add this helper function similar to the other tool calls
+    async fn call_list_windows(&self, args: Value) -> Result<Value, ToolError> {
+        let result = self.list_windows(args).await;
+        self.map_result_to_value(result)
+    }
+
+    async fn call_screen_capture(&self, args: Value) -> Result<Value, ToolError> {
+        let result = self.screen_capture(args).await;
+        self.map_result_to_value(result)
+    }
 }
 
 impl Router for DeveloperRouter {
@@ -600,6 +734,8 @@ impl Router for DeveloperRouter {
             match tool_name.as_str() {
                 "bash" => this.call_bash(arguments).await,
                 "text_editor" => this.call_text_editor(arguments).await,
+                "list_windows" => this.call_list_windows(arguments).await,
+                "screen_capture" => this.call_screen_capture(arguments).await,
                 _ => Err(ToolError::NotFound(format!("Tool {} not found", tool_name))),
             }
         })
