@@ -14,5 +14,7 @@ pub mod utils;
 pub mod google;
 pub mod groq;
 
+pub use factory::get_provider;
+
 #[cfg(test)]
 pub mod mock_server;

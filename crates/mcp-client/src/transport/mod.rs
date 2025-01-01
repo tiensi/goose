@@ -124,6 +124,12 @@ pub struct PendingRequests {
     requests: RwLock<HashMap<String, oneshot::Sender<Result<JsonRpcMessage, Error>>>>,
 }
 
+impl Default for PendingRequests {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PendingRequests {
     pub fn new() -> Self {
         Self {

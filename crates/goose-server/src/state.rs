@@ -2,17 +2,12 @@ use anyhow::Result;
 use goose::{
     agents::Agent,
     agents::AgentFactory,
-    developer::DeveloperSystem,
-    memory::MemorySystem,
     providers::{configs::ProviderConfig, factory},
-    systems::{goose_hints::GooseHintsSystem, non_developer::NonDeveloperSystem},
 };
-use std::{env, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::Mutex;
 
 /// Shared application state
-#[allow(dead_code)]
-#[derive(Clone)]
 pub struct AppState {
     pub provider_config: ProviderConfig,
     pub agent: Arc<Mutex<Box<dyn Agent>>>,
@@ -27,40 +22,14 @@ impl AppState {
         agent_version: Option<String>,
     ) -> Result<Self> {
         let provider = factory::get_provider(provider_config.clone())?;
-        let mut agent = AgentFactory::create(
+        let agent = AgentFactory::create(
             agent_version
                 .clone()
                 .unwrap_or(AgentFactory::default_version().to_string())
                 .as_str(),
             provider,
-        )?;
-
-        agent.add_system(Box::new(DeveloperSystem::new())).await?;
-
-        // Add NonDeveloperSystem only if GOOSE_SERVER__NON_DEVELOPER is set to "true"
-        if let Ok(non_dev_enabled) = env::var("GOOSE_SERVER__NON_DEVELOPER") {
-            if non_dev_enabled.to_lowercase() == "true" {
-                dbg!("Adding NonDeveloperSystem");
-                agent.add_system(Box::new(NonDeveloperSystem::new()));
-            } else {
-                dbg!("Skipping NonDeveloperSystem (GOOSE_SERVER__NON_DEVELOPER not 'true')");
-            }
-        } else {
-            dbg!("Skipping NonDeveloperSystem (GOOSE_SERVER__NON_DEVELOPER not set)");
-        }
-
-        // Add memory system only if GOOSE_SERVER__MEMORY is set to "true"
-        if let Ok(memory_enabled) = env::var("GOOSE_SERVER__MEMORY") {
-            if memory_enabled.to_lowercase() == "true" {
-                agent.add_system(Box::new(MemorySystem::new())).await?;
-            }
-        } else {
-            dbg!("Skipping MemorySystem (GOOSE_SERVER__MEMORY not set)");
-        }
-
-        dbg!("Adding GooseHintsSystem");
-        let goosehints_system = Box::new(GooseHintsSystem::new());
-        agent.add_system(goosehints_system).await?;
+        )
+        .ok_or(anyhow::Error::msg("Invalid agent version requested"))?;
 
         Ok(Self {
             provider_config,
@@ -113,11 +82,13 @@ impl Clone for AppState {
                         model: config.model.clone(),
                     })
                 }
-                ProviderConfig::Groq(config) => ProviderConfig::Groq(GroqProviderConfig {
-                    host: config.host.clone(),
-                    api_key: config.api_key.clone(),
-                    model: config.model.clone(),
-                }),
+                ProviderConfig::Groq(config) => {
+                    ProviderConfig::Groq(goose::providers::configs::GroqProviderConfig {
+                        host: config.host.clone(),
+                        api_key: config.api_key.clone(),
+                        model: config.model.clone(),
+                    })
+                }
             },
             agent: self.agent.clone(),
             secret_key: self.secret_key.clone(),

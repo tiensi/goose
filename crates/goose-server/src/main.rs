@@ -23,7 +23,8 @@ async fn main() -> anyhow::Result<()> {
         settings.provider.into_config(),
         secret_key.clone(),
         settings.agent_version,
-    ).await?;
+    )
+    .await?;
 
     // Create router with CORS support
     let cors = CorsLayer::new()

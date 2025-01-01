@@ -1,9 +1,11 @@
 mod agent;
+mod capabilities;
 mod default;
 mod factory;
-mod mcp_manager;
+mod system;
 
 pub use agent::Agent;
+pub use capabilities::Capabilities;
 pub use default::DefaultAgent;
 pub use factory::{register_agent, AgentFactory};
-pub use mcp_manager::MCPManager;
+pub use system::SystemConfig;

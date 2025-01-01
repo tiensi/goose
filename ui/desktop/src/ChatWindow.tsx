@@ -313,6 +313,33 @@ function ChatContent({
   );
 }
 
+// Function to send the system configuration to the server
+const addSystemConfig = async () => {
+  const systemConfig = {
+    type: "Stdio",
+    cmd: "goose",
+    args: ["server", "--name", "developer"]
+  };
+
+  try {
+    const response = await fetch(getApiUrl('/systems/add'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(systemConfig)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to add system config: ${response.statusText}`);
+    }
+
+    window.electron.logInfo('Successfully added system config');
+  } catch (error) {
+    window.electron.logError('Error adding system config:', error);
+  }
+};
+
 export default function ChatWindow() {
   // Shared function to create a chat window
   const openNewChatWindow = () => {
@@ -379,6 +406,11 @@ export default function ChatWindow() {
     console.log(`Toggle to ${newMode}`);
     setMode(newMode);
   };
+
+  // Initialize system config when window loads
+  useEffect(() => {
+    addSystemConfig();
+  }, []);
 
   window.electron.logInfo('ChatWindow loaded');
 
