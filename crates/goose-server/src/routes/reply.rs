@@ -390,7 +390,7 @@ pub fn routes(state: AppState) -> Router {
 mod tests {
     use super::*;
     use goose::{
-        agent::Agent,
+        agents::DefaultAgent as Agent,
         providers::{
             base::{Provider, ProviderUsage, Usage},
             configs::{ModelConfig, OpenAiProviderConfig},
@@ -422,7 +422,7 @@ mod tests {
             &self.model_config
         }
 
-        fn get_usage(&self, data: &Value) -> anyhow::Result<Usage> {
+        fn get_usage(&self, _data: &Value) -> anyhow::Result<Usage> {
             Ok(Usage::new(None, None, None))
         }
     }
@@ -518,13 +518,14 @@ mod tests {
             });
             let agent = Agent::new(mock_provider);
             let state = AppState {
-                agent: Arc::new(Mutex::new(agent)),
+                agent: Arc::new(Mutex::new(Box::new(agent))),
                 provider_config: ProviderConfig::OpenAi(OpenAiProviderConfig {
                     host: "https://api.openai.com".to_string(),
                     api_key: "test-key".to_string(),
                     model: ModelConfig::new("test-model".to_string()),
                 }),
                 secret_key: "test-secret".to_string(),
+                agent_version: "test-version".to_string(),
             };
 
             // Build router

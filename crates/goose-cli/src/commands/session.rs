@@ -1,5 +1,5 @@
 use console::style;
-use goose::agent::Agent;
+use goose::agents::AgentFactory;
 use goose::providers::factory;
 use rand::{distributions::Alphanumeric, Rng};
 use std::path::{Path, PathBuf};
@@ -13,6 +13,7 @@ use crate::session::{ensure_session_dir, get_most_recent_session, Session};
 pub fn build_session<'a>(
     session: Option<String>,
     profile: Option<String>,
+    agent_version: Option<String>,
     resume: bool,
 ) -> Box<Session<'a>> {
     let session_dir = ensure_session_dir().expect("Failed to create session directory");
@@ -45,7 +46,7 @@ pub fn build_session<'a>(
 
     // TODO: Odd to be prepping the provider rather than having that done in the agent?
     let provider = factory::get_provider(provider_config).unwrap();
-    let agent = Box::new(Agent::new(provider));
+    let agent = AgentFactory::create(agent_version.as_deref().unwrap_or("default"), provider).unwrap();
     let prompt = match std::env::var("GOOSE_INPUT") {
         Ok(val) => match val.as_str() {
             "rustyline" => Box::new(RustylinePrompt::new()) as Box<dyn Prompt>,
@@ -173,7 +174,7 @@ mod tests {
     #[should_panic(expected = "Cannot resume session: file")]
     fn test_resume_nonexistent_session_panics() {
         run_with_tmp_dir(|| {
-            build_session(Some("nonexistent-session".to_string()), None, true);
+            build_session(Some("nonexistent-session".to_string()), None, None, true);
         })
     }
 
@@ -190,7 +191,7 @@ mod tests {
             fs::write(&file2_path, "{}")?;
 
             // Test resuming without a session name
-            let session = build_session(None, None, true);
+            let session = build_session(None, None, None, true);
             assert_eq!(session.session_file().as_path(), file2_path.as_path());
 
             Ok(())
@@ -201,7 +202,7 @@ mod tests {
     #[should_panic(expected = "No session files found")]
     fn test_resume_most_recent_session_no_files() {
         run_with_tmp_dir(|| {
-            build_session(None, None, true);
+            build_session(None, None, None, true);
         });
     }
 }

@@ -1,4 +1,4 @@
-pub mod agent;
+pub mod agents;
 pub mod developer;
 pub mod errors;
 pub mod key_manager;

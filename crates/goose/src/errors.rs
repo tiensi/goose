@@ -18,6 +18,12 @@ pub enum AgentError {
 
     #[error("Invalid tool name: {0}")]
     InvalidToolName(String),
+
+    #[error("System not found: {0}")]
+    SystemNotFound(String),
+
+    #[error("Agent version not found: {0}")]
+    VersionNotFound(String),
 }
 
 pub type AgentResult<T> = Result<T, AgentError>;
