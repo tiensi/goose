@@ -70,20 +70,11 @@ pub use sse::SseTransport;
 #[derive(Clone)]
 pub struct MessageRouter {
     transport_tx: mpsc::Sender<TransportMessage>,
-    // shutdown_tx is unused, but we'll probably need it for shutdown
-    #[allow(dead_code)]
-    shutdown_tx: mpsc::Sender<()>,
 }
 
 impl MessageRouter {
-    pub fn new(
-        transport_tx: mpsc::Sender<TransportMessage>,
-        shutdown_tx: mpsc::Sender<()>,
-    ) -> Self {
-        Self {
-            transport_tx,
-            shutdown_tx,
-        }
+    pub fn new(transport_tx: mpsc::Sender<TransportMessage>) -> Self {
+        Self { transport_tx }
     }
 
     /// Send a message and wait for a response

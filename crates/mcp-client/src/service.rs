@@ -1,9 +1,8 @@
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::OnceCell;
 use tower::Service;
 
 use crate::transport::{Error as TransportError, MessageRouter, Transport};
@@ -35,43 +34,24 @@ pub enum ServiceError {
 
 struct TransportServiceInner<T: Transport> {
     transport: Arc<T>,
-    router: Mutex<Option<MessageRouter>>,
-    initialized: AtomicBool,
+    router: OnceCell<MessageRouter>,
 }
 
 impl<T: Transport> TransportServiceInner<T> {
     async fn ensure_initialized(&self) -> Result<MessageRouter, ServiceError> {
-        if !self.initialized.load(Ordering::SeqCst) {
-            let mut router_guard = self.router.lock().await;
-
-            // Double-check after acquiring lock
-            if !self.initialized.load(Ordering::SeqCst) {
-                // Start the transport
+        self.router
+            .get_or_try_init(|| async {
+                // This async block is only called once per process lifetime
                 let transport_tx = self
                     .transport
                     .start()
                     .await
                     .map_err(ServiceError::Transport)?;
 
-                // Create shutdown channel
-                let (shutdown_tx, _shutdown_rx) = mpsc::channel(1);
-
-                // Create and store the router
-                let router = MessageRouter::new(transport_tx, shutdown_tx);
-                *router_guard = Some(router);
-
-                self.initialized.store(true, Ordering::SeqCst);
-            }
-        }
-
-        // Get a clone of the router
-        Ok(self
-            .router
-            .lock()
+                Ok(MessageRouter::new(transport_tx))
+            })
             .await
-            .as_ref()
-            .ok_or(ServiceError::NotInitialized)?
-            .clone())
+            .map(Clone::clone)
     }
 }
 
@@ -85,8 +65,7 @@ impl<T: Transport> TransportService<T> {
         Self {
             inner: Arc::new(TransportServiceInner {
                 transport: Arc::new(transport),
-                router: Mutex::new(None),
-                initialized: AtomicBool::new(false),
+                router: OnceCell::new(),
             }),
         }
     }
@@ -134,14 +113,3 @@ impl<T: Transport> Service<JsonRpcMessage> for TransportService<T> {
         })
     }
 }
-
-// https://spec.modelcontextprotocol.io/specification/basic/lifecycle/#shutdown
-// impl<T: Transport> Drop for TransportServiceInner<T> {
-//     fn drop(&mut self) {
-//         if self.initialized.load(Ordering::SeqCst) {
-//             // Best effort cleanup in sync context
-//             // We can't create a new runtime here, so we'll just log a warning
-//             tracing::warn!("TransportService dropped while initialized - resources may leak");
-//         }
-//     }
-// }
