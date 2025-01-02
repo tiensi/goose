@@ -120,7 +120,7 @@ impl Provider for OpenAiProvider {
 
 #[async_trait]
 impl Moderation for OpenAiProvider {
-    async fn moderate_content(&self, content: &str) -> Result<ModerationResult> {
+    async fn moderate_content_internal(&self, content: &str) -> Result<ModerationResult> {
         let url = format!("{}/v1/moderations", self.config.host.trim_end_matches('/'));
 
         let request =
