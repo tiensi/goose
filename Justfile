@@ -25,3 +25,8 @@ run-ui:
 run-server:
     @echo "Running server..."
     cargo run -p goose-server
+
+# Setup langfuse server
+langfuse-server:
+    #!/usr/bin/env bash
+    ./scripts/setup_langfuse.sh
