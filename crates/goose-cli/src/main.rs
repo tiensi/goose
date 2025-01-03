@@ -6,10 +6,6 @@ mod commands {
 pub mod agents;
 mod profile;
 mod prompt;
-mod tracing {
-    pub mod langfuse_layer;
-    pub mod observation_layer;
-}
 pub mod session;
 
 mod systems;
@@ -21,8 +17,7 @@ use commands::session::build_session;
 use commands::version::print_version;
 use profile::has_no_profiles;
 use std::io::{self, Read};
-use tracing_appender::rolling::{RollingFileAppender, Rotation};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use goose::logging::setup_logging;
 
 mod log_usage;
 
@@ -199,50 +194,10 @@ enum CliProviderVariant {
     Ollama,
 }
 
-fn setup_logging() -> Result<()> {
-    // Set up file appender for goose module logs
-    let file_appender = RollingFileAppender::new(
-        Rotation::DAILY,
-        std::path::PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| "~".into()))
-            .join(".config")
-            .join("goose")
-            .join("logs"),
-        "goose.log",
-    );
-
-    // Create the fmt layer with file logging
-    let fmt_layer = tracing_subscriber::fmt::layer()
-        .with_target(true)
-        .with_level(true)
-        .with_writer(file_appender)
-        .json()
-        .with_file(true)
-        .pretty();
-
-    // Update filter to include debug level
-    let filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("goose=debug"));
-
-    // Build the subscriber with all layers
-    let subscriber = tracing_subscriber::registry().with(fmt_layer).with(filter);
-
-    // Add langfuse layer if available and initialize
-    if let Some(langfuse_layer) = tracing::langfuse_layer::create_langfuse_observer() {
-        subscriber.with(langfuse_layer).init();
-    } else {
-        subscriber.init();
-    }
-
-    Ok(())
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize logging
-    if let Err(e) = setup_logging() {
-        eprintln!("Failed to initialize logging: {}", e);
-    }
-
+    setup_logging()?;
+    
     let cli = Cli::parse();
 
     if cli.version {

@@ -105,7 +105,7 @@ impl DatabricksProvider {
 
 #[async_trait]
 impl Provider for DatabricksProvider {
-    #[tracing::instrument(skip(self, system, messages, tools), fields(event_type="GENERATION-CREATE",model_config, input, output, input_tokens, output_tokens, total_tokens, cost))]
+    #[tracing::instrument(skip(self, system, messages, tools), fields(model_config, input, output, input_tokens, output_tokens, total_tokens, cost))]
     async fn complete(
         &self,
         system: &str,

@@ -48,7 +48,8 @@ libc = "=0.2.167"
 lazy_static = "1.5"
 kill_tree = "0.2.4"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json", "time"] }
+tracing-appender = "0.2"
 
 keyring = { version = "3.6.1", features = [
     "apple-native",
