@@ -1,14 +1,8 @@
 // This example shows how to use the mcp-client crate to interact with a server that has a simple counter tool.
 // The server is started by running `cargo run -p mcp-server` in the root of the mcp-server crate.
 use anyhow::Result;
-use mcp_client::client::{
-    ClientCapabilities, ClientInfo, Error as ClientError, McpClient, McpClientImpl,
-};
-use mcp_client::{
-    service::TransportService,
-    transport::{StdioTransport, Transport},
-};
-use tower::ServiceBuilder;
+use mcp_client::client::{ClientCapabilities, ClientInfo, Error as ClientError, McpClient};
+use mcp_client::transport::{StdioTransport, Transport};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -34,12 +28,8 @@ async fn main() -> Result<(), ClientError> {
     // Start the transport to get a handle
     let transport_handle = transport.start().await.unwrap();
 
-    // Build service
-    // TODO: Add timeout middleware
-    let service = ServiceBuilder::new().service(TransportService::new(transport_handle));
-
     // Create client
-    let client = McpClientImpl::new(service);
+    let client = McpClient::new(transport_handle);
 
     // Initialize
     let server_info = client

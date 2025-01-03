@@ -1,9 +1,15 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use async_trait::async_trait;
 use mcp_core::protocol::JsonRpcMessage;
 use thiserror::Error;
 use tokio::sync::{mpsc, oneshot, RwLock};
+use tower::Service;
 
 /// A generic error type for transport operations.
 #[derive(Debug, Error)]
@@ -95,6 +101,21 @@ impl TransportHandle {
             }
             _ => Err(Error::Other("Unsupported message type".to_string())),
         }
+    }
+}
+
+impl Service<JsonRpcMessage> for TransportHandle {
+    type Response = JsonRpcMessage;
+    type Error = Error; // Using Transport's Error directly
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, message: JsonRpcMessage) -> Self::Future {
+        let this = self.clone();
+        Box::pin(async move { this.send(message).await })
     }
 }
 

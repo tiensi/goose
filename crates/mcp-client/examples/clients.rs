@@ -1,13 +1,11 @@
 use mcp_client::{
-    client::{ClientCapabilities, ClientInfo, McpClient, McpClientImpl},
-    service::TransportService,
+    client::{ClientCapabilities, ClientInfo, McpClient},
     transport::{StdioTransport, Transport},
 };
 use rand::Rng;
 use rand::SeedableRng;
 use std::sync::Arc;
 use std::time::Duration;
-use tower::ServiceBuilder;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -25,10 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let client3 = create_sse_client("client3", "1.0.0")?;
 
     // Initialize both clients
-    let mut clients: Vec<Box<dyn McpClient + Send + Sync>> = Vec::new();
-    clients.push(client1);
-    clients.push(client2);
-    // clients.push(client3);
+    let mut clients = vec![client1, client2];
 
     // Initialize all clients
     for (i, client) in clients.iter_mut().enumerate() {
@@ -126,20 +121,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn create_stdio_client(
     _name: &str,
     _version: &str,
-) -> Result<Box<dyn McpClient + Send + Sync>, Box<dyn std::error::Error>> {
+) -> Result<McpClient, Box<dyn std::error::Error>> {
     let transport = StdioTransport::new("uvx", vec!["mcp-server-git".to_string()]);
-    let transport_handle = transport.start().await.unwrap();
-    // TODO: Add timeout middleware
-    let service = ServiceBuilder::new().service(TransportService::new(transport_handle));
-    Ok(Box::new(McpClientImpl::new(service)))
+    Ok(McpClient::new(transport.start().await?))
 }
 
-// fn create_sse_client(
-//     _name: &str,
-//     _version: &str,
-// ) -> Result<Box<dyn McpClient + Send + Sync>, Box<dyn std::error::Error>> {
+// async fn create_sse_client(_name: &str, _version: &str) -> Result<McpClient, Box<dyn std::error::Error>> {
 //     let transport = SseTransport::new("http://localhost:8000/sse");
-//     // TODO: Add timeout middleware
-//     let service = ServiceBuilder::new().service(TransportService::new(transport));
-//     Ok(Box::new(McpClientImpl::new(service)))
+//     Ok(McpClient::new(transport.start().await?))
 // }

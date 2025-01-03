@@ -1,12 +1,6 @@
 use anyhow::Result;
-use mcp_client::client::{
-    ClientCapabilities, ClientInfo, Error as ClientError, McpClient, McpClientImpl,
-};
-use mcp_client::{
-    service::TransportService,
-    transport::{StdioTransport, Transport},
-};
-use tower::ServiceBuilder;
+use mcp_client::client::{ClientCapabilities, ClientInfo, Error as ClientError, McpClient};
+use mcp_client::transport::{StdioTransport, Transport};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -24,13 +18,10 @@ async fn main() -> Result<(), ClientError> {
     let transport = StdioTransport::new("uvx", vec!["mcp-server-git".to_string()]);
 
     // 2) Start the transport to get a handle
-    let transport_handle = transport.start().await.unwrap();
+    let transport_handle = transport.start().await?;
 
-    // 3) Build service using the handle
-    let service = ServiceBuilder::new().service(TransportService::new(transport_handle));
-
-    // 4) Create client
-    let client = McpClientImpl::new(service);
+    // 3) Create the client
+    let client = McpClient::new(transport_handle);
 
     // Initialize
     let server_info = client
