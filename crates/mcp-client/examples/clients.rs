@@ -1,6 +1,6 @@
 use mcp_client::{
     client::{ClientCapabilities, ClientInfo, McpClient},
-    transport::{StdioTransport, Transport},
+    transport::{SseTransport, StdioTransport, Transport},
 };
 use rand::Rng;
 use rand::SeedableRng;
@@ -20,10 +20,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create two separate clients with stdio transport
     let client1 = create_stdio_client("client1", "1.0.0").await?;
     let client2 = create_stdio_client("client2", "1.0.0").await?;
-    // let client3 = create_sse_client("client3", "1.0.0")?;
+    let client3 = create_sse_client("client3", "1.0.0").await?;
 
     // Initialize both clients
-    let mut clients = vec![client1, client2];
+    let mut clients = vec![client1, client2, client3];
 
     // Initialize all clients
     for (i, client) in clients.iter_mut().enumerate() {
@@ -58,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             tokio::time::sleep(Duration::from_millis(rng.gen_range(5..50))).await;
 
             // Randomly select an operation
-            match rng.gen_range(0..2) {
+            match rng.gen_range(0..4) {
                 0 => {
                     println!("\n{i}: Listing tools for client 1 (stdio)");
                     match clients[0].list_tools().await {
@@ -81,28 +81,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Err(e) => println!("  {i}: -> Error: {}", e),
                     }
                 }
-                // 2 => {
-                //     println!("\n{i}: Listing tools for client 3 (sse)");
-                //     match clients[2].list_tools().await {
-                //         Ok(tools) => {
-                //             println!("  {i}: -> Got tools, first one: {:?}", tools.tools.first())
-                //         }
-                //         Err(e) => println!("  {i}: -> Error: {}", e),
-                //     }
-                // }
-                // 3 => {
-                //     println!("\n{i}: Calling tool for client 3 (sse)");
-                //     match clients[2]
-                //             .call_tool(
-                //                 "echo_tool",
-                //                 serde_json::json!({ "message": "Client with SSE transport - calling a tool" }),
-                //             )
-                //             .await
-                //         {
-                //         Ok(result) => println!("  {i}: -> Tool execution result, is_error: {:?}", result.is_error),
-                //         Err(e) => println!("  {i}: -> Error: {}", e),
-                //     }
-                // }
+                2 => {
+                    println!("\n{i}: Listing tools for client 3 (sse)");
+                    match clients[2].list_tools().await {
+                        Ok(tools) => {
+                            println!("  {i}: -> Got tools, first one: {:?}", tools.tools.first())
+                        }
+                        Err(e) => println!("  {i}: -> Error: {}", e),
+                    }
+                }
+                3 => {
+                    println!("\n{i}: Calling tool for client 3 (sse)");
+                    match clients[2]
+                            .call_tool(
+                                "echo_tool",
+                                serde_json::json!({ "message": "Client with SSE transport - calling a tool" }),
+                            )
+                            .await
+                        {
+                        Ok(result) => println!("  {i}: -> Tool execution result, is_error: {:?}", result.is_error),
+                        Err(e) => println!("  {i}: -> Error: {}", e),
+                    }
+                }
                 _ => unreachable!(),
             }
             Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
@@ -126,7 +126,10 @@ async fn create_stdio_client(
     Ok(McpClient::new(transport.start().await?))
 }
 
-// async fn create_sse_client(_name: &str, _version: &str) -> Result<McpClient, Box<dyn std::error::Error>> {
-//     let transport = SseTransport::new("http://localhost:8000/sse");
-//     Ok(McpClient::new(transport.start().await?))
-// }
+async fn create_sse_client(
+    _name: &str,
+    _version: &str,
+) -> Result<McpClient, Box<dyn std::error::Error>> {
+    let transport = SseTransport::new("http://localhost:8000/sse");
+    Ok(McpClient::new(transport.start().await?))
+}

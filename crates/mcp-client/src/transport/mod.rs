@@ -149,5 +149,5 @@ impl PendingRequests {
 pub mod stdio;
 pub use stdio::StdioTransport;
 
-// pub mod sse;
-// pub use sse::SseTransport;
+pub mod sse;
+pub use sse::SseTransport;
