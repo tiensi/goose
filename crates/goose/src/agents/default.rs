@@ -1,22 +1,19 @@
 use async_trait::async_trait;
 use futures::stream::BoxStream;
 use serde_json::json;
-use std::collections::HashMap;
 use tokio::sync::Mutex;
 
+use super::capabilities::ResourceItem;
 use super::Agent;
 use crate::agents::capabilities::Capabilities;
-use crate::agents::system::{SystemConfig, SystemResult, SystemInfo};
+use crate::agents::system::{SystemConfig, SystemResult};
 use crate::message::{Message, ToolRequest};
-use crate::prompt_template::load_prompt_file;
 use crate::providers::base::Provider;
 use crate::providers::base::ProviderUsage;
 use crate::register_agent;
 use crate::token_counter::TokenCounter;
-use mcp_core::{Content, Resource, Tool, ToolCall};
+use mcp_core::{Content, Tool, ToolCall};
 use serde_json::Value;
-// used to sort resources by priority within error margin
-const PRIORITY_EPSILON: f32 = 0.001;
 
 /// Default implementation of an Agent
 pub struct DefaultAgent {
@@ -39,17 +36,15 @@ impl DefaultAgent {
         pending: &[Message],
         target_limit: usize,
         model_name: &str,
-        resource_content: &HashMap<String, HashMap<String, (Resource, String)>>,
+        resource_items: &mut [ResourceItem],
     ) -> SystemResult<Vec<Message>> {
         let token_counter = TokenCounter::new();
 
         // Flatten all resource content into a vector of strings
-        let mut resources = Vec::new();
-        for system_resources in resource_content.values() {
-            for (_, content) in system_resources.values() {
-                resources.push(content.clone());
-            }
-        }
+        let resources: Vec<String> = resource_items
+            .iter()
+            .map(|item| item.content.clone())
+            .collect();
 
         let approx_count = token_counter.count_everything(
             system_prompt,
@@ -64,76 +59,44 @@ impl DefaultAgent {
         if approx_count > target_limit {
             println!("[WARNING] Token budget exceeded. Current count: {} \n Difference: {} tokens over buget. Removing context", approx_count, approx_count - target_limit);
 
-            // Get token counts for each resource
-            let mut system_token_counts = HashMap::new();
-
-            // Iterate through each system and its resources
-            for (system_name, resources) in resource_content {
-                let mut resource_counts = HashMap::new();
-                for (uri, (_resource, content)) in resources {
-                    let token_count = token_counter.count_tokens(content, Some(model_name)) as u32;
-                    resource_counts.insert(uri.clone(), token_count);
-                }
-                system_token_counts.insert(system_name.clone(), resource_counts);
-            }
-
-            // Sort resources by priority and timestamp and trim to fit context limit
-            let mut all_resources: Vec<(String, String, Resource, u32)> = Vec::new();
-            for (system_name, resources) in resource_content {
-                for (uri, (resource, _)) in resources {
-                    if let Some(token_count) = system_token_counts
-                        .get(system_name)
-                        .and_then(|counts| counts.get(uri))
-                    {
-                        all_resources.push((
-                            system_name.clone(),
-                            uri.clone(),
-                            resource.clone(),
-                            *token_count,
-                        ));
-                    }
+            for item in resource_items.iter_mut() {
+                if item.token_count.is_none() {
+                    let count = token_counter.count_tokens(&item.content, Some(model_name)) as u32;
+                    item.token_count = Some(count);
                 }
             }
 
             // Sort by priority (high to low) and timestamp (newest to oldest)
-            all_resources.sort_by(|a, b| {
-                let a_priority = a.2.priority().unwrap_or(0.0);
-                let b_priority = b.2.priority().unwrap_or(0.0);
-                if (b_priority - a_priority).abs() < PRIORITY_EPSILON {
-                    b.2.timestamp().cmp(&a.2.timestamp())
+            let mut all_items: Vec<ResourceItem> = resource_items.to_vec();
+            all_items.sort_by(|a, b| {
+                // Compare priority first (descending)
+                let diff = b.priority - a.priority;
+                if diff.abs() < f32::EPSILON {
+                    // If same priority, compare timestamp (descending = newer first)
+                    b.timestamp.cmp(&a.timestamp)
                 } else {
-                    b.2.priority()
-                        .partial_cmp(&a.2.priority())
-                        .unwrap_or(std::cmp::Ordering::Equal)
+                    diff.partial_cmp(&0.0).unwrap_or(std::cmp::Ordering::Equal)
                 }
             });
 
             // Remove resources until we're under target limit
             let mut current_tokens = approx_count;
-
-            while current_tokens > target_limit && !all_resources.is_empty() {
-                if let Some((system_name, uri, _, token_count)) = all_resources.pop() {
-                    if let Some(system_counts) = system_token_counts.get_mut(&system_name) {
-                        system_counts.remove(&uri);
-                        current_tokens -= token_count as usize;
-                    }
+            while current_tokens > target_limit && !all_items.is_empty() {
+                let removed = all_items.pop().unwrap();
+                // Subtract removed item’s token_count
+                if let Some(tc) = removed.token_count {
+                    current_tokens = current_tokens.saturating_sub(tc as usize);
                 }
             }
 
-            // Create status messages only from resources that remain after token trimming
-            for (system_name, uri, _, _) in &all_resources {
-                if let Some(system_resources) = resource_content.get(system_name) {
-                    if let Some((resource, content)) = system_resources.get(uri) {
-                        status_content.push(format!("{}\n```\n{}\n```\n", resource.name, content));
-                    }
-                }
+            // We removed some items, so let's use only the trimmed set `all_items`
+            for item in &all_items {
+                status_content.push(format!("{}\n```\n{}\n```\n", item.name, item.content));
             }
         } else {
             // Create status messages from all resources when no trimming needed
-            for resources in resource_content.values() {
-                for (resource, content) in resources.values() {
-                    status_content.push(format!("{}\n```\n{}\n```\n", resource.name, content));
-                }
+            for item in resource_items {
+                status_content.push(format!("{}\n```\n{}\n```\n", item.name, item.content));
             }
         }
 
@@ -171,12 +134,18 @@ impl Agent for DefaultAgent {
 
     async fn remove_system(&mut self, name: &str) {
         let mut capabilities = self.capabilities.lock().await;
-        capabilities.remove_system(name).await.expect("Failed to remove system");
+        capabilities
+            .remove_system(name)
+            .await
+            .expect("Failed to remove system");
     }
 
     async fn list_systems(&self) -> Vec<String> {
         let capabilities = self.capabilities.lock().await;
-        capabilities.list_systems().await.expect("Failed to list systems")
+        capabilities
+            .list_systems()
+            .await
+            .expect("Failed to list systems")
     }
 
     async fn passthrough(&self, _system: &str, _request: Value) -> SystemResult<Value> {
@@ -205,7 +174,7 @@ impl Agent for DefaultAgent {
                 &Vec::new(),
                 estimated_limit,
                 &capabilities.provider().get_model_config().model_name,
-                &capabilities.get_resources().await?,
+                &mut capabilities.get_resources().await?,
             )
             .await?;
 
@@ -262,7 +231,7 @@ impl Agent for DefaultAgent {
                 messages.pop();
 
                 let pending = vec![response, message_tool_response];
-                messages = self.prepare_inference(&system_prompt, &tools, &messages, &pending, estimated_limit, &capabilities.provider().get_model_config().model_name, &capabilities.get_resources().await?).await?;
+                messages = self.prepare_inference(&system_prompt, &tools, &messages, &pending, estimated_limit, &capabilities.provider().get_model_config().model_name, &mut capabilities.get_resources().await?).await?;
             }
         }))
     }
