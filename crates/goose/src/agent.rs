@@ -129,16 +129,12 @@ impl Agent {
                 
         span.record("input", serde_json::to_string(&system_tool_call).unwrap());
 
-        let result = system.call(system_tool_call).await;
+        let result = system.call(system_tool_call.clone()).await;
 
-        match &result {
-            Ok(contents) => {
-                span.record("output", serde_json::to_string(contents).unwrap());
-            }
-            Err(e) => {
-                span.record("output", serde_json::to_string(&e).unwrap());
-            }
-        }
+        
+        tracing::debug!("input"=serde_json::to_string(&system_tool_call).unwrap(),
+                        "output"=serde_json::to_string(&result).unwrap(),
+        );
 
         result 
     }
