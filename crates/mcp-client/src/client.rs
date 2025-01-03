@@ -110,9 +110,7 @@ where
             params: Some(params),
         });
 
-        println!("Sending request: {request:?}");
         let response_msg = service.call(request).await?;
-        println!("Received response: {response_msg:?}");
 
         match response_msg {
             JsonRpcMessage::Response(JsonRpcResponse {
