@@ -113,7 +113,6 @@ impl Agent {
         &self,
         tool_call: AgentResult<ToolCall>,
     ) -> AgentResult<Vec<Content>> {
-        let span = tracing::Span::current();
         let call = tool_call?;
 
         let system = self
@@ -126,12 +125,8 @@ impl Agent {
             .nth(1)
             .ok_or_else(|| AgentError::InvalidToolName(call.name.clone()))?;
         let system_tool_call = ToolCall::new(tool_name, call.arguments);
-                
-        span.record("input", serde_json::to_string(&system_tool_call).unwrap());
-
         let result = system.call(system_tool_call.clone()).await;
 
-        
         tracing::debug!("input"=serde_json::to_string(&system_tool_call).unwrap(),
                         "output"=serde_json::to_string(&result).unwrap(),
         );
