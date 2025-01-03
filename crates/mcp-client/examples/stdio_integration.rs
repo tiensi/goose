@@ -4,7 +4,10 @@ use anyhow::Result;
 use mcp_client::client::{
     ClientCapabilities, ClientInfo, Error as ClientError, McpClient, McpClientImpl,
 };
-use mcp_client::{service::TransportService, transport::StdioTransport};
+use mcp_client::{
+    service::TransportService,
+    transport::{StdioTransport, Transport},
+};
 use tower::ServiceBuilder;
 use tracing_subscriber::EnvFilter;
 
@@ -28,9 +31,12 @@ async fn main() -> Result<(), ClientError> {
             .collect(),
     );
 
+    // Start the transport to get a handle
+    let transport_handle = transport.start().await.unwrap();
+
     // Build service
     // TODO: Add timeout middleware
-    let service = ServiceBuilder::new().service(TransportService::new(transport));
+    let service = ServiceBuilder::new().service(TransportService::new(transport_handle));
 
     // Create client
     let client = McpClientImpl::new(service);

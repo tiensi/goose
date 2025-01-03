@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
-use mcp_core::protocol::{JsonRpcMessage, JsonRpcNotification, JsonRpcRequest};
+use mcp_core::protocol::JsonRpcMessage;
 use thiserror::Error;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot, RwLock};
 
 /// A generic error type for transport operations.
 #[derive(Debug, Error)]
@@ -53,53 +55,78 @@ pub struct TransportMessage {
 #[async_trait]
 pub trait Transport: Send + Sync + 'static {
     /// Start the transport and establish the underlying connection.
-    /// Returns channels for sending messages and receiving errors.
-    async fn start(&self) -> Result<mpsc::Sender<TransportMessage>, Error>;
+    /// Returns the transport handle for sending messages.
+    async fn start(&self) -> Result<TransportHandle, Error>;
 
     /// Close the transport and free any resources.
     async fn close(&self) -> Result<(), Error>;
 }
 
+#[derive(Clone)]
+pub struct TransportHandle {
+    sender: mpsc::Sender<TransportMessage>,
+}
+
+impl TransportHandle {
+    pub async fn send(&self, message: JsonRpcMessage) -> Result<JsonRpcMessage, Error> {
+        match message {
+            JsonRpcMessage::Request(request) => {
+                let (respond_to, response) = oneshot::channel();
+                let msg = TransportMessage {
+                    message: JsonRpcMessage::Request(request),
+                    response_tx: Some(respond_to),
+                };
+                self.sender
+                    .send(msg)
+                    .await
+                    .map_err(|_| Error::ChannelClosed)?;
+                Ok(response.await.map_err(|_| Error::ChannelClosed)??)
+            }
+            JsonRpcMessage::Notification(notification) => {
+                let msg = TransportMessage {
+                    message: JsonRpcMessage::Notification(notification),
+                    response_tx: None,
+                };
+                self.sender
+                    .send(msg)
+                    .await
+                    .map_err(|_| Error::ChannelClosed)?;
+                Ok(JsonRpcMessage::Nil) // Explicitly return None for notifications
+            }
+            _ => Err(Error::Other("Unsupported message type".to_string())),
+        }
+    }
+}
+
+// A data structure to store pending requests and their response channels
+pub struct PendingRequests {
+    requests: RwLock<HashMap<String, oneshot::Sender<Result<JsonRpcMessage, Error>>>>,
+}
+
+impl PendingRequests {
+    pub fn new() -> Self {
+        Self {
+            requests: RwLock::new(HashMap::new()),
+        }
+    }
+
+    pub async fn insert(&self, id: String, sender: oneshot::Sender<Result<JsonRpcMessage, Error>>) {
+        self.requests.write().await.insert(id, sender);
+    }
+
+    pub async fn respond(&self, id: &str, response: Result<JsonRpcMessage, Error>) {
+        if let Some(tx) = self.requests.write().await.remove(id) {
+            let _ = tx.send(response);
+        }
+    }
+
+    pub async fn clear(&self) {
+        self.requests.write().await.clear();
+    }
+}
+
 pub mod stdio;
 pub use stdio::StdioTransport;
 
-pub mod sse;
-pub use sse::SseTransport;
-
-/// A router that handles message distribution for a transport
-#[derive(Clone)]
-pub struct MessageRouter {
-    transport_tx: mpsc::Sender<TransportMessage>,
-}
-
-impl MessageRouter {
-    pub fn new(transport_tx: mpsc::Sender<TransportMessage>) -> Self {
-        Self { transport_tx }
-    }
-
-    /// Send a message and wait for a response
-    pub async fn send_request(&self, request: JsonRpcRequest) -> Result<JsonRpcMessage, Error> {
-        let (response_tx, response_rx) = oneshot::channel();
-
-        self.transport_tx
-            .send(TransportMessage {
-                message: JsonRpcMessage::Request(request),
-                response_tx: Some(response_tx),
-            })
-            .await
-            .map_err(|_| Error::ChannelClosed)?;
-
-        response_rx.await.map_err(|_| Error::ChannelClosed)?
-    }
-
-    /// Send a notification (no response expected)
-    pub async fn send_notification(&self, notification: JsonRpcNotification) -> Result<(), Error> {
-        self.transport_tx
-            .send(TransportMessage {
-                message: JsonRpcMessage::Notification(notification),
-                response_tx: None,
-            })
-            .await
-            .map_err(|_| Error::ChannelClosed)
-    }
-}
+// pub mod sse;
+// pub use sse::SseTransport;
