@@ -87,7 +87,7 @@ pub trait Router: Send + Sync + 'static {
         &self,
         tool_name: &str,
         arguments: Value,
-    ) -> Pin<Box<dyn Future<Output = Result<Value, ToolError>> + Send + 'static>>;
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<Content>, ToolError>> + Send + 'static>>;
     fn list_resources(&self) -> Vec<mcp_core::resource::Resource>;
     fn read_resource(
         &self,
@@ -165,7 +165,7 @@ pub trait Router: Send + Sync + 'static {
 
             let result = match self.call_tool(name, arguments).await {
                 Ok(result) => CallToolResult {
-                    content: vec![Content::text(result.to_string())],
+                    content: result,
                     is_error: false,
                 },
                 Err(err) => CallToolResult {

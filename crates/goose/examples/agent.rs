@@ -1,9 +1,9 @@
-use futures::StreamExt;
-use goose::message::Message;
-use goose::providers::get_provider;
-use goose::providers::configs::{DatabricksProviderConfig, ProviderConfig};
-use goose::agents::{AgentFactory, SystemConfig};
 use dotenv::dotenv;
+use futures::StreamExt;
+use goose::agents::{AgentFactory, SystemConfig};
+use goose::message::Message;
+use goose::providers::configs::{DatabricksProviderConfig, ProviderConfig};
+use goose::providers::get_provider;
 
 #[tokio::main]
 async fn main() {
@@ -28,11 +28,15 @@ async fn main() {
         println!("  {}", system);
     }
 
-    let messages = vec![Message::user().with_text("can you summarize the readme.md in this dir using just a haiku?")];
+    let messages = vec![Message::user()
+        .with_text("can you summarize the readme.md in this dir using just a haiku?")];
 
     let mut stream = agent.reply(&messages).await.unwrap();
     while let Some(message) = stream.next().await {
-        println!("{}", serde_json::to_string_pretty(&message.unwrap()).unwrap());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&message.unwrap()).unwrap()
+        );
         println!("\n");
     }
 }

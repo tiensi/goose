@@ -1,4 +1,5 @@
 use anyhow::Result;
+use mcp_core::content::Content;
 use mcp_core::handler::ResourceError;
 use mcp_core::{handler::ToolError, protocol::ServerCapabilities, resource::Resource, tool::Tool};
 use mcp_server::router::{CapabilitiesBuilder, RouterService};
@@ -96,7 +97,7 @@ impl Router for CounterRouter {
         &self,
         tool_name: &str,
         _arguments: Value,
-    ) -> Pin<Box<dyn Future<Output = Result<Value, ToolError>> + Send + 'static>> {
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<Content>, ToolError>> + Send + 'static>> {
         let this = self.clone();
         let tool_name = tool_name.to_string();
 
@@ -104,15 +105,15 @@ impl Router for CounterRouter {
             match tool_name.as_str() {
                 "increment" => {
                     let value = this.increment().await?;
-                    Ok(Value::Number(value.into()))
+                    Ok(vec![Content::text(value.to_string())])
                 }
                 "decrement" => {
                     let value = this.decrement().await?;
-                    Ok(Value::Number(value.into()))
+                    Ok(vec![Content::text(value.to_string())])
                 }
                 "get_value" => {
                     let value = this.get_value().await?;
-                    Ok(Value::Number(value.into()))
+                    Ok(vec![Content::text(value.to_string())])
                 }
                 _ => Err(ToolError::NotFound(format!("Tool {} not found", tool_name))),
             }

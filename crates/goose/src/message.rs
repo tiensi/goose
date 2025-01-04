@@ -7,10 +7,9 @@
 /// when interacting with MCP servers.
 use chrono::Utc;
 use mcp_core::content::{Content, ImageContent, TextContent};
+use mcp_core::handler::ToolResult;
 use mcp_core::role::Role;
 use mcp_core::tool::ToolCall;
-use mcp_core::handler::ToolResult;
-
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ToolRequest {

@@ -1,4 +1,3 @@
-use mcp_core::ToolError;
 use crate::message::{Message, MessageContent};
 use crate::providers::base::{Provider, ProviderUsage, Usage};
 use crate::providers::configs::{GoogleProviderConfig, ModelConfig, ProviderModelConfig};
@@ -6,6 +5,7 @@ use crate::providers::utils::{
     handle_response, is_valid_function_name, sanitize_function_name, unescape_json_values,
 };
 use async_trait::async_trait;
+use mcp_core::ToolError;
 use mcp_core::{Content, Role, Tool, ToolCall};
 use reqwest::Client;
 use serde_json::{json, Map, Value};
@@ -243,8 +243,7 @@ fn process_map(
     let mut filtered_map: Map<String, serde_json::Value> = map
         .iter()
         .filter_map(|(key, value)| {
-            let should_remove =
-                !accepted_keys.contains(key) && parent_key != Some("properties");
+            let should_remove = !accepted_keys.contains(key) && parent_key != Some("properties");
             if should_remove {
                 return None;
             }
@@ -347,7 +346,7 @@ impl Provider for GoogleProvider {
 #[cfg(test)] // Only compiles this module when running tests
 mod tests {
     use super::*;
-    
+
     use crate::providers::mock_server::{
         create_mock_google_ai_response, create_mock_google_ai_response_with_tools,
         create_test_tool, get_expected_function_call_arguments, setup_mock_server,
@@ -452,10 +451,7 @@ mod tests {
     fn test_message_to_google_spec_tool_result_message() {
         let provider = set_up_provider();
         let tool_result: Vec<Content> = vec![Content::text("Hello")];
-        let messages = vec![set_up_tool_response_message(
-            "response_id",
-            tool_result,
-        )];
+        let messages = vec![set_up_tool_response_message("response_id", tool_result)];
         let payload = provider.messages_to_google_spec(&messages);
         assert_eq!(payload.len(), 1);
         assert_eq!(payload[0]["role"], "model");

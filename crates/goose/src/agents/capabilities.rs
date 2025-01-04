@@ -66,6 +66,7 @@ impl Capabilities {
     }
 
     /// Add a new MCP system based on the provided client type
+    // TODO IMPORTANT need to ensure this times out if the system command is broken!
     pub async fn add_system(&mut self, config: SystemConfig) -> SystemResult<()> {
         let client: Box<dyn McpClient + Send> = match config {
             SystemConfig::Sse { ref uri } => {

@@ -29,12 +29,11 @@ pub struct AgentFactory;
 
 impl AgentFactory {
     /// Create a new agent instance of the specified version
-    pub fn create(
-        version: &str,
-        provider: Box<dyn Provider>,
-    ) -> Option<Box<dyn Agent>> {
+    pub fn create(version: &str, provider: Box<dyn Provider>) -> Option<Box<dyn Agent>> {
         let registry = registry();
-        let map = registry.read().expect("should be able to read the registry");
+        let map = registry
+            .read()
+            .expect("should be able to read the registry");
         let constructor = map.get(version)?;
         Some(constructor(provider))
     }

@@ -1,5 +1,5 @@
 use mcp_client::client::Error as ClientError;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// Errors from System operation
@@ -14,7 +14,8 @@ pub enum SystemError {
 pub type SystemResult<T> = Result<T, SystemError>;
 
 /// Represents the different types of MCP systems that can be added to the manager
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "type")]
 pub enum SystemConfig {
     /// Server-sent events client with a URI endpoint
     Sse { uri: String },
@@ -24,15 +25,27 @@ pub enum SystemConfig {
 
 impl SystemConfig {
     pub fn sse<S: Into<String>>(uri: S) -> Self {
-        Self::Sse {
-            uri: uri.into(),
-        }
+        Self::Sse { uri: uri.into() }
     }
 
     pub fn stdio<S: Into<String>>(cmd: S) -> Self {
         Self::Stdio {
             cmd: cmd.into(),
             args: vec![],
+        }
+    }
+
+    pub fn with_args<I, S>(self, args: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        match self {
+            Self::Stdio { cmd, .. } => Self::Stdio {
+                cmd,
+                args: args.into_iter().map(Into::into).collect(),
+            },
+            other => other,
         }
     }
 }

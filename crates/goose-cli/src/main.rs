@@ -2,7 +2,6 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use goose::agents::AgentFactory;
 
-mod agents;
 mod commands;
 mod log_usage;
 mod profile;
@@ -12,6 +11,7 @@ mod systems;
 
 use commands::agent_version::AgentCommand;
 use commands::configure::handle_configure;
+use commands::server::run_server;
 use commands::session::build_session;
 use commands::version::print_version;
 use profile::has_no_profiles;
@@ -70,6 +70,19 @@ enum Command {
     System {
         #[command(subcommand)]
         action: SystemCommands,
+    },
+
+    /// Manage system prompts and behaviors
+    #[command(about = "Manage the systems that goose can operate")]
+    Server {
+        #[arg(
+            short,
+            long,
+            value_name = "NAME",
+            help = "The stdio server to run",
+            long_help = "Runs one of the goose builtin MCP servers with stdio transport."
+        )]
+        name: String,
     },
 
     /// Start or resume interactive chat sessions
@@ -239,6 +252,9 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
         },
+        Some(Command::Server { name }) => {
+            let _ = run_server(&name).await;
+        }
         Some(Command::Session {
             name,
             profile,
@@ -260,7 +276,7 @@ async fn main() -> Result<()> {
                 }
             }
 
-            let mut session = build_session(name, profile, agent, resume);
+            let mut session = build_session(name, profile, agent, resume).await;
             let _ = session.start().await;
             return Ok(());
         }
@@ -299,7 +315,7 @@ async fn main() -> Result<()> {
                     .expect("Failed to read from stdin");
                 stdin
             };
-            let mut session = build_session(name, profile, agent, resume);
+            let mut session = build_session(name, profile, agent, resume).await;
             let _ = session.headless_start(contents.clone()).await;
             return Ok(());
         }
