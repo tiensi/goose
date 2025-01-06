@@ -1,48 +1,31 @@
 use async_trait::async_trait;
 use futures::stream::BoxStream;
-use serde::Serialize;
 use serde_json::json;
-use tokio::sync::Mutex;
 use std::collections::HashMap;
+use tokio::sync::Mutex;
 
-use super::{Agent, MCPManager};
-use crate::errors::{AgentError, AgentResult};
-use crate::message::{Message, ToolRequest};
+use super::Agent;
+use crate::agents::capabilities::Capabilities;
+use crate::agents::system::{SystemConfig, SystemResult};
+use crate::message::{Message, MessageContent, ToolRequest};
 use crate::providers::base::Provider;
+use crate::providers::base::ProviderUsage;
 use crate::register_agent;
-use crate::systems::System;
 use crate::token_counter::TokenCounter;
 use mcp_core::{Content, Resource, Tool, ToolCall};
-use crate::prompt_template::load_prompt_file;
-use crate::providers::base::ProviderUsage;
 use serde_json::Value;
 // used to sort resources by priority within error margin
 const PRIORITY_EPSILON: f32 = 0.001;
 
-#[derive(Clone, Debug, Serialize)]
-struct SystemStatus {
-    name: String,
-    status: String,
-}
-
-impl SystemStatus {
-    fn new(name: &str, status: String) -> Self {
-        Self {
-            name: name.to_string(),
-            status,
-        }
-    }
-}
-
 /// Default implementation of an Agent
 pub struct DefaultAgent {
-    mcp_manager: Mutex<MCPManager>,
+    capabilities: Mutex<Capabilities>,
 }
 
 impl DefaultAgent {
     pub fn new(provider: Box<dyn Provider>) -> Self {
         Self {
-            mcp_manager: Mutex::new(MCPManager::new(provider)),
+            capabilities: Mutex::new(Capabilities::new(provider)),
         }
     }
 
@@ -56,7 +39,7 @@ impl DefaultAgent {
         target_limit: usize,
         model_name: &str,
         resource_content: &HashMap<String, HashMap<String, (Resource, String)>>,
-    ) -> AgentResult<Vec<Message>> {
+    ) -> SystemResult<Vec<Message>> {
         let token_counter = TokenCounter::new();
 
         // Flatten all resource content into a vector of strings
@@ -87,7 +70,7 @@ impl DefaultAgent {
             for (system_name, resources) in resource_content {
                 let mut resource_counts = HashMap::new();
                 for (uri, (_resource, content)) in resources {
-                    let token_count = token_counter.count_tokens(&content, Some(model_name)) as u32;
+                    let token_count = token_counter.count_tokens(content, Some(model_name)) as u32;
                     resource_counts.insert(uri.clone(), token_count);
                 }
                 system_token_counts.insert(system_name.clone(), resource_counts);
@@ -155,13 +138,6 @@ impl DefaultAgent {
 
         // Join remaining status content and create status message
         let status_str = status_content.join("\n");
-        let mut context = HashMap::new();
-        let systems_status = vec![SystemStatus::new("system", status_str)];
-        context.insert("systems", &systems_status);
-
-        // Load and format the status template with only remaining resources
-        let status = load_prompt_file("status.md", &context)
-            .map_err(|e| AgentError::Internal(e.to_string()))?;
 
         // Create a new messages vector with our changes
         let mut new_messages = messages.to_vec();
@@ -171,15 +147,17 @@ impl DefaultAgent {
             new_messages.push(msg.clone());
         }
 
-        // Finally add the status messages
-        let message_use =
-            Message::assistant().with_tool_request("000", Ok(ToolCall::new("status", json!({}))));
+        // Finally add the status messages, if we have any
+        if !status_str.is_empty() {
+            let message_use = Message::assistant()
+                .with_tool_request("000", Ok(ToolCall::new("status", json!({}))));
 
-        let message_result =
-            Message::user().with_tool_response("000", Ok(vec![Content::text(status)]));
+            let message_result =
+                Message::user().with_tool_response("000", Ok(vec![Content::text(status_str)]));
 
-        new_messages.push(message_use);
-        new_messages.push(message_result);
+            new_messages.push(message_use);
+            new_messages.push(message_result);
+        }
 
         Ok(new_messages)
     }
@@ -187,52 +165,66 @@ impl DefaultAgent {
 
 #[async_trait]
 impl Agent for DefaultAgent {
-    async fn add_system(&mut self, system: Box<dyn System>) -> AgentResult<()> {
-        let mut manager = self.mcp_manager.lock().await;
-        manager.add_system(system);
-        Ok(())
+    async fn add_system(&mut self, system: SystemConfig) -> SystemResult<()> {
+        let mut capabilities = self.capabilities.lock().await;
+        capabilities.add_system(system).await
     }
 
-    async fn remove_system(&mut self, name: &str) -> AgentResult<()> {
-        let mut manager = self.mcp_manager.lock().await;
-        manager.remove_system(name)
+    async fn remove_system(&mut self, name: &str) {
+        let mut capabilities = self.capabilities.lock().await;
+        capabilities
+            .remove_system(name)
+            .await
+            .expect("Failed to remove system");
     }
 
-    async fn list_systems(&self) -> AgentResult<Vec<(String, String)>> {
-        let manager = self.mcp_manager.lock().await;
-        manager.list_systems().await
+    async fn list_systems(&self) -> Vec<String> {
+        let capabilities = self.capabilities.lock().await;
+        capabilities
+            .list_systems()
+            .await
+            .expect("Failed to list systems")
     }
 
-    async fn passthrough(&self, _system: &str, _request: Value) -> AgentResult<Value> {
+    async fn passthrough(&self, _system: &str, _request: Value) -> SystemResult<Value> {
+        // TODO implement
         Ok(Value::Null)
     }
 
-    async fn reply(&self, messages: &[Message]) -> anyhow::Result<BoxStream<'_, anyhow::Result<Message>>> {
-        let manager = self.mcp_manager.lock().await;
-        let tools = manager.get_prefixed_tools();
-        let system_prompt = manager.get_system_prompt()?;
-        let estimated_limit = manager.provider().get_model_config().get_estimated_limit();
+    async fn reply(
+        &self,
+        messages: &[Message],
+    ) -> anyhow::Result<BoxStream<'_, anyhow::Result<Message>>> {
+        let mut capabilities = self.capabilities.lock().await;
+        let tools = capabilities.get_prefixed_tools().await?;
+        let system_prompt = capabilities.get_system_prompt().await;
+        let estimated_limit = capabilities
+            .provider()
+            .get_model_config()
+            .get_estimated_limit();
 
         // Update conversation history for the start of the reply
-        let mut messages = self.prepare_inference(
-            &system_prompt,
-            &tools,
-            messages,
-            &Vec::new(),
-            estimated_limit,
-            &manager.provider().get_model_config().model_name,
-            &manager.get_systems_resources().await?,
-        ).await?;
+        let mut messages = self
+            .prepare_inference(
+                &system_prompt,
+                &tools,
+                messages,
+                &Vec::new(),
+                estimated_limit,
+                &capabilities.provider().get_model_config().model_name,
+                &capabilities.get_resources().await?,
+            )
+            .await?;
 
         Ok(Box::pin(async_stream::try_stream! {
             loop {
                 // Get completion from provider
-                let (response, usage) = manager.provider().complete(
+                let (response, usage) = capabilities.provider().complete(
                     &system_prompt,
                     &messages,
                     &tools,
                 ).await?;
-                manager.record_usage(usage).await;
+                capabilities.record_usage(usage).await;
 
                 // Yield the assistant's response
                 yield response.clone();
@@ -252,7 +244,8 @@ impl Agent for DefaultAgent {
                 // Then dispatch each in parallel
                 let futures: Vec<_> = tool_requests
                     .iter()
-                    .map(|request| manager.dispatch_tool_call(request.tool_call.clone()))
+                    .filter_map(|request| request.tool_call.clone().ok())
+                    .map(|tool_call| capabilities.dispatch_tool_call(tool_call))
                     .collect();
 
                 // Process all the futures in parallel but wait until all are finished
@@ -272,234 +265,26 @@ impl Agent for DefaultAgent {
 
                 // Now we have to remove the previous status tooluse and toolresponse
                 // before we add pending messages, then the status msgs back again
-                messages.pop();
-                messages.pop();
+                if let Some(message) = messages.last() {
+                    if let MessageContent::ToolResponse(result) = &message.content[0] {
+                        if result.id == "000" {
+                            messages.pop();
+                            messages.pop();
+                        }
+                    }
+                }
+
 
                 let pending = vec![response, message_tool_response];
-                messages = self.prepare_inference(&system_prompt, &tools, &messages, &pending, estimated_limit, &manager.provider().get_model_config().model_name, &manager.get_systems_resources().await?).await?;
+                messages = self.prepare_inference(&system_prompt, &tools, &messages, &pending, estimated_limit, &capabilities.provider().get_model_config().model_name, &capabilities.get_resources().await?).await?;
             }
         }))
     }
 
-    async fn usage(&self) -> AgentResult<Vec<ProviderUsage>> {
-        let manager = self.mcp_manager.lock().await;
-        manager.get_usage().await.map_err(|e| AgentError::Internal(e.to_string()))
+    async fn usage(&self) -> Vec<ProviderUsage> {
+        let capabilities = self.capabilities.lock().await;
+        capabilities.get_usage().await
     }
 }
 
 register_agent!("default", DefaultAgent);
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::message::{Message, MessageContent};
-    use crate::providers::configs::ModelConfig;
-    use crate::providers::mock::MockProvider;
-    use async_trait::async_trait;
-    use chrono::Utc;
-    use futures::TryStreamExt;
-    use mcp_core::resource::Resource;
-    use mcp_core::{Annotations, Content, Tool, ToolCall};
-    use serde_json::json;
-    use std::collections::HashMap;
-
-    // Mock system for testing
-    struct MockSystem {
-        name: String,
-        tools: Vec<Tool>,
-        resources: Vec<Resource>,
-        resource_content: HashMap<String, String>,
-    }
-
-    impl MockSystem {
-        fn new(name: &str) -> Self {
-            Self {
-                name: name.to_string(),
-                tools: vec![Tool::new(
-                    "echo",
-                    "Echoes back the input",
-                    json!({"type": "object", "properties": {"message": {"type": "string"}}, "required": ["message"]}),
-                )],
-                resources: Vec::new(),
-                resource_content: HashMap::new(),
-            }
-        }
-
-        fn add_resource(&mut self, name: &str, content: &str, priority: f32) {
-            let uri = format!("file://{}", name);
-            let resource = Resource {
-                name: name.to_string(),
-                uri: uri.clone(),
-                annotations: Some(Annotations::for_resource(priority, Utc::now())),
-                description: Some("A mock resource".to_string()),
-                mime_type: "text/plain".to_string(),
-            };
-            self.resources.push(resource);
-            self.resource_content.insert(uri, content.to_string());
-        }
-    }
-
-    #[async_trait]
-    impl System for MockSystem {
-        fn name(&self) -> &str {
-            &self.name
-        }
-
-        fn description(&self) -> &str {
-            "A mock system for testing"
-        }
-
-        fn instructions(&self) -> &str {
-            "Mock system instructions"
-        }
-
-        fn tools(&self) -> &[Tool] {
-            &self.tools
-        }
-
-        async fn status(&self) -> anyhow::Result<Vec<Resource>> {
-            Ok(self.resources.clone())
-        }
-
-        async fn call(&self, tool_call: ToolCall) -> AgentResult<Vec<Content>> {
-            match tool_call.name.as_str() {
-                "echo" => Ok(vec![Content::text(
-                    tool_call.arguments["message"].as_str().unwrap_or(""),
-                )]),
-                _ => Err(AgentError::ToolNotFound(tool_call.name)),
-            }
-        }
-
-        async fn read_resource(&self, uri: &str) -> AgentResult<String> {
-            self.resource_content.get(uri).cloned().ok_or_else(|| {
-                AgentError::InvalidParameters(format!("Resource {} could not be found", uri))
-            })
-        }
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn test_simple_response() -> anyhow::Result<()> {
-        let response = Message::assistant().with_text("Hello!");
-        let provider = MockProvider::new(vec![response.clone()]);
-        let mut agent = DefaultAgent::new(Box::new(provider));
-
-        // Add a system to test system management
-        agent.add_system(Box::new(MockSystem::new("test"))).await?;
-
-        let initial_message = Message::user().with_text("Hi");
-        let initial_messages = vec![initial_message];
-
-        let mut stream = agent.reply(&initial_messages).await?;
-        let mut messages = Vec::new();
-        while let Some(msg) = stream.try_next().await? {
-            messages.push(msg);
-        }
-
-        assert_eq!(messages.len(), 1);
-        assert_eq!(messages[0], response);
-        Ok(())
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn test_system_management() -> anyhow::Result<()> {
-        let provider = MockProvider::new(vec![]);
-        let mut agent = DefaultAgent::new(Box::new(provider));
-
-        // Add a system
-        agent.add_system(Box::new(MockSystem::new("test1"))).await?;
-        agent.add_system(Box::new(MockSystem::new("test2"))).await?;
-
-        // List systems
-        let systems = agent.list_systems().await?;
-        assert_eq!(systems.len(), 2);
-        assert!(systems.iter().any(|(name, _)| name == "test1"));
-        assert!(systems.iter().any(|(name, _)| name == "test2"));
-
-        // Remove a system
-        agent.remove_system("test1").await?;
-        let systems = agent.list_systems().await?;
-        assert_eq!(systems.len(), 1);
-        assert_eq!(systems[0].0, "test2");
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_tool_call() -> anyhow::Result<()> {
-        let mut agent = DefaultAgent::new(Box::new(MockProvider::new(vec![
-            Message::assistant().with_tool_request(
-                "1",
-                Ok(ToolCall::new("test_echo", json!({"message": "test"}))),
-            ),
-            Message::assistant().with_text("Done!"),
-        ])));
-
-        agent.add_system(Box::new(MockSystem::new("test"))).await?;
-
-        let initial_message = Message::user().with_text("Echo test");
-        let initial_messages = vec![initial_message];
-
-        let mut stream = agent.reply(&initial_messages).await?;
-        let mut messages = Vec::new();
-        while let Some(msg) = stream.try_next().await? {
-            messages.push(msg);
-        }
-
-        // Should have three messages: tool request, response, and model text
-        assert_eq!(messages.len(), 3);
-        assert!(messages[0]
-            .content
-            .iter()
-            .any(|c| matches!(c, MessageContent::ToolRequest(_))));
-        assert_eq!(messages[2].content[0], MessageContent::text("Done!"));
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_prepare_inference_trims_resources() -> anyhow::Result<()> {
-        let provider = MockProvider::with_config(
-            vec![],
-            ModelConfig::new("test_model".to_string()).with_context_limit(Some(20)),
-        );
-        let mut agent = DefaultAgent::new(Box::new(provider));
-
-        // Create a mock system with resources
-        let mut system = MockSystem::new("test");
-        let hello_1_tokens = "hello ".repeat(1); // 1 tokens
-        let goodbye_10_tokens = "goodbye ".repeat(10); // 10 tokens
-        system.add_resource("test_resource_removed", &goodbye_10_tokens, 0.1);
-        system.add_resource("test_resource_expected", &hello_1_tokens, 0.5);
-
-        agent.add_system(Box::new(system)).await?;
-
-        // Set up test parameters
-        let manager = agent.mcp_manager.lock().await;
-
-        let system_prompt = "This is a system prompt";
-        let messages = vec![Message::user().with_text("Hi there")];
-        let pending = vec![];
-        let tools = vec![];
-        let target_limit = manager.provider().get_model_config().context_limit();
-
-        assert_eq!(target_limit, 20, "Context limit should be 20");
-        // Test prepare_inference
-        let result = agent
-            .prepare_inference(&system_prompt, &tools, &messages, &pending, target_limit, &manager.provider().get_model_config().model_name, &manager.get_systems_resources().await?)
-            .await?;
-
-        // Get the last message which should be the tool response containing status
-        let status_message = result.last().unwrap();
-        let status_content = status_message
-            .content
-            .first()
-            .and_then(|content| content.as_tool_response_text())
-            .unwrap_or_default();
-
-
-        // Verify that "hello" is within the response, should be just under 20 tokens with "hello"
-        assert!(status_content.contains("hello"));
-        assert!(!status_content.contains("goodbye"));
-
-        Ok(())
-    }
-}

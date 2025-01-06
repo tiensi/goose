@@ -176,12 +176,10 @@ async fn stream_message(
     message: Message,
     tx: &mpsc::Sender<String>,
 ) -> Result<(), mpsc::error::SendError<String>> {
-    dbg!(&message);
     match message.role {
         Role::User => {
             // Handle tool responses
             for content in message.content {
-                dbg!(&content);
                 // I believe with the protocol we aren't intended to pass back user messages, so we only deal with
                 // the tool responses here
                 if let MessageContent::ToolResponse(response) = content {
@@ -306,7 +304,8 @@ async fn handler(
                         Err(_) => { // Heartbeat, used to detect disconnected clients and then end running tools.
                             if tx.is_closed() {
                                 // Kill any running processes when the client disconnects
-                                goose::process_store::kill_processes();
+                                // TODO is this used? I suspect post MCP this is on the server instead
+                                // goose::process_store::kill_processes();
                                 break;
                             }
                             continue;
