@@ -36,7 +36,7 @@ export default function Input({
     <form onSubmit={onFormSubmit} className="flex relative h-auto px-[16px] py-[1rem]">
       <div className="w-full relative">
         <MarkdownToolbar onFormat={handleFormat} disabled={disabled || isPreview} />
-        <div className="pr-[160px]">
+        <div className="pr-[160px] relative">
           {isPreview ? (
             <InputPreview 
               text={text} 

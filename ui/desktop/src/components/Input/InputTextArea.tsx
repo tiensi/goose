@@ -25,12 +25,7 @@ export const InputTextArea = ({
     disabled={disabled}
     ref={textAreaRef}
     rows={1}
-    style={{
-      minHeight: '1rem',
-      maxHeight: '240px',
-      overflowY: 'auto'
-    }}
-    className={`w-full outline-none border-none focus:ring-0 bg-transparent p-0 text-14 resize-none ${
+    className={`w-full min-h-[1rem] max-h-[240px] overflow-y-auto outline-none border-none focus:ring-0 bg-transparent text-14 resize-none pr-3 ${
       disabled ? 'cursor-not-allowed opacity-50' : ''
     }`}
   />
