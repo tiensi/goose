@@ -20,12 +20,14 @@ const PRIORITY_EPSILON: f32 = 0.001;
 /// Default implementation of an Agent
 pub struct DefaultAgent {
     capabilities: Mutex<Capabilities>,
+    token_counter: TokenCounter,
 }
 
 impl DefaultAgent {
     pub fn new(provider: Box<dyn Provider>) -> Self {
         Self {
             capabilities: Mutex::new(Capabilities::new(provider)),
+            token_counter: TokenCounter::new(),
         }
     }
 
@@ -40,7 +42,6 @@ impl DefaultAgent {
         model_name: &str,
         resource_content: &HashMap<String, HashMap<String, (Resource, String)>>,
     ) -> SystemResult<Vec<Message>> {
-        let token_counter = TokenCounter::new();
 
         // Flatten all resource content into a vector of strings
         let mut resources = Vec::new();
@@ -50,7 +51,7 @@ impl DefaultAgent {
             }
         }
 
-        let approx_count = token_counter.count_everything(
+        let approx_count = self.token_counter.count_everything(
             system_prompt,
             messages,
             tools,
@@ -70,7 +71,7 @@ impl DefaultAgent {
             for (system_name, resources) in resource_content {
                 let mut resource_counts = HashMap::new();
                 for (uri, (_resource, content)) in resources {
-                    let token_count = token_counter.count_tokens(content, Some(model_name)) as u32;
+                    let token_count = self.token_counter.count_tokens(content, Some(model_name)) as u32;
                     resource_counts.insert(uri.clone(), token_count);
                 }
                 system_token_counts.insert(system_name.clone(), resource_counts);
