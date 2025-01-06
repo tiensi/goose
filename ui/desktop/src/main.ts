@@ -9,6 +9,7 @@ import log from './utils/logger';
 import { exec } from 'child_process';
 import { addRecentDir, loadRecentDirs } from './utils/recentDirs';
 import { EnvToggles, loadSettings, saveSettings, updateEnvironmentVariables, createEnvironmentMenu } from './utils/settings';
+import isDev from 'electron-is-dev';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) app.quit();
@@ -175,15 +176,26 @@ const createChat = async (app, query?: string, dir?: string) => {
   }
 
   // DevTools
-  globalShortcut.register('Alt+Command+I', () => {
-    mainWindow.webContents.openDevTools();
-  });
+  // Enable app-focused DevTools shortcut only in development
+  if (isDev) {
+    console.log('Running in development mode');
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+      if (input.key === 'I' && input.meta && input.alt) {
+        mainWindow.webContents.openDevTools();
+      }
+    });
+  } else {
+    console.log('Running in production mode');
+    // Ensure DevTools cannot open in production
+    mainWindow.webContents.on('devtools-opened', () => {
+      mainWindow.webContents.closeDevTools();
+    });
 
   windowMap.set(windowId, mainWindow);
   mainWindow.on('closed', () => {
     windowMap.delete(windowId);
   });
-};
+}
 
 const createTray = () => {
   const isDev = process.env.NODE_ENV === 'development';
