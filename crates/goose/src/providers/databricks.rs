@@ -14,6 +14,8 @@ use super::utils::{
 };
 use crate::message::Message;
 use mcp_core::tool::Tool;
+use tracing::{debug};
+
 
 pub struct DatabricksProvider {
     client: Client,
@@ -165,7 +167,7 @@ impl Provider for DatabricksProvider {
         let usage = Self::get_usage(&response)?;
         let model = get_model(&response);
         let cost = cost(&usage, &model_pricing_for(&model));
-        tracing::debug!(
+        debug!(
             model_config = %serde_json::to_string_pretty(&self.config).unwrap_or_default(),
             input = %serde_json::to_string_pretty(&payload).unwrap_or_default(),
             output = %serde_json::to_string_pretty(&response).unwrap_or_default(),

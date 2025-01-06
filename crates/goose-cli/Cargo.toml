@@ -39,6 +39,8 @@ rust_decimal_macros = "1.36.0"
 tracing = "0.1"
 chrono = "0.4"
 parking_lot = "0.12.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json", "time"] }
+tracing-appender = "0.2"
 
 [dev-dependencies]
 tempfile = "3"

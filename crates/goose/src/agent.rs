@@ -127,8 +127,8 @@ impl Agent {
         let system_tool_call = ToolCall::new(tool_name, call.arguments);
         let result = system.call(system_tool_call.clone()).await;
 
-        tracing::debug!("input"=serde_json::to_string(&system_tool_call).unwrap(),
-                        "output"=serde_json::to_string(&result).unwrap(),
+        debug!("input"=serde_json::to_string(&system_tool_call).unwrap(),
+                "output"=serde_json::to_string(&result).unwrap(),
         );
 
         result 
@@ -350,7 +350,7 @@ impl Agent {
             .and_then(|msg| msg.content.first())
             .and_then(|c| c.as_text()) 
         {
-            reply_span.record("user_message", &content);
+            debug!("user_message"=&content);
         }
 
         let system_prompt = self.get_system_prompt()?;

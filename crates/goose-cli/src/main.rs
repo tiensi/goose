@@ -7,6 +7,7 @@ pub mod agents;
 mod profile;
 mod prompt;
 pub mod session;
+mod logging;
 
 mod systems;
 
@@ -17,7 +18,7 @@ use commands::session::build_session;
 use commands::version::print_version;
 use profile::has_no_profiles;
 use std::io::{self, Read};
-use goose::logging::setup_logging;
+use logging::setup_logging;
 
 mod log_usage;
 
@@ -196,7 +197,7 @@ enum CliProviderVariant {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    setup_logging()?;
+    setup_logging();
     
     let cli = Cli::parse();
 

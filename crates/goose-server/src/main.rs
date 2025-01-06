@@ -1,5 +1,6 @@
 mod configuration;
 mod error;
+mod logging;
 mod routes;
 mod state;
 
@@ -9,7 +10,7 @@ use tracing::info;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Initialize tracing for logging
-    tracing_subscriber::fmt::init();
+    logging::setup_logging()?;
 
     // Load configuration
     let settings = configuration::Settings::new()?;
