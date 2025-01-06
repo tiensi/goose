@@ -12,9 +12,6 @@ import { EnvToggles, loadSettings, saveSettings, updateEnvironmentVariables, cre
 import isDev from 'electron-is-dev';
 
 
-console.log('NODE_ENV:', process.env.NODE_ENV);
-console.log('isDev:', isDev);
-
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) app.quit();
 
