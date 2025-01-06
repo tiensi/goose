@@ -9,6 +9,8 @@ pub enum SystemError {
     Initialization(SystemConfig),
     #[error("Failed a client call to an MCP server")]
     Client(#[from] ClientError),
+    #[error("Transport error: {0}")]
+    Transport(#[from] mcp_client::transport::Error),
 }
 
 pub type SystemResult<T> = Result<T, SystemError>;

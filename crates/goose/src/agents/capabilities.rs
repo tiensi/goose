@@ -6,15 +6,13 @@ use tokio::sync::Mutex;
 use super::system::{SystemConfig, SystemError, SystemInfo, SystemResult};
 use crate::prompt_template::load_prompt_file;
 use crate::providers::base::{Provider, ProviderUsage};
-use mcp_client::client::{ClientCapabilities, ClientInfo, McpClient, McpClientImpl};
-use mcp_client::service::TransportService;
-use mcp_client::transport::{SseTransport, StdioTransport};
+use mcp_client::client::{ClientCapabilities, ClientInfo, McpClient};
+use mcp_client::transport::{Transport, SseTransport, StdioTransport};
 use mcp_core::{Content, Resource, Tool, ToolCall, ToolError, ToolResult};
-use tower::ServiceBuilder;
 
 /// Manages MCP clients and their interactions
 pub struct Capabilities {
-    clients: HashMap<String, Arc<Mutex<Box<dyn McpClient + Send>>>>,
+    clients: HashMap<String, Arc<Mutex<McpClient>>>,
     instructions: HashMap<String, String>,
     provider: Box<dyn Provider>,
     provider_usage: Mutex<Vec<ProviderUsage>>,
@@ -34,16 +32,14 @@ impl Capabilities {
     /// Add a new MCP system based on the provided client type
     // TODO IMPORTANT need to ensure this times out if the system command is broken!
     pub async fn add_system(&mut self, config: SystemConfig) -> SystemResult<()> {
-        let client: Box<dyn McpClient + Send> = match config {
+        let client: McpClient = match config {
             SystemConfig::Sse { ref uri } => {
                 let transport = SseTransport::new(uri);
-                let service = ServiceBuilder::new().service(TransportService::new(transport));
-                Box::new(McpClientImpl::new(service))
+                McpClient::new(transport.start().await?)
             }
             SystemConfig::Stdio { ref cmd, ref args } => {
                 let transport = StdioTransport::new(cmd, args.to_vec());
-                let service = ServiceBuilder::new().service(TransportService::new(transport));
-                Box::new(McpClientImpl::new(service))
+                McpClient::new(transport.start().await?)
             }
         };
 
@@ -200,7 +196,7 @@ impl Capabilities {
     fn get_client_for_tool(
         &self,
         prefixed_name: &str,
-    ) -> Option<Arc<Mutex<Box<dyn McpClient + Send>>>> {
+    ) -> Option<Arc<Mutex<McpClient>>> {
         prefixed_name
             .split_once("__")
             .and_then(|(client_name, _)| self.clients.get(client_name))
