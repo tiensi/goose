@@ -7,7 +7,7 @@ import { ScrollArea } from './components/ui/scroll-area';
 import Splash from './components/Splash';
 import GooseMessage from './components/GooseMessage';
 import UserMessage from './components/UserMessage';
-import Input from './components/Input';
+import Input from './components/Input/index';
 import MoreMenu from './components/MoreMenu';
 import BottomMenu from './components/BottomMenu';
 import LoadingGoose from './components/LoadingGoose';
