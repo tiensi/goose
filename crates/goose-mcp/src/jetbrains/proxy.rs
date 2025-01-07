@@ -134,16 +134,16 @@ impl JetBrainsProxy {
         }
 
         let tools_response: Value = response.json().await?;
-        let tools = tools_response["tools"]
+        let tools = tools_response
             .as_array()
             .ok_or_else(|| anyhow!("Invalid tools response format"))?
             .iter()
             .filter_map(|t| {
-                if let (Some(name), Some(description)) = (t["name"].as_str(), t["description"].as_str()) {
+                if let (Some(name), Some(description), Some(input_schema)) = (t["name"].as_str(), t["description"].as_str(), t["input_schema"].as_str()) {
                     Some(Tool {
                         name: name.to_string(),
                         description: description.to_string(),
-                        input_schema: serde_json::json!({}),
+                        input_schema: serde_json::json!(input_schema),
                     })
                 } else {
                     None
