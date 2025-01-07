@@ -76,12 +76,6 @@ impl LangfuseBatchManager {
             return Ok(());
         }
 
-        // In test mode, just clear the batch and return success
-        if cfg!(test) {
-            self.batch.clear();
-            return Ok(());
-        }
-
         let payload = json!({ "batch": self.batch });
         let url = format!("{}/api/public/ingestion", self.base_url);
 
@@ -144,11 +138,6 @@ impl BatchManager for LangfuseBatchManager {
     }
 
     fn send(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        if cfg!(test) {
-            self.batch.clear();
-            return Ok(());
-        }
-
         tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(self.send_async())
         })
@@ -215,10 +204,16 @@ mod tests {
         }
 
         fn save_env_vars() -> HashMap<String, String> {
-            ["LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "LANGFUSE_URL"]
-                .iter()
-                .filter_map(|&var| env::var(var).ok().map(|val| (var.to_string(), val)))
-                .collect()
+            [
+                "LANGFUSE_PUBLIC_KEY",
+                "LANGFUSE_INIT_PROJECT_PUBLIC_KEY",
+                "LANGFUSE_SECRET_KEY",
+                "LANGFUSE_INIT_PROJECT_SECRET_KEY",
+                "LANGFUSE_URL",
+            ]
+            .iter()
+            .filter_map(|&var| env::var(var).ok().map(|val| (var.to_string(), val)))
+            .collect()
         }
 
         async fn with_mock_server(mut self) -> Self {
@@ -250,7 +245,13 @@ mod tests {
             }
 
             // Restore environment
-            for var in ["LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "LANGFUSE_URL"] {
+            for var in [
+                "LANGFUSE_PUBLIC_KEY",
+                "LANGFUSE_INIT_PROJECT_PUBLIC_KEY",
+                "LANGFUSE_SECRET_KEY",
+                "LANGFUSE_INIT_PROJECT_SECRET_KEY",
+                "LANGFUSE_URL",
+            ] {
                 if let Some(value) = self.original_env_vars.get(var) {
                     env::set_var(var, value);
                 } else {
@@ -387,25 +388,86 @@ mod tests {
     async fn test_create_langfuse_observer() {
         let fixture = TestFixture::new().await.with_mock_server().await;
 
-        fixture
-            .mock_response(
-                200,
-                json!({
-                    "successes": [{"id": "1", "status": 200}],
-                    "errors": []
-                }),
-            )
-            .await;
+        // Test 1: No environment variables set - remove all possible variables
+        for var in &[
+            "LANGFUSE_PUBLIC_KEY",
+            "LANGFUSE_INIT_PROJECT_PUBLIC_KEY",
+            "LANGFUSE_SECRET_KEY",
+            "LANGFUSE_INIT_PROJECT_SECRET_KEY",
+            "LANGFUSE_URL",
+        ] {
+            env::remove_var(var);
+        }
 
         let observer = create_langfuse_observer();
-        assert!(observer.is_some());
+        assert!(
+            observer.is_none(),
+            "Observer should be None without environment variables"
+        );
 
-        // Remove the send() test since it's blocking
-        // Instead test that we can get the batch manager
+        // Test 2: Only public key set (regular)
+        env::set_var("LANGFUSE_PUBLIC_KEY", "test-public-key");
+        let observer = create_langfuse_observer();
+        assert!(
+            observer.is_none(),
+            "Observer should be None with only public key"
+        );
+        env::remove_var("LANGFUSE_PUBLIC_KEY");
+
+        // Test 3: Only secret key set (regular)
+        env::set_var("LANGFUSE_SECRET_KEY", "test-secret-key");
+        let observer = create_langfuse_observer();
+        assert!(
+            observer.is_none(),
+            "Observer should be None with only secret key"
+        );
+        env::remove_var("LANGFUSE_SECRET_KEY");
+
+        // Test 4: Only public key set (init project)
+        env::set_var("LANGFUSE_INIT_PROJECT_PUBLIC_KEY", "test-public-key");
+        let observer = create_langfuse_observer();
+        assert!(
+            observer.is_none(),
+            "Observer should be None with only init project public key"
+        );
+        env::remove_var("LANGFUSE_INIT_PROJECT_PUBLIC_KEY");
+
+        // Test 5: Only secret key set (init project)
+        env::set_var("LANGFUSE_INIT_PROJECT_SECRET_KEY", "test-secret-key");
+        let observer = create_langfuse_observer();
+        assert!(
+            observer.is_none(),
+            "Observer should be None with only init project secret key"
+        );
+        env::remove_var("LANGFUSE_INIT_PROJECT_SECRET_KEY");
+
+        // Test 6: Both regular keys set (should succeed)
+        env::set_var("LANGFUSE_PUBLIC_KEY", "test-public-key");
+        env::set_var("LANGFUSE_SECRET_KEY", "test-secret-key");
+        env::set_var("LANGFUSE_URL", fixture.mock_server_uri());
+        let observer = create_langfuse_observer();
+        assert!(
+            observer.is_some(),
+            "Observer should be Some with both regular keys set"
+        );
+
+        // Clean up regular keys
+        env::remove_var("LANGFUSE_PUBLIC_KEY");
+        env::remove_var("LANGFUSE_SECRET_KEY");
+
+        // Test 7: Both init project keys set (should succeed)
+        env::set_var("LANGFUSE_INIT_PROJECT_PUBLIC_KEY", "test-public-key");
+        env::set_var("LANGFUSE_INIT_PROJECT_SECRET_KEY", "test-secret-key");
+        let observer = create_langfuse_observer();
+        assert!(
+            observer.is_some(),
+            "Observer should be Some with both init project keys set"
+        );
+
+        // Verify the observer has an empty batch manager
         let batch_manager = observer.unwrap().batch_manager;
         assert!(batch_manager.lock().await.is_empty());
     }
-
     #[tokio::test]
     async fn test_batch_manager_spawn_sender() {
         let fixture = TestFixture::new().await.with_mock_server().await;
