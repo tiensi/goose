@@ -11,7 +11,7 @@ use super::base::{Provider, Usage};
 use super::configs::{AnthropicProviderConfig, ModelConfig, ProviderModelConfig};
 use super::model_pricing::cost;
 use super::model_pricing::model_pricing_for;
-use super::utils::{get_model, emit_debug_trace};
+use super::utils::{emit_debug_trace, get_model};
 use crate::message::{Message, MessageContent};
 use mcp_core::content::Content;
 use mcp_core::role::Role;

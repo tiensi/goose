@@ -197,7 +197,6 @@ enum CliProviderVariant {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-
     let cli = Cli::parse();
 
     if cli.version {

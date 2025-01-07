@@ -10,7 +10,7 @@ use super::configs::OpenAiProviderConfig;
 use super::configs::{ModelConfig, ProviderModelConfig};
 use super::model_pricing::cost;
 use super::model_pricing::model_pricing_for;
-use super::utils::{get_model, handle_response, emit_debug_trace};
+use super::utils::{emit_debug_trace, get_model, handle_response};
 use crate::message::Message;
 use crate::providers::openai_utils::{
     check_openai_context_length_error, create_openai_request_payload, get_openai_usage,
