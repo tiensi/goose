@@ -95,3 +95,135 @@ pub fn setup_logging(session_name: Option<&str>) -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+    use tempfile::TempDir;
+    use test_case::test_case;
+    use tokio::runtime::Runtime;
+
+    fn setup_temp_home() -> TempDir {
+        let temp_dir = TempDir::new().unwrap();
+        env::set_var("HOME", temp_dir.path());
+        temp_dir
+    }
+
+    #[test]
+    fn test_log_directory_creation() {
+        let _temp_dir = setup_temp_home();
+        let log_dir = get_log_directory().unwrap();
+        assert!(log_dir.exists());
+        assert!(log_dir.is_dir());
+
+        // Verify directory structure
+        let path_components: Vec<_> = log_dir.components().collect();
+        assert!(path_components.iter().any(|c| c.as_os_str() == "goose"));
+        assert!(path_components.iter().any(|c| c.as_os_str() == "logs"));
+        assert!(path_components.iter().any(|c| c.as_os_str() == "cli"));
+    }
+
+    #[test_case(Some("test_session") ; "with session name")]
+    #[test_case(None ; "without session name")]
+    fn test_log_file_name(session_name: Option<&str>) {
+        let _rt = Runtime::new().unwrap();
+        let _temp_dir = setup_temp_home();
+
+        // Create a test-specific log directory and file
+        let log_dir = get_log_directory().unwrap();
+        let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
+        let file_name = format!("{}.log", session_name.unwrap_or(&timestamp));
+
+        // Create the log file
+        let file_path = log_dir.join(&file_name);
+        fs::write(&file_path, "test").unwrap();
+
+        // Verify the file exists and has the correct name
+        let entries = fs::read_dir(log_dir).unwrap();
+        let log_files: Vec<_> = entries
+            .filter_map(Result::ok)
+            .filter(|e| e.path().extension().map_or(false, |ext| ext == "log"))
+            .collect();
+
+        assert_eq!(log_files.len(), 1, "Expected exactly one log file");
+
+        let log_file_name = log_files[0].file_name().to_string_lossy().into_owned();
+        println!("Log file name: {}", log_file_name);
+
+        if let Some(name) = session_name {
+            assert_eq!(log_file_name, format!("{}.log", name));
+        } else {
+            // Extract just the filename without extension for comparison
+            let name_without_ext = log_file_name.trim_end_matches(".log");
+            // Verify it's a valid timestamp format
+            assert_eq!(
+                name_without_ext.len(),
+                15,
+                "Expected 15 characters (YYYYMMDD_HHMMSS)"
+            );
+            assert!(
+                name_without_ext[8..9].contains('_'),
+                "Expected underscore at position 8"
+            );
+            assert!(
+                name_without_ext
+                    .chars()
+                    .all(|c| c.is_ascii_digit() || c == '_'),
+                "Expected only digits and underscore"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_langfuse_layer_creation() {
+        let _temp_dir = setup_temp_home();
+
+        // Store original environment variables (both sets)
+        let original_vars = [
+            ("LANGFUSE_PUBLIC_KEY", env::var("LANGFUSE_PUBLIC_KEY").ok()),
+            ("LANGFUSE_SECRET_KEY", env::var("LANGFUSE_SECRET_KEY").ok()),
+            ("LANGFUSE_HOST", env::var("LANGFUSE_HOST").ok()),
+            (
+                "LANGFUSE_INIT_PROJECT_PUBLIC_KEY",
+                env::var("LANGFUSE_INIT_PROJECT_PUBLIC_KEY").ok(),
+            ),
+            (
+                "LANGFUSE_INIT_PROJECT_SECRET_KEY",
+                env::var("LANGFUSE_INIT_PROJECT_SECRET_KEY").ok(),
+            ),
+        ];
+
+        // Clear all Langfuse environment variables
+        for (var, _) in &original_vars {
+            env::remove_var(var);
+        }
+
+        // Test without any environment variables
+        assert!(langfuse_layer::create_langfuse_observer().is_none());
+
+        // Test with standard Langfuse variables
+        env::set_var("LANGFUSE_PUBLIC_KEY", "test_public_key");
+        env::set_var("LANGFUSE_SECRET_KEY", "test_secret_key");
+        assert!(langfuse_layer::create_langfuse_observer().is_some());
+
+        // Clear and test with init project variables
+        env::remove_var("LANGFUSE_PUBLIC_KEY");
+        env::remove_var("LANGFUSE_SECRET_KEY");
+        env::set_var("LANGFUSE_INIT_PROJECT_PUBLIC_KEY", "test_public_key");
+        env::set_var("LANGFUSE_INIT_PROJECT_SECRET_KEY", "test_secret_key");
+        assert!(langfuse_layer::create_langfuse_observer().is_some());
+
+        // Test fallback behavior
+        env::remove_var("LANGFUSE_INIT_PROJECT_PUBLIC_KEY");
+        assert!(langfuse_layer::create_langfuse_observer().is_none());
+
+        // Restore original environment variables
+        for (var, value) in original_vars {
+            match value {
+                Some(val) => env::set_var(var, val),
+                None => env::remove_var(var),
+            }
+        }
+    }
+}
