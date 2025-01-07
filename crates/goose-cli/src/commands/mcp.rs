@@ -1,5 +1,5 @@
 use anyhow::Result;
-use developer::DeveloperRouter;
+use goose_mcp::DeveloperRouter;
 use mcp_server::router::RouterService;
 use mcp_server::{ByteTransport, Server};
 use tokio::io::{stdin, stdout};

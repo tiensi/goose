@@ -13,7 +13,7 @@ path = "src/main.rs"
 
 [dependencies]
 goose = { path = "../goose" }
-developer = { path = "../developer" }
+goose-mcp = { path = "../goose-mcp" }
 mcp-client = { path = "../mcp-client" }
 mcp-server = { path = "../mcp-server" }
 mcp-core = { path = "../mcp-core" }

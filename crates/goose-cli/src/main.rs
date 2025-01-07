@@ -11,7 +11,7 @@ mod systems;
 
 use commands::agent_version::AgentCommand;
 use commands::configure::handle_configure;
-use commands::server::run_server;
+use commands::mcp::run_server;
 use commands::session::build_session;
 use commands::version::print_version;
 use profile::has_no_profiles;
@@ -73,8 +73,8 @@ enum Command {
     },
 
     /// Manage system prompts and behaviors
-    #[command(about = "Manage the systems that goose can operate")]
-    Server {
+    #[command(about = "Run one of the mcp servers bundled with goose")]
+    Mcp {
         #[arg(
             short,
             long,
@@ -252,7 +252,7 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
         },
-        Some(Command::Server { name }) => {
+        Some(Command::Mcp { name }) => {
             let _ = run_server(&name).await;
         }
         Some(Command::Session {
