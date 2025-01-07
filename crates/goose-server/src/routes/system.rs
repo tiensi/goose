@@ -15,7 +15,9 @@ async fn add_system(
     let mut agent = state.agent.lock().await;
     let response = agent.add_system(request).await;
 
-    Json(SystemResponse { error: !response.is_ok() })
+    Json(SystemResponse {
+        error: response.is_err(),
+    })
 }
 
 pub fn routes(state: AppState) -> Router {

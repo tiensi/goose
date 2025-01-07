@@ -1,5 +1,5 @@
-mod configuration;
 mod commands;
+mod configuration;
 mod error;
 mod routes;
 mod state;
