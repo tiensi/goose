@@ -30,8 +30,6 @@ enum Commands {
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
-    logging::setup_logging()?;
-
     match &cli.command {
         Commands::Agent => {
             commands::agent::run().await?;

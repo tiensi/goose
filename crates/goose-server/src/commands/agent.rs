@@ -5,8 +5,8 @@ use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 
 pub async fn run() -> Result<()> {
-    // Initialize tracing for logging
-    tracing_subscriber::fmt::init();
+    // Initialize logging
+    crate::logging::setup_logging()?;
 
     // Load configuration
     let settings = configuration::Settings::new()?;
