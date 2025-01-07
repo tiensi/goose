@@ -315,10 +315,14 @@ function ChatContent({
 
 // Function to send the system configuration to the server
 const addSystemConfig = async () => {
+  console.log("calling add system")
+  // Get the app instance from electron
+  const app = window.electron.app;
+  
   const systemConfig = {
     type: "Stdio",
-    cmd: "goose",
-    args: ["server", "--name", "developer"]
+    cmd: await window.electron.getBinaryPath('goosed'),
+    args: ["mcp", "developer"]
   };
 
   try {
@@ -334,9 +338,9 @@ const addSystemConfig = async () => {
       throw new Error(`Failed to add system config: ${response.statusText}`);
     }
 
-    window.electron.logInfo('Successfully added system config');
+    console.log('Successfully added system config');
   } catch (error) {
-    window.electron.logError('Error adding system config:', error);
+    console.log('Error adding system config:', error);
   }
 };
 

@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { loadZshEnv } from './utils/loadEnv';
+import { getBinaryPath } from './utils/binaryPath';
 import { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, Notification, MenuItem, dialog } from 'electron';
 import path from 'node:path';
 import { startGoosed } from './goosed';
@@ -380,6 +381,11 @@ app.whenReady().then(async () => {
   ipcMain.on('reload-app', () => {
     app.relaunch();
     app.exit(0);
+  });
+
+  // Handle binary path requests
+  ipcMain.handle('get-binary-path', (event, binaryName) => {
+    return getBinaryPath(app, binaryName);
   });
 
   // Handle metadata fetching from main process
