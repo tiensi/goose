@@ -34,16 +34,16 @@ fn get_log_directory() -> Result<PathBuf> {
 /// - File-based logging with JSON formatting (DEBUG level)
 /// - Console output for development (INFO level)
 /// - Optional Langfuse integration (DEBUG level)
-pub fn setup_logging() -> Result<()> {
+pub fn setup_logging(session_name: Option<&str>) -> Result<()> {
     // Set up file appender for goose module logs
     let log_dir = get_log_directory()?;
     let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
-
+    
     // Create non-rolling file appender for detailed logs
     let file_appender = tracing_appender::rolling::RollingFileAppender::new(
         Rotation::NEVER,
         log_dir,
-        &format!("goose_{}.log", timestamp),
+        &format!("{}.log", session_name.unwrap_or(&timestamp))
     );
 
     // Create JSON file logging layer with all logs (DEBUG and above)

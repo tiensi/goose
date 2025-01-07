@@ -197,7 +197,6 @@ enum CliProviderVariant {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    setup_logging();
 
     let cli = Cli::parse();
 
@@ -231,6 +230,8 @@ async fn main() -> Result<()> {
             resume,
         }) => {
             let mut session = build_session(name, profile, resume);
+            setup_logging(session.session_file().file_stem().and_then(|s| s.to_str()))?;
+
             let _ = session.start().await;
             return Ok(());
         }
