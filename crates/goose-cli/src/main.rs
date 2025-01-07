@@ -1,26 +1,23 @@
-mod commands {
-    pub mod configure;
-    pub mod session;
-    pub mod version;
-}
-pub mod agents;
+use anyhow::Result;
+use clap::{Parser, Subcommand};
+use goose::agents::AgentFactory;
+
+mod commands;
+mod log_usage;
 mod logging;
 mod profile;
 mod prompt;
-pub mod session;
-
+mod session;
 mod systems;
 
-use anyhow::Result;
-use clap::{Parser, Subcommand};
+use commands::agent_version::AgentCommand;
 use commands::configure::handle_configure;
+use commands::mcp::run_server;
 use commands::session::build_session;
 use commands::version::print_version;
 use logging::setup_logging;
 use profile::has_no_profiles;
 use std::io::{self, Read};
-
-mod log_usage;
 
 #[cfg(test)]
 mod test_helpers;
@@ -77,6 +74,10 @@ enum Command {
         action: SystemCommands,
     },
 
+    /// Manage system prompts and behaviors
+    #[command(about = "Run one of the mcp servers bundled with goose")]
+    Mcp { name: String },
+
     /// Start or resume interactive chat sessions
     #[command(about = "Start or resume interactive chat sessions", alias = "s")]
     Session {
@@ -99,6 +100,15 @@ enum Command {
             long_help = "Use a specific configuration profile. Profiles contain settings like API keys and model preferences."
         )]
         profile: Option<String>,
+
+        /// Agent version to use (e.g., 'default', 'v1')
+        #[arg(
+            short,
+            long,
+            help = "Agent version to use (e.g., 'default', 'v1'), defaults to 'default'",
+            long_help = "Specify which agent version to use for this session."
+        )]
+        agent: Option<String>,
 
         /// Resume a previous session
         #[arg(
@@ -153,6 +163,15 @@ enum Command {
         )]
         name: Option<String>,
 
+        /// Agent version to use (e.g., 'default', 'v1')
+        #[arg(
+            short,
+            long,
+            help = "Agent version to use (e.g., 'default', 'v1')",
+            long_help = "Specify which agent version to use for this session."
+        )]
+        agent: Option<String>,
+
         /// Resume a previous run
         #[arg(
             short,
@@ -163,6 +182,9 @@ enum Command {
         )]
         resume: bool,
     },
+
+    /// List available agent versions
+    Agents(AgentCommand),
 }
 
 #[derive(Subcommand)]
@@ -223,12 +245,31 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
         },
+        Some(Command::Mcp { name }) => {
+            let _ = run_server(&name).await;
+        }
         Some(Command::Session {
             name,
             profile,
+            agent,
             resume,
         }) => {
-            let mut session = build_session(name, profile, resume);
+            if let Some(agent_version) = agent.clone() {
+                if !AgentFactory::available_versions().contains(&agent_version.as_str()) {
+                    eprintln!("Error: Invalid agent version '{}'", agent_version);
+                    eprintln!("Available versions:");
+                    for version in AgentFactory::available_versions() {
+                        if version == AgentFactory::default_version() {
+                            eprintln!("* {} (default)", version);
+                        } else {
+                            eprintln!("  {}", version);
+                        }
+                    }
+                    std::process::exit(1);
+                }
+            }
+
+            let mut session = build_session(name, profile, agent, resume).await;
             setup_logging(session.session_file().file_stem().and_then(|s| s.to_str()))?;
 
             let _ = session.start().await;
@@ -239,8 +280,24 @@ async fn main() -> Result<()> {
             input_text,
             profile,
             name,
+            agent,
             resume,
         }) => {
+            if let Some(agent_version) = agent.clone() {
+                if !AgentFactory::available_versions().contains(&agent_version.as_str()) {
+                    eprintln!("Error: Invalid agent version '{}'", agent_version);
+                    eprintln!("Available versions:");
+                    for version in AgentFactory::available_versions() {
+                        if version == AgentFactory::default_version() {
+                            eprintln!("* {} (default)", version);
+                        } else {
+                            eprintln!("  {}", version);
+                        }
+                    }
+                    std::process::exit(1);
+                }
+            }
+
             let contents = if let Some(file_name) = instructions {
                 let file_path = std::path::Path::new(&file_name);
                 std::fs::read_to_string(file_path).expect("Failed to read the instruction file")
@@ -253,8 +310,12 @@ async fn main() -> Result<()> {
                     .expect("Failed to read from stdin");
                 stdin
             };
-            let mut session = build_session(name, profile, resume);
+            let mut session = build_session(name, profile, agent, resume).await;
             let _ = session.headless_start(contents.clone()).await;
+            return Ok(());
+        }
+        Some(Command::Agents(cmd)) => {
+            cmd.run()?;
             return Ok(());
         }
         None => {

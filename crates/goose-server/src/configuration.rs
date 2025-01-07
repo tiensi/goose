@@ -288,6 +288,12 @@ pub struct Settings {
     #[serde(default)]
     pub server: ServerSettings,
     pub provider: ProviderSettings,
+    #[serde(default = "default_agent_version")]
+    pub agent_version: Option<String>,
+}
+
+fn default_agent_version() -> Option<String> {
+    None // Will use AgentFactory::default_version() when None
 }
 
 impl Settings {
