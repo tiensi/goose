@@ -68,7 +68,6 @@ pub fn setup_logging(session_name: Option<&str>) -> Result<()> {
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
         // Set default levels for different modules
         EnvFilter::new("")
-            // Set goose module to INFO only
             .add_directive("goose=debug".parse().unwrap())
             // Set goose-cli to INFO
             .add_directive("goose_cli=info".parse().unwrap())

@@ -3,6 +3,7 @@ use futures::stream::BoxStream;
 use serde_json::json;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
+use tracing::{debug, instrument};
 
 use super::Agent;
 use crate::agents::capabilities::Capabilities;
@@ -192,10 +193,12 @@ impl Agent for DefaultAgent {
         Ok(Value::Null)
     }
 
+    #[instrument(skip(self, messages), fields(user_message))]
     async fn reply(
         &self,
         messages: &[Message],
     ) -> anyhow::Result<BoxStream<'_, anyhow::Result<Message>>> {
+        let reply_span = tracing::Span::current();
         let mut capabilities = self.capabilities.lock().await;
         let tools = capabilities.get_prefixed_tools().await?;
         let system_prompt = capabilities.get_system_prompt().await;
@@ -203,6 +206,15 @@ impl Agent for DefaultAgent {
             .provider()
             .get_model_config()
             .get_estimated_limit();
+
+        // Set the user_message field in the span instead of creating a new event
+        if let Some(content) = messages
+            .last()
+            .and_then(|msg| msg.content.first())
+            .and_then(|c| c.as_text())
+        {
+            debug!("user_message" = &content);
+        }
 
         // Update conversation history for the start of the reply
         let mut messages = self
@@ -218,6 +230,7 @@ impl Agent for DefaultAgent {
             .await?;
 
         Ok(Box::pin(async_stream::try_stream! {
+            let _reply_guard = reply_span.enter();
             loop {
                 // Get completion from provider
                 let (response, usage) = capabilities.provider().complete(

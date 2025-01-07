@@ -2,6 +2,7 @@ use rust_decimal_macros::dec;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tracing::{debug, instrument};
 
 use super::system::{SystemConfig, SystemError, SystemInfo, SystemResult};
 use crate::prompt_template::load_prompt_file;
@@ -201,6 +202,7 @@ impl Capabilities {
     }
 
     /// Dispatch a single tool call to the appropriate client
+    #[instrument(skip(self, tool_call), fields(input, output))]
     pub async fn dispatch_tool_call(&self, tool_call: ToolCall) -> ToolResult<Vec<Content>> {
         let client = self
             .get_client_for_tool(&tool_call.name)
@@ -213,10 +215,17 @@ impl Capabilities {
             .ok_or_else(|| ToolError::NotFound(tool_call.name.clone()))?;
 
         let client_guard = client.lock().await;
-        client_guard
-            .call_tool(tool_name, tool_call.arguments)
+        let result = client_guard
+            .call_tool(tool_name, tool_call.clone().arguments)
             .await
             .map(|result| result.content)
-            .map_err(|e| ToolError::ExecutionError(e.to_string()))
+            .map_err(|e| ToolError::ExecutionError(e.to_string()));
+
+        debug!(
+            "input" = serde_json::to_string(&tool_call).unwrap(),
+            "output" = serde_json::to_string(&result).unwrap(),
+        );
+
+        result
     }
 }

@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::env;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Mutex;
 use uuid::Uuid;
-use std::time::Duration;
 
 const DEFAULT_LANGFUSE_URL: &str = "http://localhost:3000";
 
@@ -172,7 +172,6 @@ pub fn create_langfuse_observer() -> Option<ObservationLayer> {
     if public_key.is_empty() || secret_key.is_empty() {
         return None;
     }
-
 
     let base_url = env::var("LANGFUSE_URL").unwrap_or_else(|_| DEFAULT_LANGFUSE_URL.to_string());
 
