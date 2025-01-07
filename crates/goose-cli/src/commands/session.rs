@@ -62,10 +62,16 @@ pub async fn build_session<'a>(
             .expect("should resolve executable to string path"),
     )
     .with_args(vec!["mcp", "developer"]);
+    let jbconfig = SystemConfig::stdio("goose").with_args(vec!["mcp", "jetbrains"]);
     agent
         .add_system(config)
         .await
         .expect("should start developer server");
+    agent
+        .add_system(jbconfig)
+        .await
+        .expect("should start jetbrains server");
+
 
     let prompt = match std::env::var("GOOSE_INPUT") {
         Ok(val) => match val.as_str() {
