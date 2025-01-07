@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use reqwest::{Client, StatusCode};
+use reqwest::Client;
 use serde_json::{json, Value};
 use std::time::Duration;
 
@@ -8,14 +8,17 @@ use super::base::{Provider, ProviderUsage, Usage};
 use super::configs::{DatabricksAuth, DatabricksProviderConfig, ModelConfig, ProviderModelConfig};
 use super::model_pricing::{cost, model_pricing_for};
 use super::oauth;
-use super::utils::{
-    check_bedrock_context_length_error, check_openai_context_length_error, get_model,
-    messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec,
-};
+use super::utils::{check_bedrock_context_length_error, get_model, handle_response};
 use crate::message::Message;
+use crate::providers::openai_utils::{
+    check_openai_context_length_error, get_openai_usage, messages_to_openai_spec,
+    openai_response_to_message, tools_to_openai_spec,
+};
 use mcp_core::tool::Tool;
 use tracing::{debug};
 
+
+pub const DATABRICKS_DEFAULT_MODEL: &str = "claude-3-5-sonnet-2";
 
 pub struct DatabricksProvider {
     client: Client,
@@ -47,33 +50,6 @@ impl DatabricksProvider {
         }
     }
 
-    fn get_usage(data: &Value) -> Result<Usage> {
-        let usage = data
-            .get("usage")
-            .ok_or_else(|| anyhow!("No usage data in response"))?;
-
-        let input_tokens = usage
-            .get("prompt_tokens")
-            .and_then(|v| v.as_i64())
-            .map(|v| v as i32);
-
-        let output_tokens = usage
-            .get("completion_tokens")
-            .and_then(|v| v.as_i64())
-            .map(|v| v as i32);
-
-        let total_tokens = usage
-            .get("total_tokens")
-            .and_then(|v| v.as_i64())
-            .map(|v| v as i32)
-            .or_else(|| match (input_tokens, output_tokens) {
-                (Some(input), Some(output)) => Some(input + output),
-                _ => None,
-            });
-
-        Ok(Usage::new(input_tokens, output_tokens, total_tokens))
-    }
-
     async fn post(&self, payload: Value) -> Result<Value> {
         let url = format!(
             "{}/serving-endpoints/{}/invocations",
@@ -90,23 +66,16 @@ impl DatabricksProvider {
             .send()
             .await?;
 
-        match response.status() {
-            StatusCode::OK => Ok(response.json().await?),
-            status if status == StatusCode::TOO_MANY_REQUESTS || status.is_server_error() => {
-                // Implement retry logic here if needed
-                Err(anyhow!("Server error: {}", status))
-            }
-            _ => {
-                let status = response.status();
-                let err_text = response.text().await.unwrap_or_default();
-                Err(anyhow!("Request failed: {}: {}", status, err_text))
-            }
-        }
+        handle_response(payload, response).await?
     }
 }
 
 #[async_trait]
 impl Provider for DatabricksProvider {
+    fn get_model_config(&self) -> &ModelConfig {
+        self.config.model_config()
+    }
+
     #[tracing::instrument(skip(self, system, messages, tools), fields(model_config, input, output, input_tokens, output_tokens, total_tokens, cost))]
     async fn complete(
         &self,
@@ -115,7 +84,12 @@ impl Provider for DatabricksProvider {
         tools: &[Tool],
     ) -> Result<(Message, ProviderUsage)> {
         // Prepare messages and tools
-        let messages_spec = messages_to_openai_spec(messages, &self.config.image_format);
+        let concat_tool_response_contents = false;
+        let messages_spec = messages_to_openai_spec(
+            messages,
+            &self.config.image_format,
+            concat_tool_response_contents,
+        );
         let tools_spec = if !tools.is_empty() {
             tools_to_openai_spec(tools)?
         } else {
@@ -164,7 +138,7 @@ impl Provider for DatabricksProvider {
 
         // Parse response
         let message = openai_response_to_message(response.clone())?;
-        let usage = Self::get_usage(&response)?;
+        let usage = self.get_usage(&response)?;
         let model = get_model(&response);
         let cost = cost(&usage, &model_pricing_for(&model));
         debug!(
@@ -179,8 +153,8 @@ impl Provider for DatabricksProvider {
         Ok((message, ProviderUsage::new(model, usage, cost)))
     }
 
-    fn get_model_config(&self) -> &ModelConfig {
-        self.config.model_config()
+    fn get_usage(&self, data: &Value) -> Result<Usage> {
+        get_openai_usage(data)
     }
 }
 
@@ -189,6 +163,9 @@ mod tests {
     use super::*;
     use crate::message::MessageContent;
     use crate::providers::configs::ModelConfig;
+    use crate::providers::mock_server::{
+        create_mock_open_ai_response, TEST_INPUT_TOKENS, TEST_OUTPUT_TOKENS, TEST_TOTAL_TOKENS,
+    };
     use wiremock::matchers::{body_json, header, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -198,19 +175,7 @@ mod tests {
         let mock_server = MockServer::start().await;
 
         // Mock response for completion
-        let mock_response = json!({
-            "choices": [{
-                "message": {
-                    "role": "assistant",
-                    "content": "Hello!"
-                }
-            }],
-            "usage": {
-                "prompt_tokens": 10,
-                "completion_tokens": 25,
-                "total_tokens": 35
-            }
-        });
+        let mock_response = create_mock_open_ai_response("my-databricks-model", "Hello!");
 
         // Expected request body
         let system = "You are a helpful assistant.";
@@ -254,9 +219,9 @@ mod tests {
         } else {
             panic!("Expected Text content");
         }
-        assert_eq!(reply_usage.usage.input_tokens, Some(10));
-        assert_eq!(reply_usage.usage.output_tokens, Some(25));
-        assert_eq!(reply_usage.usage.total_tokens, Some(35));
+        assert_eq!(reply_usage.usage.input_tokens, Some(TEST_INPUT_TOKENS));
+        assert_eq!(reply_usage.usage.output_tokens, Some(TEST_OUTPUT_TOKENS));
+        assert_eq!(reply_usage.usage.total_tokens, Some(TEST_TOTAL_TOKENS));
 
         Ok(())
     }

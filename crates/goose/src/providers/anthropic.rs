@@ -17,6 +17,8 @@ use mcp_core::content::Content;
 use mcp_core::role::Role;
 use mcp_core::tool::{Tool, ToolCall};
 
+pub const ANTHROPIC_DEFAULT_MODEL: &str = "claude-3-5-sonnet-latest";
+
 pub struct AnthropicProvider {
     client: Client,
     config: AnthropicProviderConfig,
@@ -29,29 +31,6 @@ impl AnthropicProvider {
             .build()?;
 
         Ok(Self { client, config })
-    }
-
-    fn get_usage(data: &Value) -> Result<Usage> {
-        // Extract usage data if available
-        if let Some(usage) = data.get("usage") {
-            let input_tokens = usage
-                .get("input_tokens")
-                .and_then(|v| v.as_u64())
-                .map(|v| v as i32);
-            let output_tokens = usage
-                .get("output_tokens")
-                .and_then(|v| v.as_u64())
-                .map(|v| v as i32);
-            let total_tokens = match (input_tokens, output_tokens) {
-                (Some(i), Some(o)) => Some(i + o),
-                _ => None,
-            };
-
-            Ok(Usage::new(input_tokens, output_tokens, total_tokens))
-        } else {
-            // If no usage data, return None for all values
-            Ok(Usage::new(None, None, None))
-        }
     }
 
     fn tools_to_anthropic_spec(tools: &[Tool]) -> Vec<Value> {
@@ -210,6 +189,10 @@ impl AnthropicProvider {
 
 #[async_trait]
 impl Provider for AnthropicProvider {
+    fn get_model_config(&self) -> &ModelConfig {
+        self.config.model_config()
+    }
+
     async fn complete(
         &self,
         system: &str,
@@ -259,15 +242,34 @@ impl Provider for AnthropicProvider {
 
         // Parse response
         let message = Self::parse_anthropic_response(response.clone())?;
-        let usage = Self::get_usage(&response)?;
+        let usage = self.get_usage(&response)?;
         let model = get_model(&response);
         let cost = cost(&usage, &model_pricing_for(&model));
 
         Ok((message, ProviderUsage::new(model, usage, cost)))
     }
 
-    fn get_model_config(&self) -> &ModelConfig {
-        self.config.model_config()
+    fn get_usage(&self, data: &Value) -> Result<Usage> {
+        // Extract usage data if available
+        if let Some(usage) = data.get("usage") {
+            let input_tokens = usage
+                .get("input_tokens")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as i32);
+            let output_tokens = usage
+                .get("output_tokens")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as i32);
+            let total_tokens = match (input_tokens, output_tokens) {
+                (Some(i), Some(o)) => Some(i + o),
+                _ => None,
+            };
+
+            Ok(Usage::new(input_tokens, output_tokens, total_tokens))
+        } else {
+            // If no usage data, return None for all values
+            Ok(Usage::new(None, None, None))
+        }
     }
 }
 

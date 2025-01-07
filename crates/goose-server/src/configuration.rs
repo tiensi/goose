@@ -1,13 +1,17 @@
 use crate::error::{to_env_var, ConfigError};
 use config::{Config, Environment};
-use goose::providers::configs::GoogleProviderConfig;
+use goose::providers::configs::{
+    AnthropicProviderConfig, GoogleProviderConfig, GroqProviderConfig,
+};
+use goose::providers::openai::OPEN_AI_DEFAULT_MODEL;
 use goose::providers::{
+    anthropic,
     configs::{
         DatabricksAuth, DatabricksProviderConfig, ModelConfig, OllamaProviderConfig,
         OpenAiProviderConfig, ProviderConfig,
     },
     factory::ProviderType,
-    google, ollama,
+    google, groq, ollama,
     utils::ImageFormat,
 };
 use serde::Deserialize;
@@ -34,6 +38,21 @@ impl ServerSettings {
 pub enum ProviderSettings {
     OpenAi {
         #[serde(default = "default_openai_host")]
+        host: String,
+        api_key: String,
+        #[serde(default = "default_model")]
+        model: String,
+        #[serde(default)]
+        temperature: Option<f32>,
+        #[serde(default)]
+        max_tokens: Option<i32>,
+        #[serde(default)]
+        context_limit: Option<usize>,
+        #[serde(default)]
+        estimate_factor: Option<f32>,
+    },
+    OpenRouter {
+        #[serde(default = "default_openrouter_host")]
         host: String,
         api_key: String,
         #[serde(default = "default_model")]
@@ -87,6 +106,40 @@ pub enum ProviderSettings {
         temperature: Option<f32>,
         #[serde(default)]
         max_tokens: Option<i32>,
+        #[serde(default)]
+        context_limit: Option<usize>,
+        #[serde(default)]
+        estimate_factor: Option<f32>,
+    },
+    Groq {
+        #[serde(default = "default_groq_host")]
+        host: String,
+        api_key: String,
+        #[serde(default = "default_groq_model")]
+        model: String,
+        #[serde(default)]
+        temperature: Option<f32>,
+        #[serde(default)]
+        max_tokens: Option<i32>,
+        #[serde(default)]
+        context_limit: Option<usize>,
+        #[serde(default)]
+        estimate_factor: Option<f32>,
+    },
+    Anthropic {
+        #[serde(default = "default_anthropic_host")]
+        host: String,
+        api_key: String,
+        #[serde(default = "default_anthropic_model")]
+        model: String,
+        #[serde(default)]
+        temperature: Option<f32>,
+        #[serde(default)]
+        max_tokens: Option<i32>,
+        #[serde(default)]
+        context_limit: Option<usize>,
+        #[serde(default)]
+        estimate_factor: Option<f32>,
     },
 }
 
@@ -99,6 +152,9 @@ impl ProviderSettings {
             ProviderSettings::Databricks { .. } => ProviderType::Databricks,
             ProviderSettings::Ollama { .. } => ProviderType::Ollama,
             ProviderSettings::Google { .. } => ProviderType::Google,
+            ProviderSettings::Groq { .. } => ProviderType::Groq,
+            ProviderSettings::Anthropic { .. } => ProviderType::Anthropic,
+            ProviderSettings::OpenRouter { .. } => ProviderType::OpenRouter,
         }
     }
 
@@ -114,6 +170,23 @@ impl ProviderSettings {
                 context_limit,
                 estimate_factor,
             } => ProviderConfig::OpenAi(OpenAiProviderConfig {
+                host,
+                api_key,
+                model: ModelConfig::new(model)
+                    .with_temperature(temperature)
+                    .with_max_tokens(max_tokens)
+                    .with_context_limit(context_limit)
+                    .with_estimate_factor(estimate_factor),
+            }),
+            ProviderSettings::OpenRouter {
+                host,
+                api_key,
+                model,
+                temperature,
+                max_tokens,
+                context_limit,
+                estimate_factor,
+            } => ProviderConfig::OpenRouter(OpenAiProviderConfig {
                 host,
                 api_key,
                 model: ModelConfig::new(model)
@@ -161,12 +234,50 @@ impl ProviderSettings {
                 model,
                 temperature,
                 max_tokens,
+                context_limit,
+                estimate_factor,
             } => ProviderConfig::Google(GoogleProviderConfig {
                 host,
                 api_key,
                 model: ModelConfig::new(model)
                     .with_temperature(temperature)
-                    .with_max_tokens(max_tokens),
+                    .with_max_tokens(max_tokens)
+                    .with_context_limit(context_limit)
+                    .with_estimate_factor(estimate_factor),
+            }),
+            ProviderSettings::Groq {
+                host,
+                api_key,
+                model,
+                temperature,
+                max_tokens,
+                context_limit,
+                estimate_factor,
+            } => ProviderConfig::Groq(GroqProviderConfig {
+                host,
+                api_key,
+                model: ModelConfig::new(model)
+                    .with_temperature(temperature)
+                    .with_max_tokens(max_tokens)
+                    .with_context_limit(context_limit)
+                    .with_estimate_factor(estimate_factor),
+            }),
+            ProviderSettings::Anthropic {
+                host,
+                api_key,
+                model,
+                temperature,
+                max_tokens,
+                context_limit,
+                estimate_factor,
+            } => ProviderConfig::Anthropic(AnthropicProviderConfig {
+                host,
+                api_key,
+                model: ModelConfig::new(model)
+                    .with_temperature(temperature)
+                    .with_max_tokens(max_tokens)
+                    .with_context_limit(context_limit)
+                    .with_estimate_factor(estimate_factor),
             }),
         }
     }
@@ -239,8 +350,12 @@ fn default_port() -> u16 {
     3000
 }
 
+pub fn default_openrouter_host() -> String {
+    "https://openrouter.ai".to_string()
+}
+
 fn default_model() -> String {
-    "gpt-4o".to_string()
+    OPEN_AI_DEFAULT_MODEL.to_string()
 }
 
 fn default_openai_host() -> String {
@@ -265,6 +380,22 @@ fn default_google_host() -> String {
 
 fn default_google_model() -> String {
     google::GOOGLE_DEFAULT_MODEL.to_string()
+}
+
+fn default_groq_host() -> String {
+    groq::GROQ_API_HOST.to_string()
+}
+
+fn default_groq_model() -> String {
+    groq::GROQ_DEFAULT_MODEL.to_string()
+}
+
+fn default_anthropic_host() -> String {
+    "https://api.anthropic.com".to_string()
+}
+
+fn default_anthropic_model() -> String {
+    anthropic::ANTHROPIC_DEFAULT_MODEL.to_string()
 }
 
 fn default_image_format() -> ImageFormat {

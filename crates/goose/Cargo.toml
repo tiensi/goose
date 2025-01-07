@@ -9,7 +9,7 @@ description.workspace = true
 
 [build-dependencies]
 tokio = { version = "1.36", features = ["full"] }
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.12.9", features = ["json", "rustls-tls"], default-features = false }
 
 [dependencies]
 mcp-core = { path = "../mcp-core" }
@@ -18,7 +18,18 @@ anyhow = "1.0"
 thiserror = "1.0"
 futures = "0.3"
 tokio-stream = "0.1"
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.12.9", features = [
+        "rustls-tls",
+        "json",
+        "cookies",
+        "gzip",
+        "brotli",
+        "deflate",
+        "zstd",
+        "charset",
+        "http2",
+        "stream"
+    ], default-features = false }
 tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -59,6 +70,7 @@ keyring = { version = "3.6.1", features = [
 shellexpand = "3.1.0"
 rust_decimal = "1.36.0"
 rust_decimal_macros = "1.36.0"
+tempfile = "3.8"
 
 [dev-dependencies]
 sysinfo = "0.32.1"
