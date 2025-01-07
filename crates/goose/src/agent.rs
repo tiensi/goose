@@ -129,11 +129,12 @@ impl Agent {
         let system_tool_call = ToolCall::new(tool_name, call.arguments);
         let result = system.call(system_tool_call.clone()).await;
 
-        debug!("input"=serde_json::to_string(&system_tool_call).unwrap(),
-                "output"=serde_json::to_string(&result).unwrap(),
+        debug!(
+            "input" = serde_json::to_string(&system_tool_call).unwrap(),
+            "output" = serde_json::to_string(&result).unwrap(),
         );
 
-        result 
+        result
     }
 
     fn get_system_prompt(&self) -> AgentResult<String> {
@@ -345,13 +346,14 @@ impl Agent {
         let reply_span = tracing::Span::current();
         let mut messages = messages.to_vec();
         let tools = self.get_prefixed_tools();
-        
+
         // Set the user_message field in the span instead of creating a new event
-        if let Some(content) = messages.last()
+        if let Some(content) = messages
+            .last()
             .and_then(|msg| msg.content.first())
-            .and_then(|c| c.as_text()) 
+            .and_then(|c| c.as_text())
         {
-            debug!("user_message"=&content);
+            debug!("user_message" = &content);
         }
 
         let system_prompt = self.get_system_prompt()?;
@@ -371,7 +373,7 @@ impl Agent {
 
         Ok(Box::pin(async_stream::try_stream! {
             let _reply_guard = reply_span.enter();
-            
+
             loop {
                 // Get completion from provider
                 let (response, usage) = self.provider.complete(
@@ -408,7 +410,7 @@ impl Agent {
                     })
                     .collect();
 
-                
+
 
                 // Process all the futures in parallel but wait until all are finished
                 let outputs = futures::future::join_all(futures)

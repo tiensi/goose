@@ -3,13 +3,8 @@ use std::fs;
 use std::path::PathBuf;
 use tracing_appender::rolling::Rotation;
 use tracing_subscriber::{
-    fmt,
-    Layer,
-    layer::SubscriberExt,
-    util::SubscriberInitExt,
-    EnvFilter,
+    filter::LevelFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer,
     Registry,
-    filter::LevelFilter,
 };
 
 use goose::tracing::langfuse_layer;
@@ -83,8 +78,8 @@ pub fn setup_logging() -> Result<()> {
 
     // Build the subscriber with required layers
     let subscriber = Registry::default()
-        .with(file_layer.with_filter(env_filter))    // Gets all logs
-        .with(console_layer.with_filter(LevelFilter::INFO));   // Controls log levels
+        .with(file_layer.with_filter(env_filter)) // Gets all logs
+        .with(console_layer.with_filter(LevelFilter::INFO)); // Controls log levels
 
     // Initialize with Langfuse if available
     if let Some(langfuse) = langfuse_layer::create_langfuse_observer() {

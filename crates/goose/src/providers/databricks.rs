@@ -15,8 +15,7 @@ use crate::providers::openai_utils::{
     openai_response_to_message, tools_to_openai_spec,
 };
 use mcp_core::tool::Tool;
-use tracing::{debug};
-
+use tracing::debug;
 
 pub const DATABRICKS_DEFAULT_MODEL: &str = "claude-3-5-sonnet-2";
 
@@ -76,7 +75,18 @@ impl Provider for DatabricksProvider {
         self.config.model_config()
     }
 
-    #[tracing::instrument(skip(self, system, messages, tools), fields(model_config, input, output, input_tokens, output_tokens, total_tokens, cost))]
+    #[tracing::instrument(
+        skip(self, system, messages, tools),
+        fields(
+            model_config,
+            input,
+            output,
+            input_tokens,
+            output_tokens,
+            total_tokens,
+            cost
+        )
+    )]
     async fn complete(
         &self,
         system: &str,

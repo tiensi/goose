@@ -4,10 +4,10 @@ mod commands {
     pub mod version;
 }
 pub mod agents;
+mod logging;
 mod profile;
 mod prompt;
 pub mod session;
-mod logging;
 
 mod systems;
 
@@ -16,9 +16,9 @@ use clap::{Parser, Subcommand};
 use commands::configure::handle_configure;
 use commands::session::build_session;
 use commands::version::print_version;
+use logging::setup_logging;
 use profile::has_no_profiles;
 use std::io::{self, Read};
-use logging::setup_logging;
 
 mod log_usage;
 
@@ -198,7 +198,7 @@ enum CliProviderVariant {
 #[tokio::main]
 async fn main() -> Result<()> {
     setup_logging();
-    
+
     let cli = Cli::parse();
 
     if cli.version {
