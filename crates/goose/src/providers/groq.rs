@@ -52,6 +52,30 @@ impl Provider for GroqProvider {
         self.config.model_config()
     }
 
+    #[tracing::instrument(
+        skip(self, system, messages, tools),
+        fields(
+            model_config,
+            input,
+            output,
+            input_tokens,
+            output_tokens,
+            total_tokens,
+            cost
+        )
+    )]
+    #[tracing::instrument(
+        skip(self, system, messages, tools),
+        fields(
+            model_config,
+            input,
+            output,
+            input_tokens,
+            output_tokens,
+            total_tokens,
+            cost
+        )
+    )]
     async fn complete(
         &self,
         system: &str,
@@ -65,12 +89,12 @@ impl Provider for GroqProvider {
             tools,
         )?;
 
-        let response = self.post(payload).await?;
+        let response = self.post(payload.clone()).await?;
 
         let message = openai_response_to_message(response.clone())?;
         let usage = self.get_usage(&response)?;
         let model = get_model(&response);
-
+        super::utils::emit_debug_trace(&self.config, &payload, &response, &usage, None);
         Ok((message, ProviderUsage::new(model, usage, None)))
     }
 

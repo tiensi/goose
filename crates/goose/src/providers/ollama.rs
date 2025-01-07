@@ -47,6 +47,18 @@ impl Provider for OllamaProvider {
         self.config.model_config()
     }
 
+    #[tracing::instrument(
+        skip(self, system, messages, tools),
+        fields(
+            model_config,
+            input,
+            output,
+            input_tokens,
+            output_tokens,
+            total_tokens,
+            cost
+        )
+    )]
     async fn complete(
         &self,
         system: &str,
@@ -55,14 +67,14 @@ impl Provider for OllamaProvider {
     ) -> Result<(Message, ProviderUsage)> {
         let payload = create_openai_request_payload(&self.config.model, system, messages, tools)?;
 
-        let response = self.post(payload).await?;
+        let response = self.post(payload.clone()).await?;
 
         // Parse response
         let message = openai_response_to_message(response.clone())?;
         let usage = self.get_usage(&response)?;
         let model = get_model(&response);
         let cost = None;
-
+        super::utils::emit_debug_trace(&self.config, &payload, &response, &usage, cost);
         Ok((message, ProviderUsage::new(model, usage, cost)))
     }
 

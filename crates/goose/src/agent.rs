@@ -416,8 +416,6 @@ impl Agent {
                 let outputs = futures::future::join_all(futures)
                     .await;
 
-                debug!("All tool requests completed");
-
                 // Create a message with the responses
                 let mut message_tool_response = Message::user();
                 // Now combine these into MessageContent::ToolResponse using the original ID

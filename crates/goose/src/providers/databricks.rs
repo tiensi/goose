@@ -15,7 +15,6 @@ use crate::providers::openai_utils::{
     openai_response_to_message, tools_to_openai_spec,
 };
 use mcp_core::tool::Tool;
-use tracing::debug;
 
 pub const DATABRICKS_DEFAULT_MODEL: &str = "claude-3-5-sonnet-2";
 
@@ -151,15 +150,7 @@ impl Provider for DatabricksProvider {
         let usage = self.get_usage(&response)?;
         let model = get_model(&response);
         let cost = cost(&usage, &model_pricing_for(&model));
-        debug!(
-            model_config = %serde_json::to_string_pretty(&self.config).unwrap_or_default(),
-            input = %serde_json::to_string_pretty(&payload).unwrap_or_default(),
-            output = %serde_json::to_string_pretty(&response).unwrap_or_default(),
-            input_tokens = ?usage.input_tokens.unwrap_or_default(),
-            output_tokens = ?usage.output_tokens.unwrap_or_default(),
-            total_tokens = ?usage.total_tokens.unwrap_or_default(),
-            cost = ?cost.unwrap_or_default()
-        );
+        super::utils::emit_debug_trace(&self.config, &payload, &response, &usage, cost);
         Ok((message, ProviderUsage::new(model, usage, cost)))
     }
 
