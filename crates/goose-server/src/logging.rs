@@ -79,8 +79,8 @@ pub fn setup_logging() -> Result<()> {
 
     // Build the subscriber with required layers
     let subscriber = Registry::default()
-        .with(file_layer.with_filter(env_filter)) 
-        .with(console_layer.with_filter(LevelFilter::INFO)); 
+        .with(file_layer.with_filter(env_filter))
+        .with(console_layer.with_filter(LevelFilter::INFO));
 
     // Initialize with Langfuse if available
     if let Some(langfuse) = langfuse_layer::create_langfuse_observer() {
