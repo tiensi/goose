@@ -212,6 +212,6 @@ mod tests {
     async fn test_capabilities() {
         let router = get_router().await;
         let capabilities = router.capabilities();
-        assert!(capabilities.tools);
+        assert!(capabilities.tools.is_some());
     }
 }

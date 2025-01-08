@@ -63,7 +63,6 @@ pub async fn build_session<'a>(
     )
     .with_args(vec!["mcp", "developer"]);
     let jbconfig = SystemConfig::stdio("goose").with_args(vec!["mcp", "jetbrains"]);
-    let jbconfig = SystemConfig::stdio("goose").with_args(vec!["mcp", "jetbrains"]);
     agent
         .add_system(config)
         .await
