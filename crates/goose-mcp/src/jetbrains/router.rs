@@ -4,6 +4,7 @@ use mcp_core::{Tool, Resource, Content};
 use mcp_core::handler::{ToolError, ResourceError};
 use mcp_core::protocol::{ServerCapabilities, ToolsCapability, ResourcesCapability};
 use mcp_server::Router;
+use mcp_server::router::CapabilitiesBuilder;
 use serde_json::Value;
 use tracing::{info, warn, debug};
 use std::future::Future;
@@ -110,27 +111,7 @@ impl Router for JetBrainsRouter {
     }
 
     fn capabilities(&self) -> ServerCapabilities {
-        // Trigger initialization when capabilities are requested
-        if !self.initialized.load(Ordering::SeqCst) {
-            debug!("Capabilities requested before initialization, spawning init task");
-            let router = self.clone();
-            tokio::spawn(async move {
-                if let Err(e) = router.initialize().await {
-                    debug!("Background initialization failed: {}", e);
-                }
-            });
-        }
-
-        ServerCapabilities {
-            tools: Some(ToolsCapability {
-                list_changed: Some(true),
-            }),
-            resources: Some(ResourcesCapability {
-                list_changed: Some(false),
-                subscribe: Some(false),
-            }),
-            prompts: None,
-        }
+        CapabilitiesBuilder::new().with_tools(true).build()
     }
 
     fn list_tools(&self) -> Vec<Tool> {
