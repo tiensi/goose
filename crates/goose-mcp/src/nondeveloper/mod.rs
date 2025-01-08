@@ -3,14 +3,8 @@ use indoc::{formatdoc, indoc};
 use reqwest::{Client, Url};
 use serde_json::{json, Value};
 use std::{
-    future::Future,
-    pin::Pin,
-    collections::HashMap,
-    fs,
-    os::unix::fs::PermissionsExt,
-    path::PathBuf,
-    sync::Mutex,
-    sync::Arc,
+    collections::HashMap, fs, future::Future, os::unix::fs::PermissionsExt, path::PathBuf,
+    pin::Pin, sync::Arc, sync::Mutex,
 };
 use tokio::process::Command;
 
@@ -360,31 +354,32 @@ impl NonDeveloperRouter {
         }
 
         // Process based on save_as parameter
-        let (content, extension) = match save_as {
-            "text" => {
-                let text = response.text().await.map_err(|e| {
-                    ToolError::ExecutionError(format!("Failed to get text: {}", e))
-                })?;
-                (text.into_bytes(), "txt")
-            }
-            "json" => {
-                let text = response.text().await.map_err(|e| {
-                    ToolError::ExecutionError(format!("Failed to get text: {}", e))
-                })?;
-                // Verify it's valid JSON
-                serde_json::from_str::<Value>(&text).map_err(|e| {
-                    ToolError::ExecutionError(format!("Invalid JSON response: {}", e))
-                })?;
-                (text.into_bytes(), "json")
-            }
-            "binary" => {
-                let bytes = response.bytes().await.map_err(|e| {
-                    ToolError::ExecutionError(format!("Failed to get bytes: {}", e))
-                })?;
-                (bytes.to_vec(), "bin")
-            }
-            _ => unreachable!(), // Prevented by enum in tool definition
-        };
+        let (content, extension) =
+            match save_as {
+                "text" => {
+                    let text = response.text().await.map_err(|e| {
+                        ToolError::ExecutionError(format!("Failed to get text: {}", e))
+                    })?;
+                    (text.into_bytes(), "txt")
+                }
+                "json" => {
+                    let text = response.text().await.map_err(|e| {
+                        ToolError::ExecutionError(format!("Failed to get text: {}", e))
+                    })?;
+                    // Verify it's valid JSON
+                    serde_json::from_str::<Value>(&text).map_err(|e| {
+                        ToolError::ExecutionError(format!("Invalid JSON response: {}", e))
+                    })?;
+                    (text.into_bytes(), "json")
+                }
+                "binary" => {
+                    let bytes = response.bytes().await.map_err(|e| {
+                        ToolError::ExecutionError(format!("Failed to get bytes: {}", e))
+                    })?;
+                    (bytes.to_vec(), "bin")
+                }
+                _ => unreachable!(), // Prevented by enum in tool definition
+            };
 
         // Save to cache
         let cache_path = self.save_to_cache(&content, "web", extension).await?;
@@ -632,7 +627,9 @@ impl Router for NonDeveloperRouter {
                 .map_err(|e| ResourceError::NotFound(format!("Invalid URI: {}", e)))?;
 
             if url.scheme() != "file" {
-                return Err(ResourceError::NotFound("Only file:// URIs are supported".into()));
+                return Err(ResourceError::NotFound(
+                    "Only file:// URIs are supported".into(),
+                ));
             }
 
             let path = url
@@ -640,11 +637,13 @@ impl Router for NonDeveloperRouter {
                 .map_err(|_| ResourceError::NotFound("Invalid file path in URI".into()))?;
 
             match resource.mime_type.as_str() {
-                "text" | "json" => fs::read_to_string(&path)
-                    .map_err(|e| ResourceError::ExecutionError(format!("Failed to read file: {}", e))),
+                "text" | "json" => fs::read_to_string(&path).map_err(|e| {
+                    ResourceError::ExecutionError(format!("Failed to read file: {}", e))
+                }),
                 "binary" => {
-                    let bytes = fs::read(&path)
-                        .map_err(|e| ResourceError::ExecutionError(format!("Failed to read file: {}", e)))?;
+                    let bytes = fs::read(&path).map_err(|e| {
+                        ResourceError::ExecutionError(format!("Failed to read file: {}", e))
+                    })?;
                     Ok(base64::prelude::BASE64_STANDARD.encode(bytes))
                 }
                 mime_type => Err(ResourceError::NotFound(format!(
