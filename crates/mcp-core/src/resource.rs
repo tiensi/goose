@@ -117,6 +117,16 @@ impl Resource {
         self
     }
 
+    /// Mark the resource as active, i.e. set its priority to 1.0
+    pub fn mark_active(mut self) -> Self {
+        self.with_priority(1.0)
+    }
+
+    // Check if the resource is active
+    pub fn is_active(&self) -> bool {
+        self.priority() == Some(1.0)
+    }
+
     /// Returns the priority of the resource, if set
     pub fn priority(&self) -> Option<f32> {
         self.annotations.as_ref().and_then(|a| a.priority)

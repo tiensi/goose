@@ -154,6 +154,12 @@ impl Capabilities {
 
             let mut resource_content = HashMap::new();
             for resource in resources.resources {
+                // Skip inactive resources
+                if !resource.is_active() {
+                    continue;
+                }
+
+                // Read the resource contents for active resources
                 if let Ok(contents) = client_guard.read_resource(&resource.uri).await {
                     for content in contents.contents {
                         let (uri, content_str) = match content {
