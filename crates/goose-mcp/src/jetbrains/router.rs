@@ -1,17 +1,17 @@
 use std::sync::Arc;
+use std::pin::Pin;
+use std::future::Future;
 use anyhow::Result;
 use mcp_core::{Tool, Resource, Content};
 use mcp_core::handler::{ToolError, ResourceError};
-use mcp_core::protocol::{ServerCapabilities, ToolsCapability, ResourcesCapability};
+use mcp_core::protocol::ServerCapabilities;
 use mcp_server::Router;
 use mcp_server::router::CapabilitiesBuilder;
 use serde_json::Value;
 use tracing::{info, warn, debug};
-use std::future::Future;
-use std::pin::Pin;
 use std::time::Duration;
-use tokio::time::sleep;
 use std::sync::atomic::{AtomicBool, Ordering};
+use tokio::sync::Notify;
 
 use crate::jetbrains::proxy::JetBrainsProxy;
 
@@ -20,15 +20,27 @@ pub struct JetBrainsRouter {
     proxy: Arc<JetBrainsProxy>,
     tools_cache: Arc<parking_lot::RwLock<Vec<Tool>>>,
     initialized: Arc<AtomicBool>,
+    init_notifier: Arc<Notify>,
 }
 
 impl JetBrainsRouter {
     pub fn new() -> Self {
-        Self {
+        let router = Self {
             proxy: Arc::new(JetBrainsProxy::new()),
             tools_cache: Arc::new(parking_lot::RwLock::new(Vec::new())),
             initialized: Arc::new(AtomicBool::new(false)),
-        }
+            init_notifier: Arc::new(Notify::new()),
+        };
+
+        // Spawn background initialization task
+        let router_clone = router.clone();
+        tokio::spawn(async move {
+            if let Err(e) = router_clone.initialize().await {
+                debug!("Background initialization failed: {}", e);
+            }
+        });
+
+        router
     }
 
     async fn populate_tools_cache(&self) -> Result<()> {
@@ -43,7 +55,7 @@ impl JetBrainsRouter {
                     debug!("Successfully fetched {} tools from proxy", tools.len());
                     if tools.is_empty() {
                         debug!("Tools list is empty, will retry...");
-                        sleep(Duration::from_secs(1)).await;
+                        tokio::time::sleep(Duration::from_secs(1)).await;
                         continue;
                     }
                     let mut cache = self.tools_cache.write();
@@ -55,7 +67,7 @@ impl JetBrainsRouter {
                     debug!("Failed to fetch tools (attempt {}): {}", attempt, e);
                     if attempt < 5 {
                         debug!("Waiting before retry...");
-                        sleep(Duration::from_secs(1)).await;
+                        tokio::time::sleep(Duration::from_secs(1)).await;
                     }
                 }
             }
@@ -76,17 +88,15 @@ impl JetBrainsRouter {
         
         // First start the proxy
         debug!("Starting proxy...");
-        let result = self.proxy.start().await;
-        if result.is_ok() {
-            debug!("Proxy started successfully");
-        } else {
-            debug!("Failed to start proxy: {:?}", result);
-            return result;
+        if let Err(e) = self.proxy.start().await {
+            debug!("Failed to start proxy: {:?}", e);
+            return Err(e);
         }
+        debug!("Proxy started successfully");
 
         // Give the proxy a moment to initialize
         debug!("Waiting for proxy initialization...");
-        sleep(Duration::from_secs(1)).await;
+        tokio::time::sleep(Duration::from_secs(1)).await;
         
         // Then try to populate the tools cache
         if let Err(e) = self.populate_tools_cache().await {
@@ -95,6 +105,7 @@ impl JetBrainsRouter {
         }
 
         self.initialized.store(true, Ordering::SeqCst);
+        self.init_notifier.notify_waiters();
         debug!("Router initialization completed");
         
         Ok(())
@@ -118,49 +129,32 @@ impl Router for JetBrainsRouter {
         debug!("Accessing tools cache...");
         let tools = self.tools_cache.read().clone();
         
-        if tools.is_empty() {
-            debug!("Cache is empty, attempting to populate...");
-            // Ensure initialization has happened
-            if !self.initialized.load(Ordering::SeqCst) {
-                debug!("Router not initialized, triggering initialization");
-                let router = self.clone();
-                tokio::spawn(async move {
-                    if let Err(e) = router.initialize().await {
-                        debug!("Background initialization failed: {}", e);
-                    }
-                });
-            } else {
-                // If initialized but cache is empty, try to populate it
-                let router = self.clone();
-                tokio::spawn(async move {
-                    if let Err(e) = router.populate_tools_cache().await {
-                        debug!("Background cache population failed: {}", e);
-                    }
-                });
-            }
+        if !tools.is_empty() {
+            debug!("Returning {} tools from cache", tools.len());
+            return tools;
         }
-        
-        debug!("Returning {} tools from cache", tools.len());
-        tools
+
+        debug!("Cache is empty, initialization may still be in progress");
+        Vec::new()
     }
 
-    fn call_tool(
-        &self,
-        tool_name: &str,
-        arguments: Value,
-    ) -> Pin<Box<dyn Future<Output = Result<Vec<Content>, ToolError>> + Send + 'static>> {
-        let proxy = Arc::clone(&self.proxy);
-        let name = tool_name.to_string();
-
+    fn call_tool(&self, tool_name: &str, arguments: Value) -> Pin<Box<dyn Future<Output = Result<Vec<Content>, ToolError>> + Send + 'static>> {
+        let tool_name = tool_name.to_string();
+        let proxy = self.proxy.clone();
+        let init_notifier = self.init_notifier.clone();
+        
         Box::pin(async move {
-            debug!("Calling tool: {}", name);
-            match proxy.call_tool(&name, arguments).await {
+            // Wait for initialization before proceeding
+            init_notifier.notified().await;
+            
+            debug!("Calling tool: {}", tool_name);
+            match proxy.call_tool(&tool_name, arguments).await {
                 Ok(result) => {
-                    debug!("Tool {} completed successfully", name);
+                    debug!("Tool {} completed successfully", tool_name);
                     Ok(result.content)
                 }
                 Err(e) => {
-                    debug!("Tool {} failed: {}", name, e);
+                    debug!("Tool {} failed: {}", tool_name, e);
                     Err(ToolError::ExecutionError(e.to_string()))
                 }
             }
@@ -171,10 +165,7 @@ impl Router for JetBrainsRouter {
         vec![] // No static resources
     }
 
-    fn read_resource(
-        &self,
-        uri: &str,
-    ) -> Pin<Box<dyn Future<Output = Result<String, ResourceError>> + Send + 'static>> {
+    fn read_resource(&self, uri: &str) -> Pin<Box<dyn Future<Output = Result<String, ResourceError>> + Send + 'static>> {
         let uri = uri.to_string();
         Box::pin(async move {
             Err(ResourceError::NotFound(format!("Resource not found: {}", uri)))

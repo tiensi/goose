@@ -196,6 +196,14 @@ impl JetBrainsProxy {
                     t["name"].as_str(), 
                     t["description"].as_str()
                 ) {
+                    // Get just the first sentence of the description
+                    let first_sentence = description
+                        .split('.')
+                        .next()
+                        .unwrap_or(description)
+                        .trim()
+                        .to_string() + ".";
+
                     // Handle input_schema as either a string or an object
                     let input_schema = match &t["inputSchema"] {
                         Value::String(s) => Value::String(s.clone()),
@@ -208,7 +216,7 @@ impl JetBrainsProxy {
 
                     Some(Tool {
                         name: name.to_string(),
-                        description: description.to_string(),
+                        description: first_sentence,
                         input_schema,
                     })
                 } else {
