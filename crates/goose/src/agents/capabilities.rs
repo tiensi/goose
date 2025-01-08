@@ -1,9 +1,6 @@
-use mcp_core::protocol::ListResourcesResult;
 use rust_decimal_macros::dec;
-use tokio::time::timeout;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::sync::Mutex;
 
 use super::system::{SystemConfig, SystemError, SystemInfo, SystemResult};
@@ -35,7 +32,7 @@ impl Capabilities {
     /// Add a new MCP system based on the provided client type
     // TODO IMPORTANT need to ensure this times out if the system command is broken!
     pub async fn add_system(&mut self, config: SystemConfig) -> SystemResult<()> {
-        let client: McpClient = match config {
+        let mut client: McpClient = match config {
             SystemConfig::Sse { ref uri } => {
                 let transport = SseTransport::new(uri);
                 McpClient::new(transport.start().await?)
@@ -149,23 +146,10 @@ impl Capabilities {
     pub async fn get_resources(
         &self,
     ) -> SystemResult<HashMap<String, HashMap<String, (Resource, String)>>> {
-        println!("In get_resources");
         let mut client_resource_content = HashMap::new();
         for (name, client) in &self.clients {
             let client_guard = client.lock().await;
-
-            // Add timeout of 3 seconds, return empty vec if timeout occurs
-            let resources: ListResourcesResult = match timeout(Duration::from_secs(3), client_guard.list_resources()).await {
-                Ok(Ok(resources)) => resources,
-                Ok(Err(e)) => return Err(e.into()),  // Preserve original errors
-                Err(_) => {
-                    println!("Timeout occurred while fetching resources for client {}", name);
-                    ListResourcesResult{resources: vec![]}  // Skip this client and continue with others
-                }
-            };
-
-            // let resources = client_guard.list_resources().await?;
-            println!("In get_resources, list_resources ({}): {:?}", resources.resources.len(), resources);
+            let resources = client_guard.list_resources().await?;
 
             let mut resource_content = HashMap::new();
             for resource in resources.resources {
