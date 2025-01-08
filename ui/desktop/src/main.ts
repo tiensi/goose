@@ -197,7 +197,7 @@ const createChat = async (app, query?: string, dir?: string) => {
       }
     });
   }
-
+gh
   windowMap.set(windowId, mainWindow);
   mainWindow.on('closed', () => {
     windowMap.delete(windowId);
