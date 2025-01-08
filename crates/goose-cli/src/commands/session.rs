@@ -73,7 +73,6 @@ pub async fn build_session<'a>(
         .await
         .expect("should start jetbrains server");
 
-
     let prompt = match std::env::var("GOOSE_INPUT") {
         Ok(val) => match val.as_str() {
             "rustyline" => Box::new(RustylinePrompt::new()) as Box<dyn Prompt>,

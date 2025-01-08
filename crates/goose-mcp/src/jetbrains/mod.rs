@@ -107,7 +107,7 @@ impl JetBrainsRouter {
                 return Ok(());
             }
             drop(tools); // Release the lock before sleeping
-            
+
             sleep(retry_delay).await;
             retry_count += 1;
         }

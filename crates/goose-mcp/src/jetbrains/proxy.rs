@@ -1,13 +1,13 @@
+use anyhow::{anyhow, Result};
+use mcp_core::{Content, Tool};
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
-use reqwest::Client;
-use anyhow::{Result, anyhow};
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use tracing::{info, error, debug};
-use mcp_core::{Content, Tool};
+use tracing::{debug, error, info};
 
 const PORT_RANGE_START: u16 = 63342;
 const PORT_RANGE_END: u16 = 63352;
@@ -49,8 +49,13 @@ impl JetBrainsProxy {
 
     async fn test_list_tools(&self, endpoint: &str) -> Result<bool> {
         debug!("Sending test request to {}/mcp/list_tools", endpoint);
-        
-        let response = match self.client.get(&format!("{}/mcp/list_tools", endpoint)).send().await {
+
+        let response = match self
+            .client
+            .get(&format!("{}/mcp/list_tools", endpoint))
+            .send()
+            .await
+        {
             Ok(resp) => {
                 debug!("Got response with status: {}", resp.status());
                 resp
@@ -99,17 +104,22 @@ impl JetBrainsProxy {
                 return Ok(test_endpoint);
             }
             debug!("IDE_PORT {} is not responding correctly", port);
-            return Err(anyhow!("Specified IDE_PORT={} is not responding correctly", port));
+            return Err(anyhow!(
+                "Specified IDE_PORT={} is not responding correctly",
+                port
+            ));
         }
 
-        debug!("No IDE_PORT environment variable, scanning port range {}-{}", 
-            PORT_RANGE_START, PORT_RANGE_END);
+        debug!(
+            "No IDE_PORT environment variable, scanning port range {}-{}",
+            PORT_RANGE_START, PORT_RANGE_END
+        );
 
         // Scan port range
         for port in PORT_RANGE_START..=PORT_RANGE_END {
             let candidate_endpoint = format!("http://127.0.0.1:{}/api", port);
             debug!("Testing port {}...", port);
-            
+
             if self.test_list_tools(&candidate_endpoint).await? {
                 debug!("Found working IDE endpoint at {}", candidate_endpoint);
                 return Ok(candidate_endpoint);
@@ -117,8 +127,11 @@ impl JetBrainsProxy {
         }
 
         debug!("No working IDE endpoint found in port range");
-        Err(anyhow!("No working IDE endpoint found in range {}-{}", 
-            PORT_RANGE_START, PORT_RANGE_END))
+        Err(anyhow!(
+            "No working IDE endpoint found in range {}-{}",
+            PORT_RANGE_START,
+            PORT_RANGE_END
+        ))
     }
 
     async fn update_ide_endpoint(&self) {
@@ -153,10 +166,11 @@ impl JetBrainsProxy {
         };
 
         debug!("Sending list_tools request to {}/mcp/list_tools", endpoint);
-        let response = match self.client
+        let response = match self
+            .client
             .get(&format!("{}/mcp/list_tools", endpoint))
             .send()
-            .await 
+            .await
         {
             Ok(resp) => {
                 debug!("Got response with status: {}", resp.status());
@@ -170,17 +184,19 @@ impl JetBrainsProxy {
 
         if !response.status().is_success() {
             debug!("Request failed with status: {}", response.status());
-            return Err(anyhow!("Failed to fetch tools with status {}", response.status()));
+            return Err(anyhow!(
+                "Failed to fetch tools with status {}",
+                response.status()
+            ));
         }
 
         let response_text = response.text().await?;
         debug!("Got response text: {}", response_text);
 
-        let tools_response: Value = serde_json::from_str(&response_text)
-            .map_err(|e| {
-                debug!("Failed to parse response as JSON: {}", e);
-                anyhow!("Failed to parse response as JSON: {}", e)
-            })?;
+        let tools_response: Value = serde_json::from_str(&response_text).map_err(|e| {
+            debug!("Failed to parse response as JSON: {}", e);
+            anyhow!("Failed to parse response as JSON: {}", e)
+        })?;
 
         debug!("Parsed JSON response: {:?}", tools_response);
 
@@ -192,24 +208,27 @@ impl JetBrainsProxy {
             })?
             .iter()
             .filter_map(|t| {
-                if let (Some(name), Some(description)) = (
-                    t["name"].as_str(), 
-                    t["description"].as_str()
-                ) {
+                if let (Some(name), Some(description)) =
+                    (t["name"].as_str(), t["description"].as_str())
+                {
                     // Get just the first sentence of the description
                     let first_sentence = description
                         .split('.')
                         .next()
                         .unwrap_or(description)
                         .trim()
-                        .to_string() + ".";
+                        .to_string()
+                        + ".";
 
                     // Handle input_schema as either a string or an object
                     let input_schema = match &t["inputSchema"] {
                         Value::String(s) => Value::String(s.clone()),
                         Value::Object(o) => Value::Object(o.clone()),
                         _ => {
-                            debug!("Invalid inputSchema format for tool {}: {:?}", name, t["inputSchema"]);
+                            debug!(
+                                "Invalid inputSchema format for tool {}: {:?}",
+                                name, t["inputSchema"]
+                            );
                             return None;
                         }
                     };
@@ -231,13 +250,20 @@ impl JetBrainsProxy {
     }
 
     pub async fn call_tool(&self, name: &str, args: Value) -> Result<CallToolResult> {
-        let endpoint = self.cached_endpoint.read().await
+        let endpoint = self
+            .cached_endpoint
+            .read()
+            .await
             .clone()
             .ok_or_else(|| anyhow!("No working IDE endpoint available"))?;
 
-        debug!("ENDPOINT: {} | Tool name: {} | args: {}", endpoint, name, args);
+        debug!(
+            "ENDPOINT: {} | Tool name: {} | args: {}",
+            endpoint, name, args
+        );
 
-        let response = self.client
+        let response = self
+            .client
             .post(&format!("{}/mcp/{}", endpoint, name))
             .json(&args)
             .send()
@@ -253,7 +279,7 @@ impl JetBrainsProxy {
             Value::Object(map) => {
                 let status = map.get("status").and_then(|v| v.as_str());
                 let error = map.get("error").and_then(|v| v.as_str());
-                
+
                 match (status, error) {
                     (Some(s), None) => (false, s.to_string()),
                     (None, Some(e)) => (true, e.to_string()),
@@ -283,7 +309,7 @@ impl JetBrainsProxy {
     pub async fn start(&self) -> Result<()> {
         debug!("Initializing JetBrains Proxy...");
         info!("Initializing JetBrains Proxy...");
-        
+
         // Initial endpoint check
         debug!("Performing initial endpoint check...");
         self.update_ide_endpoint().await;

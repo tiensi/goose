@@ -2,7 +2,7 @@ use anyhow::Result;
 use goose_mcp::{DeveloperRouter, JetBrainsRouter};
 use goose_mcp::NonDeveloperRouter;
 use mcp_server::router::RouterService;
-use mcp_server::{BoundedService, ByteTransport, Server, BoundedService};
+use mcp_server::{BoundedService, ByteTransport, Server};
 use tokio::io::{stdin, stdout};
 
 pub async fn run(name: &str) -> Result<()> {
