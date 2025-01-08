@@ -82,6 +82,7 @@ const createLauncher = () => {
     frame: false,
     transparent: true,
     webPreferences: {
+      devTools: isDev, // Disable DevTools in production
       preload: path.join(__dirname, 'preload.js'),
       additionalArguments: [JSON.stringify(appConfig)],
     },
@@ -146,6 +147,7 @@ const createChat = async (app, query?: string, dir?: string) => {
     useContentSize: true,
     icon: path.join(__dirname, '../images/icon'),
     webPreferences: {
+      devTools: isDev,
       preload: path.join(__dirname, 'preload.js'),
       additionalArguments: [JSON.stringify({ ...appConfig, GOOSE_SERVER__PORT: port, GOOSE_WORKING_DIR: working_dir, REQUEST_DIR: dir })],
     },
@@ -180,6 +182,7 @@ const createChat = async (app, query?: string, dir?: string) => {
   // Enable app-focused DevTools shortcut only in development
   if (isDev) {
     console.log('Running in development mode');
+    // Enable app-focused DevTools shortcut in development mode only
     mainWindow.webContents.on('before-input-event', (event, input) => {
       if (input.key === 'I' && input.meta && input.alt) {
         mainWindow.webContents.openDevTools();
@@ -188,8 +191,10 @@ const createChat = async (app, query?: string, dir?: string) => {
   } else {
     console.log('Running in production mode');
     // Ensure DevTools cannot open in production
-    mainWindow.webContents.on('devtools-opened', () => {
-      mainWindow.webContents.closeDevTools();
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+      if (input.key === 'I' && input.meta && input.alt) {
+        event.preventDefault(); // Prevent the shortcut from doing anything in Electron
+      }
     });
   }
 
