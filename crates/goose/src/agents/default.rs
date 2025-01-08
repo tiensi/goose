@@ -42,6 +42,7 @@ impl DefaultAgent {
         model_name: &str,
         resource_content: &HashMap<String, HashMap<String, (Resource, String)>>,
     ) -> SystemResult<Vec<Message>> {
+        println!("In prepare_inference");
         // Flatten all resource content into a vector of strings
         let mut resources = Vec::new();
         for system_resources in resource_content.values() {
@@ -49,6 +50,7 @@ impl DefaultAgent {
                 resources.push(content.clone());
             }
         }
+        println!("Resources: {:?}", resources);
 
         let approx_count = self.token_counter.count_everything(
             system_prompt,
@@ -57,7 +59,7 @@ impl DefaultAgent {
             &resources,
             Some(model_name),
         );
-
+        println!("Approx count: {:?}", approx_count);
         let mut status_content: Vec<String> = Vec::new();
 
         if approx_count > target_limit {
@@ -129,6 +131,7 @@ impl DefaultAgent {
                 }
             }
         } else {
+            println!("No trimming needed");
             // Create status messages from all resources when no trimming needed
             for resources in resource_content.values() {
                 for (resource, content) in resources.values() {
@@ -136,6 +139,8 @@ impl DefaultAgent {
                 }
             }
         }
+
+        println!("Status content: {:?}", status_content);
 
         // Join remaining status content and create status message
         let status_str = status_content.join("\n");
@@ -196,6 +201,7 @@ impl Agent for DefaultAgent {
         &self,
         messages: &[Message],
     ) -> anyhow::Result<BoxStream<'_, anyhow::Result<Message>>> {
+        println!("In goose agent reply");
         let mut capabilities = self.capabilities.lock().await;
         let tools = capabilities.get_prefixed_tools().await?;
         let system_prompt = capabilities.get_system_prompt().await;
@@ -205,6 +211,12 @@ impl Agent for DefaultAgent {
             .get_estimated_limit();
 
         // Update conversation history for the start of the reply
+        println!("Preparing inference (before loop)");
+        let model_name = capabilities.provider().get_model_config().model_name.clone();
+        println!("Model name: {:?}", model_name);
+        let resources = capabilities.get_resources().await?;
+        println!("Resources: {:?}", resources);
+
         let mut messages = self
             .prepare_inference(
                 &system_prompt,
@@ -212,14 +224,15 @@ impl Agent for DefaultAgent {
                 messages,
                 &Vec::new(),
                 estimated_limit,
-                &capabilities.provider().get_model_config().model_name,
-                &capabilities.get_resources().await?,
+                &model_name,
+                &resources,
             )
             .await?;
 
         Ok(Box::pin(async_stream::try_stream! {
             loop {
                 // Get completion from provider
+                println!("(in loop) Getting completion from provider with messages: {:?}", messages);
                 let (response, usage) = capabilities.provider().complete(
                     &system_prompt,
                     &messages,
