@@ -43,7 +43,6 @@ impl DefaultAgent {
         model_name: &str,
         resource_content: &HashMap<String, HashMap<String, (Resource, String)>>,
     ) -> SystemResult<Vec<Message>> {
-        println!("In prepare_inference");
         // Flatten all resource content into a vector of strings
         let mut resources = Vec::new();
         for system_resources in resource_content.values() {
@@ -51,7 +50,6 @@ impl DefaultAgent {
                 resources.push(content.clone());
             }
         }
-        println!("Resources: {:?}", resources);
 
         let approx_count = self.token_counter.count_everything(
             system_prompt,
@@ -131,7 +129,6 @@ impl DefaultAgent {
                 }
             }
         } else {
-            println!("No trimming needed");
             // Create status messages from all resources when no trimming needed
             for resources in resource_content.values() {
                 for (resource, content) in resources.values() {
@@ -139,8 +136,6 @@ impl DefaultAgent {
                 }
             }
         }
-
-        println!("Status content: {:?}", status_content);
 
         // Join remaining status content and create status message
         let status_str = status_content.join("\n");
@@ -242,7 +237,6 @@ impl Agent for DefaultAgent {
             let _reply_guard = reply_span.enter();
             loop {
                 // Get completion from provider
-                println!("(in loop) Getting completion from provider with messages: {:?}", messages);
                 let (response, usage) = capabilities.provider().complete(
                     &system_prompt,
                     &messages,
