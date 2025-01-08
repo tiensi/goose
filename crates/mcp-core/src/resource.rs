@@ -118,13 +118,18 @@ impl Resource {
     }
 
     /// Mark the resource as active, i.e. set its priority to 1.0
-    pub fn mark_active(mut self) -> Self {
+    pub fn mark_active(self) -> Self {
         self.with_priority(1.0)
     }
 
     // Check if the resource is active
     pub fn is_active(&self) -> bool {
-        self.priority() == Some(1.0)
+        const EPSILON: f32 = 1e-6; // Tolerance for floating point comparison
+        if let Some(priority) = self.priority() {
+            (priority - 1.0).abs() < EPSILON
+        } else {
+            false
+        }
     }
 
     /// Returns the priority of the resource, if set
