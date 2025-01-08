@@ -125,6 +125,7 @@ const windowMap = new Map<number, BrowserWindow>();
 const createChat = async (app, query?: string, dir?: string) => {
   // Apply current environment settings before creating chat
   updateEnvironmentVariables(envToggles);
+  console.log("hello there")
 
   const maybeStartGoosed = async () => {
     if (checkApiCredentials()) {
@@ -179,7 +180,7 @@ const createChat = async (app, query?: string, dir?: string) => {
   }
 
   // DevTools
-  // Enable app-focused DevTools shortcut only in development
+  // Enable app-focused DevTools shortcut only in development when app is in focus
   if (isDev) {
     console.log('Running in development mode');
     // Enable app-focused DevTools shortcut in development mode only
@@ -188,16 +189,8 @@ const createChat = async (app, query?: string, dir?: string) => {
         mainWindow.webContents.openDevTools();
       }
     });
-  } else {
-    console.log('Running in production mode');
-    // Ensure DevTools cannot open in production
-    mainWindow.webContents.on('before-input-event', (event, input) => {
-      if (input.key === 'I' && input.meta && input.alt) {
-        event.preventDefault(); // Prevent the shortcut from doing anything in Electron
-      }
-    });
   }
-gh
+
   windowMap.set(windowId, mainWindow);
   mainWindow.on('closed', () => {
     windowMap.delete(windowId);
