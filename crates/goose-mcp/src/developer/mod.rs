@@ -99,22 +99,22 @@ impl DeveloperRouter {
                     },
                     "command": {
                         "enum": ["view", "write", "str_replace", "undo_edit"],
-                        "description": "The commands to run."
+                        "description": "The command to run."
                     },
                     "new_str": {
                         "type": "string",
                         "default": null,
-                        "description": "Required for the `replace` command."
+                        "description": "Required for the `str_replace` command."
                     },
                     "old_str": {
                         "type": "string",
                         "default": null,
-                        "description": "Required for the `replace` command."
+                        "description": "Required for the `str_replace` command."
                     },
                     "file_text": {
                         "type": "string",
                         "default": null,
-                        "description": "Required for `create` command."
+                        "description": "Required for `write` command."
                     },
                 }
             }),
