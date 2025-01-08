@@ -1,5 +1,6 @@
 use anyhow::Result;
 use goose_mcp::DeveloperRouter;
+use goose_mcp::NonDeveloperRouter;
 use mcp_server::router::RouterService;
 use mcp_server::{BoundedService, ByteTransport, Server};
 use tokio::io::{stdin, stdout};
@@ -9,6 +10,7 @@ pub async fn run_server(name: &str) -> Result<()> {
 
     let router: Option<Box<dyn BoundedService>> = match name {
         "developer" => Some(Box::new(RouterService(DeveloperRouter::new()))),
+        "nondeveloper" => Some(Box::new(RouterService(NonDeveloperRouter::new()))),
         _ => None,
     };
 
