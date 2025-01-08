@@ -67,7 +67,7 @@ impl Capabilities {
     /// Add a new MCP system based on the provided client type
     // TODO IMPORTANT need to ensure this times out if the system command is broken!
     pub async fn add_system(&mut self, config: SystemConfig) -> SystemResult<()> {
-        let client: McpClient = match config {
+        let mut client: McpClient = match config {
             SystemConfig::Sse { ref uri } => {
                 let transport = SseTransport::new(uri);
                 McpClient::new(transport.start().await?)

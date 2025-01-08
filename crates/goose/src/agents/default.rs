@@ -56,7 +56,6 @@ impl DefaultAgent {
             &resources,
             Some(model_name),
         );
-
         let mut status_content: Vec<String> = Vec::new();
 
         if approx_count > target_limit {
