@@ -68,7 +68,7 @@ pub fn setup_logging() -> Result<()> {
         // Set default levels for different modules
         EnvFilter::new("")
             // Set goose module to INFO only
-            .add_directive("goose=info".parse().unwrap())
+            .add_directive("goose=debug".parse().unwrap())
             // Set goose-server to INFO
             .add_directive("goose_server=info".parse().unwrap())
             // Set tower-http to INFO for request logging
@@ -79,8 +79,8 @@ pub fn setup_logging() -> Result<()> {
 
     // Build the subscriber with required layers
     let subscriber = Registry::default()
-        .with(file_layer)
-        .with(console_layer.with_filter(env_filter));
+        .with(file_layer.with_filter(env_filter)) 
+        .with(console_layer.with_filter(LevelFilter::INFO)); 
 
     // Initialize with Langfuse if available
     if let Some(langfuse) = langfuse_layer::create_langfuse_observer() {
