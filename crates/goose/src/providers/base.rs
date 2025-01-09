@@ -182,7 +182,6 @@ pub trait Provider: Send + Sync + Moderation {
 
         // Get the content to moderate
         let content = latest_user_msg.content.first().unwrap().as_text().unwrap();
-        println!("Content to moderate: {}", content);
 
         // Start completion and moderation immediately
         let completion_fut = self.complete_internal(system, messages, tools);
