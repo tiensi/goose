@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use mcp_client::client::Error as ClientError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -15,25 +17,56 @@ pub enum SystemError {
 
 pub type SystemResult<T> = Result<T, SystemError>;
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Secrets {
+    /// A map of environment variables to set, e.g. API_KEY -> some_secret
+    #[serde(default)]
+    #[serde(flatten)]
+    map: HashMap<String, String>,
+}
+
+impl Secrets {
+    pub fn new(map: HashMap<String, String>) -> Self {
+        Self { map }
+    }
+
+    pub fn set_environment_vars(&self) {
+        for (key, value) in &self.map {
+            std::env::set_var(key, value);
+        }
+    }
+}
+
 /// Represents the different types of MCP systems that can be added to the manager
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "type")]
 pub enum SystemConfig {
     /// Server-sent events client with a URI endpoint
-    Sse { uri: String },
+    Sse {
+        uri: String,
+        secrets: Option<Secrets>,
+    },
     /// Standard I/O client with command and arguments
-    Stdio { cmd: String, args: Vec<String> },
+    Stdio {
+        cmd: String,
+        args: Vec<String>,
+        secrets: Option<Secrets>,
+    },
 }
 
 impl SystemConfig {
     pub fn sse<S: Into<String>>(uri: S) -> Self {
-        Self::Sse { uri: uri.into() }
+        Self::Sse {
+            uri: uri.into(),
+            secrets: None,
+        }
     }
 
     pub fn stdio<S: Into<String>>(cmd: S) -> Self {
         Self::Stdio {
             cmd: cmd.into(),
             args: vec![],
+            secrets: None,
         }
     }
 
@@ -43,11 +76,20 @@ impl SystemConfig {
         S: Into<String>,
     {
         match self {
-            Self::Stdio { cmd, .. } => Self::Stdio {
+            Self::Stdio { cmd, secrets, .. } => Self::Stdio {
                 cmd,
+                secrets,
                 args: args.into_iter().map(Into::into).collect(),
             },
             other => other,
+        }
+    }
+
+    /// Returns a reference to the secrets in this config, if any
+    pub fn secrets(&self) -> Option<&Secrets> {
+        match self {
+            Self::Sse { secrets, .. } => secrets.as_ref(),
+            Self::Stdio { secrets, .. } => secrets.as_ref(),
         }
     }
 }
@@ -55,8 +97,8 @@ impl SystemConfig {
 impl std::fmt::Display for SystemConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SystemConfig::Sse { uri } => write!(f, "SSE({})", uri),
-            SystemConfig::Stdio { cmd, args } => write!(f, "Stdio({} {})", cmd, args.join(" ")),
+            SystemConfig::Sse { uri, .. } => write!(f, "SSE({})", uri),
+            SystemConfig::Stdio { cmd, args, .. } => write!(f, "Stdio({} {})", cmd, args.join(" ")),
         }
     }
 }
