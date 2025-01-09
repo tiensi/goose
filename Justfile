@@ -30,3 +30,8 @@ run-server:
 make-ui:
     @just release
     cd ui/desktop && npm run bundle:default
+
+# Setup langfuse server
+langfuse-server:
+    #!/usr/bin/env bash
+    ./scripts/setup_langfuse.sh

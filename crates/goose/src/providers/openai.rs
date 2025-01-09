@@ -10,7 +10,7 @@ use super::configs::OpenAiProviderConfig;
 use super::configs::{ModelConfig, ProviderModelConfig};
 use super::model_pricing::cost;
 use super::model_pricing::model_pricing_for;
-use super::utils::{get_model, handle_response};
+use super::utils::{emit_debug_trace, get_model, handle_response};
 use crate::message::Message;
 use crate::providers::openai_utils::{
     check_openai_context_length_error, create_openai_request_payload, get_openai_usage,
@@ -58,6 +58,18 @@ impl Provider for OpenAiProvider {
         self.config.model_config()
     }
 
+    #[tracing::instrument(
+        skip(self, system, messages, tools),
+        fields(
+            model_config,
+            input,
+            output,
+            input_tokens,
+            output_tokens,
+            total_tokens,
+            cost
+        )
+    )]
     async fn complete(
         &self,
         system: &str,
@@ -68,7 +80,7 @@ impl Provider for OpenAiProvider {
         let payload = create_openai_request_payload(&self.config.model, system, messages, tools)?;
 
         // Make request
-        let response = self.post(payload).await?;
+        let response = self.post(payload.clone()).await?;
 
         // Raise specific error if context length is exceeded
         if let Some(error) = response.get("error") {
@@ -83,7 +95,7 @@ impl Provider for OpenAiProvider {
         let usage = self.get_usage(&response)?;
         let model = get_model(&response);
         let cost = cost(&usage, &model_pricing_for(&model));
-
+        emit_debug_trace(&self.config, &payload, &response, &usage, cost);
         Ok((message, ProviderUsage::new(model, usage, cost)))
     }
 

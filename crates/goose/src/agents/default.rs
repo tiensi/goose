@@ -3,6 +3,7 @@ use futures::stream::BoxStream;
 use serde_json::json;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
+use tracing::{debug, instrument};
 
 use super::Agent;
 use crate::agents::capabilities::Capabilities;
@@ -57,7 +58,6 @@ impl DefaultAgent {
             &resources,
             Some(model_name),
         );
-
         let mut status_content: Vec<String> = Vec::new();
 
         if approx_count > target_limit {
@@ -192,10 +192,12 @@ impl Agent for DefaultAgent {
         Ok(Value::Null)
     }
 
+    #[instrument(skip(self, messages), fields(user_message))]
     async fn reply(
         &self,
         messages: &[Message],
     ) -> anyhow::Result<BoxStream<'_, anyhow::Result<Message>>> {
+        let reply_span = tracing::Span::current();
         let mut capabilities = self.capabilities.lock().await;
         let tools = capabilities.get_prefixed_tools().await?;
         let system_prompt = capabilities.get_system_prompt().await;
@@ -204,7 +206,17 @@ impl Agent for DefaultAgent {
             .get_model_config()
             .get_estimated_limit();
 
+        // Set the user_message field in the span instead of creating a new event
+        if let Some(content) = messages
+            .last()
+            .and_then(|msg| msg.content.first())
+            .and_then(|c| c.as_text())
+        {
+            debug!("user_message" = &content);
+        }
+
         // Update conversation history for the start of the reply
+        let resources = capabilities.get_resources().await?;
         let mut messages = self
             .prepare_inference(
                 &system_prompt,
@@ -212,12 +224,17 @@ impl Agent for DefaultAgent {
                 messages,
                 &Vec::new(),
                 estimated_limit,
-                &capabilities.provider().get_model_config().model_name,
-                &capabilities.get_resources().await?,
+                &capabilities
+                    .provider()
+                    .get_model_config()
+                    .model_name
+                    .clone(),
+                &resources,
             )
             .await?;
 
         Ok(Box::pin(async_stream::try_stream! {
+            let _reply_guard = reply_span.enter();
             loop {
                 // Get completion from provider
                 let (response, usage) = capabilities.provider().complete(

@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { loadZshEnv } from './utils/loadEnv';
 import { getBinaryPath } from './utils/binaryPath';
-import { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, Notification, MenuItem, dialog } from 'electron';
+import { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, Notification, MenuItem, dialog, powerSaveBlocker } from 'electron';
 import path from 'node:path';
 import { startGoosed } from './goosed';
 import started from "electron-squirrel-startup";
@@ -37,6 +37,10 @@ const parseArgs = () => {
 const checkApiCredentials = () => {
   loadZshEnv(app.isPackaged);
 
+  
+  //{env-macro-start}//
+  //needed when goose is bundled for a specific provider
+
   const apiKeyProvidersValid =
     ['openai', 'anthropic', 'google', 'groq', 'openrouter'].includes(process.env.GOOSE_PROVIDER__TYPE) &&
       process.env.GOOSE_PROVIDER__HOST &&
@@ -49,6 +53,9 @@ const checkApiCredentials = () => {
       process.env.GOOSE_PROVIDER__MODEL;
 
   return apiKeyProvidersValid || optionalApiKeyProvidersValid;
+  
+  //needed when goose is bundled for a specific provider:
+  //{env-macro-end}//
 };
 
 const generateSecretKey = () => {
@@ -386,6 +393,30 @@ app.whenReady().then(async () => {
   ipcMain.on('reload-app', () => {
     app.relaunch();
     app.exit(0);
+  });
+
+
+  let powerSaveBlockerId: number | null = null;
+
+  ipcMain.handle('start-power-save-blocker', () => {
+    log.info('Starting power save blocker...');
+    if (powerSaveBlockerId === null) {
+      powerSaveBlockerId = powerSaveBlocker.start('prevent-display-sleep');
+      log.info('Started power save blocker');
+      return true;
+    }
+    return false;
+  });
+
+  ipcMain.handle('stop-power-save-blocker', () => {
+    log.info('Stopping power save blocker...');
+    if (powerSaveBlockerId !== null) {
+      powerSaveBlocker.stop(powerSaveBlockerId);
+      powerSaveBlockerId = null;
+      log.info('Stopped power save blocker');
+      return true;
+    }
+    return false;
   });
 
   // Handle binary path requests

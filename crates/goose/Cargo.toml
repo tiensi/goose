@@ -59,6 +59,10 @@ xcap = "0.0.14"
 libc = "=0.2.167"
 lazy_static = "1.5"
 kill_tree = "0.2.4"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+wiremock = "0.6.0"
+
 
 keyring = { version = "3.6.1", features = [
     "apple-native",
@@ -75,7 +79,6 @@ tower-service = "0.3"
 
 [dev-dependencies]
 sysinfo = "0.32.1"
-wiremock = "0.6.0"
 mockito = "1.2"
 tempfile = "3.8"
 mockall = "0.11"

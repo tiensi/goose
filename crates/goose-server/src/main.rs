@@ -1,6 +1,7 @@
 mod commands;
 mod configuration;
 mod error;
+mod logging;
 mod routes;
 mod state;
 

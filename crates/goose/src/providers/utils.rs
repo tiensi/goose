@@ -1,8 +1,11 @@
+use super::base::Usage;
 use anyhow::{anyhow, Error, Result};
 use regex::Regex;
 use reqwest::{Response, StatusCode};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
+use tracing::debug;
 
 use mcp_core::content::ImageContent;
 
@@ -113,6 +116,30 @@ pub fn unescape_json_values(value: &Value) -> Value {
         }
         _ => value.clone(),
     }
+}
+
+pub fn emit_debug_trace<T: serde::Serialize>(
+    model_config: &T,
+    payload: &impl serde::Serialize,
+    response: &Value,
+    usage: &Usage,
+    cost: Option<Decimal>,
+) {
+    // Handle both Map<String, Value> and Value payload types
+    let payload_str = match serde_json::to_value(payload) {
+        Ok(value) => serde_json::to_string_pretty(&value).unwrap_or_default(),
+        Err(_) => serde_json::to_string_pretty(&payload).unwrap_or_default(),
+    };
+
+    debug!(
+        model_config = %serde_json::to_string_pretty(model_config).unwrap_or_default(),
+        input = %payload_str,
+        output = %serde_json::to_string_pretty(response).unwrap_or_default(),
+        input_tokens = ?usage.input_tokens.unwrap_or_default(),
+        output_tokens = ?usage.output_tokens.unwrap_or_default(),
+        total_tokens = ?usage.total_tokens.unwrap_or_default(),
+        cost = ?cost.unwrap_or_default()
+    );
 }
 
 #[cfg(test)]

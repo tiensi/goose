@@ -74,6 +74,18 @@ impl Provider for DatabricksProvider {
         self.config.model_config()
     }
 
+    #[tracing::instrument(
+        skip(self, system, messages, tools),
+        fields(
+            model_config,
+            input,
+            output,
+            input_tokens,
+            output_tokens,
+            total_tokens,
+            cost
+        )
+    )]
     async fn complete(
         &self,
         system: &str,
@@ -121,8 +133,7 @@ impl Provider for DatabricksProvider {
                 .collect(),
         );
 
-        // Make request
-        let response = self.post(payload).await?;
+        let response = self.post(payload.clone()).await?;
 
         // Raise specific error if context length is exceeded
         if let Some(error) = response.get("error") {
@@ -139,7 +150,7 @@ impl Provider for DatabricksProvider {
         let usage = self.get_usage(&response)?;
         let model = get_model(&response);
         let cost = cost(&usage, &model_pricing_for(&model));
-
+        super::utils::emit_debug_trace(&self.config, &payload, &response, &usage, cost);
         Ok((message, ProviderUsage::new(model, usage, cost)))
     }
 

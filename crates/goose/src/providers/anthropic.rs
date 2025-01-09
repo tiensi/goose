@@ -11,7 +11,7 @@ use super::base::{Provider, Usage};
 use super::configs::{AnthropicProviderConfig, ModelConfig, ProviderModelConfig};
 use super::model_pricing::cost;
 use super::model_pricing::model_pricing_for;
-use super::utils::get_model;
+use super::utils::{emit_debug_trace, get_model};
 use crate::message::{Message, MessageContent};
 use mcp_core::content::Content;
 use mcp_core::role::Role;
@@ -193,6 +193,18 @@ impl Provider for AnthropicProvider {
         self.config.model_config()
     }
 
+    #[tracing::instrument(
+        skip(self, system, messages, tools),
+        fields(
+            model_config,
+            input,
+            output,
+            input_tokens,
+            output_tokens,
+            total_tokens,
+            cost
+        )
+    )]
     async fn complete(
         &self,
         system: &str,
@@ -238,14 +250,14 @@ impl Provider for AnthropicProvider {
         }
 
         // Make request
-        let response = self.post(payload).await?;
+        let response = self.post(payload.clone()).await?;
 
         // Parse response
         let message = Self::parse_anthropic_response(response.clone())?;
         let usage = self.get_usage(&response)?;
         let model = get_model(&response);
         let cost = cost(&usage, &model_pricing_for(&model));
-
+        emit_debug_trace(&self.config, &payload, &response, &usage, cost);
         Ok((message, ProviderUsage::new(model, usage, cost)))
     }
 

@@ -4,6 +4,7 @@ use goose::agents::AgentFactory;
 
 mod commands;
 mod log_usage;
+mod logging;
 mod profile;
 mod prompt;
 mod session;
@@ -14,6 +15,7 @@ use commands::configure::handle_configure;
 use commands::mcp::run_server;
 use commands::session::build_session;
 use commands::version::print_version;
+use logging::setup_logging;
 use profile::has_no_profiles;
 use std::io::{self, Read};
 
@@ -268,6 +270,8 @@ async fn main() -> Result<()> {
             }
 
             let mut session = build_session(name, profile, agent, resume).await;
+            setup_logging(session.session_file().file_stem().and_then(|s| s.to_str()))?;
+
             let _ = session.start().await;
             return Ok(());
         }

@@ -94,10 +94,12 @@ function ChatContent({
         updateWorking(Working.Working);
       }
     },
-    onFinish: async (message, options) => {
+    onFinish: async (message, _) => {
+      window.electron.stopPowerSaveBlocker();
       setTimeout(() => {
         setProgressMessage('Task finished. Click here to expand.');
         updateWorking(Working.Idle);
+        
       }, 500);
       
       const fetchResponses = await askAi(message.content);
@@ -161,6 +163,8 @@ function ChatContent({
 
   // Handle submit
   const handleSubmit = (e: React.FormEvent) => {
+    // Start power save blocker when sending a message
+    window.electron.startPowerSaveBlocker();
     const customEvent = e as CustomEvent;
     const content = customEvent.detail?.value || '';
     if (content.trim()) {
@@ -181,6 +185,7 @@ function ChatContent({
   const onStopGoose = () => {
     stop();
     setLastInteractionTime(Date.now()); // Update last interaction time
+    window.electron.stopPowerSaveBlocker();
 
     const lastMessage: Message = messages[messages.length - 1];
     if (lastMessage.role === 'user' && lastMessage.toolInvocations === undefined) {
@@ -314,7 +319,7 @@ function ChatContent({
 }
 
 // Function to send the system configuration to the server
-const addSystemConfig = async () => {
+const addSystemConfig = async (system: string) => {
   console.log("calling add system")
   // Get the app instance from electron
   const app = window.electron.app;
@@ -322,7 +327,7 @@ const addSystemConfig = async () => {
   const systemConfig = {
     type: "Stdio",
     cmd: await window.electron.getBinaryPath('goosed'),
-    args: ["mcp", "developer"]
+    args: ["mcp", system]
   };
 
   try {
@@ -335,12 +340,12 @@ const addSystemConfig = async () => {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to add system config: ${response.statusText}`);
+      throw new Error(`Failed to add system config for ${system}: ${response.statusText}`);
     }
 
-    console.log('Successfully added system config');
+    console.log(`Successfully added system config for ${system}`);
   } catch (error) {
-    console.log('Error adding system config:', error);
+    console.log(`Error adding system config for ${system}:`, error);
   }
 };
 
@@ -413,7 +418,7 @@ export default function ChatWindow() {
 
   // Initialize system config when window loads
   useEffect(() => {
-    addSystemConfig();
+    addSystemConfig("developer");
   }, []);
 
   window.electron.logInfo('ChatWindow loaded');

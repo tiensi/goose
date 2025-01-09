@@ -276,6 +276,18 @@ impl Provider for GoogleProvider {
         self.config.model_config()
     }
 
+    #[tracing::instrument(
+        skip(self, system, messages, tools),
+        fields(
+            model_config,
+            input,
+            output,
+            input_tokens,
+            output_tokens,
+            total_tokens,
+            cost
+        )
+    )]
     async fn complete(
         &self,
         system: &str,
@@ -309,7 +321,7 @@ impl Provider for GoogleProvider {
         }
 
         // Make request
-        let response = self.post(Value::Object(payload)).await?;
+        let response = self.post(Value::Object(payload.clone())).await?;
         // Parse response
         let message = self.google_response_to_message(unescape_json_values(&response))?;
         let usage = self.get_usage(&response)?;
@@ -317,6 +329,7 @@ impl Provider for GoogleProvider {
             Some(model_version) => model_version.as_str().unwrap_or_default().to_string(),
             None => self.config.model.model_name.clone(),
         };
+        super::utils::emit_debug_trace(&self.config, &payload, &response, &usage, None);
         let provider_usage = ProviderUsage::new(model, usage, None);
         Ok((message, provider_usage))
     }
