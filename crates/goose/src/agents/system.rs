@@ -30,10 +30,15 @@ impl Secrets {
         Self { map }
     }
 
-    pub fn set_environment_vars(&self) {
-        for (key, value) in &self.map {
-            std::env::set_var(key, value);
-        }
+    pub fn default() -> Self {
+        Self::new(HashMap::new())
+    }
+
+    pub fn get_env(&self) -> HashMap<String, String> {
+        self.map
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
     }
 }
 
@@ -42,15 +47,12 @@ impl Secrets {
 #[serde(tag = "type")]
 pub enum SystemConfig {
     /// Server-sent events client with a URI endpoint
-    Sse {
-        uri: String,
-        secrets: Option<Secrets>,
-    },
+    Sse { uri: String, secrets: Secrets },
     /// Standard I/O client with command and arguments
     Stdio {
         cmd: String,
         args: Vec<String>,
-        secrets: Option<Secrets>,
+        secrets: Secrets,
     },
 }
 
@@ -58,7 +60,7 @@ impl SystemConfig {
     pub fn sse<S: Into<String>>(uri: S) -> Self {
         Self::Sse {
             uri: uri.into(),
-            secrets: None,
+            secrets: Secrets::default(),
         }
     }
 
@@ -66,7 +68,7 @@ impl SystemConfig {
         Self::Stdio {
             cmd: cmd.into(),
             args: vec![],
-            secrets: None,
+            secrets: Secrets::default(),
         }
     }
 
@@ -82,14 +84,6 @@ impl SystemConfig {
                 args: args.into_iter().map(Into::into).collect(),
             },
             other => other,
-        }
-    }
-
-    /// Returns a reference to the secrets in this config, if any
-    pub fn secrets(&self) -> Option<&Secrets> {
-        match self {
-            Self::Sse { secrets, .. } => secrets.as_ref(),
-            Self::Stdio { secrets, .. } => secrets.as_ref(),
         }
     }
 }

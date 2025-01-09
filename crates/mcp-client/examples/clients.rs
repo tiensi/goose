@@ -4,8 +4,8 @@ use mcp_client::{
 };
 use rand::Rng;
 use rand::SeedableRng;
-use std::sync::Arc;
 use std::time::Duration;
+use std::{collections::HashMap, sync::Arc};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -122,7 +122,7 @@ async fn create_stdio_client(
     _name: &str,
     _version: &str,
 ) -> Result<McpClient, Box<dyn std::error::Error>> {
-    let transport = StdioTransport::new("uvx", vec!["mcp-server-git".to_string()]);
+    let transport = StdioTransport::new("uvx", vec!["mcp-server-git".to_string()], HashMap::new());
     Ok(McpClient::new(transport.start().await?))
 }
 
@@ -130,6 +130,6 @@ async fn create_sse_client(
     _name: &str,
     _version: &str,
 ) -> Result<McpClient, Box<dyn std::error::Error>> {
-    let transport = SseTransport::new("http://localhost:8000/sse");
+    let transport = SseTransport::new("http://localhost:8000/sse", HashMap::new());
     Ok(McpClient::new(transport.start().await?))
 }

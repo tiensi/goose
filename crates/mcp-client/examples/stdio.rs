@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::Result;
 use mcp_client::client::{ClientCapabilities, ClientInfo, Error as ClientError, McpClient};
 use mcp_client::transport::{StdioTransport, Transport};
@@ -15,7 +17,7 @@ async fn main() -> Result<(), ClientError> {
         .init();
 
     // 1) Create the transport
-    let transport = StdioTransport::new("uvx", vec!["mcp-server-git".to_string()]);
+    let transport = StdioTransport::new("uvx", vec!["mcp-server-git".to_string()], HashMap::new());
 
     // 2) Start the transport to get a handle
     let transport_handle = transport.start().await?;

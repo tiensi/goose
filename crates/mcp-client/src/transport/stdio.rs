@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 
@@ -103,18 +104,25 @@ impl StdioActor {
 pub struct StdioTransport {
     command: String,
     args: Vec<String>,
+    env: HashMap<String, String>,
 }
 
 impl StdioTransport {
-    pub fn new<S: Into<String>>(command: S, args: Vec<String>) -> Self {
+    pub fn new<S: Into<String>>(
+        command: S,
+        args: Vec<String>,
+        env: HashMap<String, String>,
+    ) -> Self {
         Self {
             command: command.into(),
             args,
+            env: env,
         }
     }
 
     async fn spawn_process(&self) -> Result<(Child, ChildStdin, ChildStdout), Error> {
         let mut process = Command::new(&self.command)
+            .envs(&self.env)
             .args(&self.args)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())

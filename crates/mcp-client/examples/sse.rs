@@ -1,6 +1,7 @@
 use anyhow::Result;
 use mcp_client::client::{ClientCapabilities, ClientInfo, McpClient};
 use mcp_client::transport::{SseTransport, Transport};
+use std::collections::HashMap;
 use std::time::Duration;
 use tracing_subscriber::EnvFilter;
 
@@ -16,7 +17,7 @@ async fn main() -> Result<()> {
         .init();
 
     // Create the base transport
-    let transport = SseTransport::new("http://localhost:8000/sse");
+    let transport = SseTransport::new("http://localhost:8000/sse", HashMap::new());
 
     // Start transport
     let handle = transport.start().await?;

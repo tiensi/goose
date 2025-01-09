@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 // This example shows how to use the mcp-client crate to interact with a server that has a simple counter tool.
 // The server is started by running `cargo run -p mcp-server` in the root of the mcp-server crate.
 use anyhow::Result;
@@ -23,6 +25,7 @@ async fn main() -> Result<(), ClientError> {
             .into_iter()
             .map(|s| s.to_string())
             .collect(),
+        HashMap::new(),
     );
 
     // Start the transport to get a handle

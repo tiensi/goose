@@ -87,20 +87,20 @@ impl Capabilities {
     /// Add a new MCP system based on the provided client type
     // TODO IMPORTANT need to ensure this times out if the system command is broken!
     pub async fn add_system(&mut self, config: SystemConfig) -> SystemResult<()> {
-        // If secrets exist, set them as environment variables
-        if let Some(secrets) = config.secrets() {
-            secrets.set_environment_vars();
-        };
-
         let mut client: McpClient = match config {
-            SystemConfig::Sse { ref uri, .. } => {
-                let transport = SseTransport::new(uri);
+            SystemConfig::Sse {
+                ref uri,
+                ref secrets,
+            } => {
+                let transport = SseTransport::new(uri, secrets.get_env());
                 McpClient::new(transport.start().await?)
             }
             SystemConfig::Stdio {
-                ref cmd, ref args, ..
+                ref cmd,
+                ref args,
+                ref secrets,
             } => {
-                let transport = StdioTransport::new(cmd, args.to_vec());
+                let transport = StdioTransport::new(cmd, args.to_vec(), secrets.get_env());
                 McpClient::new(transport.start().await?)
             }
         };
