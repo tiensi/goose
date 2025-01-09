@@ -125,7 +125,6 @@ const windowMap = new Map<number, BrowserWindow>();
 const createChat = async (app, query?: string, dir?: string) => {
   // Apply current environment settings before creating chat
   updateEnvironmentVariables(envToggles);
-  console.log("hello there")
 
   const maybeStartGoosed = async () => {
     if (checkApiCredentials()) {
