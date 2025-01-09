@@ -1,14 +1,11 @@
 mod lang;
 
 use anyhow::Result;
-use base64::Engine;
 use indoc::formatdoc;
 use serde_json::{json, Value};
 use std::{
     collections::HashMap,
-    fs,
     future::Future,
-    io::Cursor,
     path::{Path, PathBuf},
     pin::Pin,
 };
@@ -27,18 +24,17 @@ use mcp_server::Router;
 use mcp_core::content::Content;
 use mcp_core::role::Role;
 
+use indoc::indoc;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
-use tracing::info;
-use xcap::{Monitor, Window};
 
-pub struct DeveloperRouter {
+pub struct Developer2Router {
     tools: Vec<Tool>,
     file_history: Arc<Mutex<HashMap<PathBuf, Vec<String>>>>,
     instructions: String,
 }
 
-impl Default for DeveloperRouter {
+impl Default for Developer2Router {
     fn default() -> Self {
         Self::new()
     }
@@ -103,7 +99,7 @@ impl Developer2Router {
                     },
                     "command": {
                         "type": "string",
-                        "enum": ["view", "write", "str_replace", "undo_edit"],
+                        "enum": ["view", "create", "str_replace", "undo_edit"],
                         "description": "Allowed options are: `view`, `create`, `str_replace`, undo_edit`."
                     },
                     "old_str": {"type": "string"},
@@ -125,14 +121,11 @@ impl Developer2Router {
 
             "#,
             os=std::env::consts::OS,
-            cwd=std::env::current_dir().expect("should have a current working dir"),
+            cwd=std::env::current_dir().expect("should have a current working dir").to_string_lossy(),
         };
 
         Self {
-            tools: vec![
-                bash_tool,
-                text_editor_tool,
-            ],
+            tools: vec![bash_tool, text_editor_tool],
             file_history: Arc::new(Mutex::new(HashMap::new())),
             instructions,
         }
@@ -140,23 +133,19 @@ impl Developer2Router {
 
     // Helper method to resolve a path relative to cwd
     fn resolve_path(&self, path_str: &str) -> Result<PathBuf, ToolError> {
-        let cwd = self.cwd.lock().unwrap();
+        let cwd = std::env::current_dir().expect("should have a current working dir");
         let expanded = shellexpand::tilde(path_str);
         let path = Path::new(expanded.as_ref());
 
         let suggestion = cwd.join(path);
 
         match path.is_absolute() {
-            true => Ok(path),
-            false => Err(
-                ToolError::InvalidParameters(
-                    format!(
-                        "The path {} is not an absolute path, did you possibly mean {}?",
-                        path_str,
-                        suggestion
-                    )
-                )
-            ),
+            true => Ok(path.to_path_buf()),
+            false => Err(ToolError::InvalidParameters(format!(
+                "The path {} is not an absolute path, did you possibly mean {}?",
+                path_str,
+                suggestion.to_string_lossy(),
+            ))),
         }
     }
 
@@ -216,16 +205,6 @@ impl Developer2Router {
 
         let path = self.resolve_path(path_str)?;
 
-        // TODO the below functions need to be updated
-        //  1. view needs to actually return the content instead of active files
-        //  2. create should error if the file exists, can return a success message
-        //  3. str_replace should return a snippet with some before/after buffer if possible
-        //  4. undo_edit fine as is i suspect
-        //
-        //  I am debating if we want create to be for new files only vs allowing overwrites.
-        //  I still fine the models can struggle with the replace tool. It can use more tokens
-        //  to specify the before+after than to just overwrite the file if its a major rewrite.
-        //  But having two ways to do things let's the model choose, which means more variability.
         match command {
             "view" => self.text_editor_view(&path).await,
             "create" => {
@@ -236,7 +215,7 @@ impl Developer2Router {
                         ToolError::InvalidParameters("Missing 'file_text' parameter".into())
                     })?;
 
-                self.text_editor_write(&path, file_text).await
+                self.text_editor_create(&path, file_text).await
             }
             "str_replace" => {
                 let old_str = params
@@ -282,12 +261,10 @@ impl Developer2Router {
                 )));
             }
 
-            // Create a new resource and add it to active_resources
             let uri = Url::from_file_path(path)
                 .map_err(|_| ToolError::ExecutionError("Invalid file path".into()))?
                 .to_string();
 
-            // Read the content once
             let content = std::fs::read_to_string(path)
                 .map_err(|e| ToolError::ExecutionError(format!("Failed to read file: {}", e)))?;
 
@@ -300,14 +277,6 @@ impl Developer2Router {
                     MAX_CHAR_COUNT
                 )));
             }
-
-            // Create and store the resource
-            let resource =
-                Resource::new(uri.clone(), Some("text".to_string()), None).map_err(|e| {
-                    ToolError::ExecutionError(format!("Failed to create resource: {}", e))
-                })?;
-
-            self.active_resources.lock().unwrap().insert(uri, resource);
 
             let language = lang::get_language_identifier(path);
             let formatted = formatdoc! {"
@@ -324,11 +293,7 @@ impl Developer2Router {
             // The LLM gets just a quick update as we expect the file to view in the status
             // but we send a low priority message for the human
             Ok(vec![
-                Content::text(format!(
-                    "The file content for {} is now available in the system status.",
-                    path.display()
-                ))
-                .with_audience(vec![Role::Assistant]),
+                Content::embedded_text(uri, content).with_audience(vec![Role::Assistant]),
                 Content::text(formatted)
                     .with_audience(vec![Role::User])
                     .with_priority(0.0),
@@ -341,40 +306,28 @@ impl Developer2Router {
         }
     }
 
-    async fn text_editor_write(
+    async fn text_editor_create(
         &self,
         path: &PathBuf,
         file_text: &str,
     ) -> Result<Vec<Content>, ToolError> {
-        // Get the URI for the file
-        let uri = Url::from_file_path(path)
-            .map_err(|_| ToolError::ExecutionError("Invalid file path".into()))?
-            .to_string();
-
-        // Check if file already exists and is active
-        if path.exists() && !self.active_resources.lock().unwrap().contains_key(&uri) {
+        // Check if file already exists
+        if path.exists() {
             return Err(ToolError::InvalidParameters(format!(
-                "File '{}' exists but is not active. View it first before overwriting.",
+                "File '{}' already exists - you will need to edit it with the `str_replace` command",
                 path.display()
             )));
         }
-
-        // Save history for undo
-        self.save_file_history(path)?;
 
         // Write to the file
         std::fs::write(path, file_text)
             .map_err(|e| ToolError::ExecutionError(format!("Failed to write file: {}", e)))?;
 
-        // Create and store resource
-
-        let resource = Resource::new(uri.clone(), Some("text".to_string()), None)
-            .map_err(|e| ToolError::ExecutionError(e.to_string()))?;
-        self.active_resources.lock().unwrap().insert(uri, resource);
-
         // Try to detect the language from the file extension
         let language = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
 
+        // The assistant output does not show the file again because the content is already in the tool request
+        // but we do show it to the user here
         Ok(vec![
             Content::text(format!("Successfully wrote to {}", path.display()))
                 .with_audience(vec![Role::Assistant]),
@@ -399,21 +352,10 @@ impl Developer2Router {
         old_str: &str,
         new_str: &str,
     ) -> Result<Vec<Content>, ToolError> {
-        // Get the URI for the file
-        let uri = Url::from_file_path(path)
-            .map_err(|_| ToolError::ExecutionError("Invalid file path".into()))?
-            .to_string();
-
         // Check if file exists and is active
         if !path.exists() {
             return Err(ToolError::InvalidParameters(format!(
-                "File '{}' does not exist",
-                path.display()
-            )));
-        }
-        if !self.active_resources.lock().unwrap().contains_key(&uri) {
-            return Err(ToolError::InvalidParameters(format!(
-                "You must view '{}' before editing it",
+                "File '{}' does not exist, you can write a new file with the `create` command",
                 path.display()
             )));
         }
@@ -431,7 +373,7 @@ impl Developer2Router {
         }
         if content.matches(old_str).count() == 0 {
             return Err(ToolError::InvalidParameters(
-                "'old_str' must appear exactly once in the file, but it does not appear in the file. Make sure the string exactly matches existing file content, including spacing.".into(),
+                "'old_str' must appear exactly once in the file, but it does not appear in the file. Make sure the string exactly matches existing file content, including whitespace!".into(),
             ));
         }
 
@@ -443,36 +385,57 @@ impl Developer2Router {
         std::fs::write(path, &new_content)
             .map_err(|e| ToolError::ExecutionError(format!("Failed to write file: {}", e)))?;
 
-        // Update resource
-        if let Some(resource) = self.active_resources.lock().unwrap().get_mut(&uri) {
-            resource.update_timestamp();
-        }
-
         // Try to detect the language from the file extension
         let language = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
 
+        // Show a snippet of the changed content with context
+        const SNIPPET_LINES: usize = 4;
+
+        // Count newlines before the replacement to find the line number
+        let replacement_line = content
+            .split(old_str)
+            .next()
+            .expect("should split on already matched content")
+            .matches('\n')
+            .count();
+
+        // Calculate start and end lines for the snippet
+        let start_line = replacement_line.saturating_sub(SNIPPET_LINES);
+        let end_line = replacement_line + SNIPPET_LINES + new_str.matches('\n').count();
+
+        // Get the relevant lines for our snippet
+        let lines: Vec<&str> = new_content.lines().collect();
+        let snippet = lines
+            .iter()
+            .skip(start_line)
+            .take(end_line - start_line + 1)
+            .cloned()
+            .collect::<Vec<&str>>()
+            .join("\n");
+
+        let output = formatdoc! {r#"
+            ```{language}
+            {snippet}
+            ```
+            "#,
+            language=language,
+            snippet=snippet
+        };
+
+        let success_message = formatdoc! {r#"
+            The file {} has been edited, and the section now reads:
+            {}
+            Review the changes above for errors. Undo and edit the file again if necessary!
+            "#,
+            path.display(),
+            output
+        };
+
         Ok(vec![
-            Content::text("Successfully replaced text").with_audience(vec![Role::Assistant]),
-            Content::text(formatdoc! {r#"
-                ### {path}
-
-                *Before*:
-                ```{language}
-                {old_str}
-                ```
-
-                *After*:
-                ```{language}
-                {new_str}
-                ```
-                "#,
-                path=path.display(),
-                language=language,
-                old_str=old_str,
-                new_str=new_str,
-            })
-            .with_audience(vec![Role::User])
-            .with_priority(0.2),
+            Content::text(success_message).with_audience(vec![Role::Assistant]),
+            Content::text(output)
+                .with_audience(vec![Role::User])
+                .with_priority(0.2),
         ])
     }
 
@@ -510,7 +473,7 @@ impl Developer2Router {
     }
 }
 
-impl Router for DeveloperRouter {
+impl Router for Developer2Router {
     fn name(&self) -> String {
         "developer".to_string()
     }
@@ -536,28 +499,27 @@ impl Router for DeveloperRouter {
         let tool_name = tool_name.to_string();
         Box::pin(async move {
             match tool_name.as_str() {
-                "bash" => this.bash(arguments).await,
+                "shell" => this.bash(arguments).await,
                 "text_editor" => this.text_editor(arguments).await,
-                "list_windows" => this.list_windows(arguments).await,
-                "screen_capture" => this.screen_capture(arguments).await,
                 _ => Err(ToolError::NotFound(format!("Tool {} not found", tool_name))),
             }
         })
     }
 
+    // TODO see if we can make it easy to skip implementing these
     fn list_resources(&self) -> Vec<Resource> {
         Vec::new()
     }
 
     fn read_resource(
         &self,
-        uri: &str,
+        _uri: &str,
     ) -> Pin<Box<dyn Future<Output = Result<String, ResourceError>> + Send + 'static>> {
-        ""
+        Box::pin(async move { Ok("".to_string()) })
     }
 }
 
-impl Clone for DeveloperRouter {
+impl Clone for Developer2Router {
     fn clone(&self) -> Self {
         Self {
             tools: self.tools.clone(),
@@ -566,4 +528,3 @@ impl Clone for DeveloperRouter {
         }
     }
 }
-
