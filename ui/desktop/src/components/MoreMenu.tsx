@@ -1,4 +1,12 @@
-import { useEffect, useState } from 'react';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+    PopoverPortal,
+} from "@radix-ui/react-popover";
+import React, { useEffect, useState } from 'react';
+import { FaMoon, FaSun } from 'react-icons/fa';
+import VertDots from './ui/VertDots';
 
 interface VersionInfo {
     current_version: string;
@@ -115,81 +123,87 @@ export default function MoreMenu() {
                     <VertDots size={18}/>
                 </button>
             </PopoverTrigger>
-            <PopoverContent className="w-48 rounded-md" align="end">
-                <div className="flex flex-col bg-black text-white dark:bg-gray-800 rounded-md">
-                    <div className="flex items-center justify-between p-2">
-                        <span className="text-sm">Use System Theme</span>
-                        <input
-                            type="checkbox"
-                            checked={useSystemTheme}
-                            onChange={toggleUseSystemTheme}
-                        />
-                    </div>
-                    {!useSystemTheme && (<div className="flex items-center justify-between p-2">
-                        <span className="text-sm">{isDarkMode ? 'Dark Mode' : 'Light Mode'}</span>
-                        <button
-                            className={`relative inline-flex items-center h-6 rounded-full w-11 focus:outline-none border-2 ${isDarkMode
-                                ? 'bg-gray-600 border-gray-600'
-                                : 'bg-yellow-300 border-yellow-300'}`}
-                            onClick={() => toggleTheme()}>
-                            <span
-                                className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform ${isDarkMode
-                                    ? 'translate-x-6' : 'translate-x-1'}`}
-                            >
-                                {isDarkMode ? <FaMoon className="text-gray-200"/> : <FaSun
-                                    className="text-yellow-500"/>}
-                            </span>
-                        </button>
-                    </div>)}
-                    
-                    {/* Versions Menu */}
-                    {versions && versions.available_versions.length > 0 && (
-                        <>
+            <PopoverPortal>
+                <PopoverContent 
+                    className="z-[200] w-48 rounded-md bg-black text-white dark:bg-gray-800 shadow-lg" 
+                    align="end"
+                    sideOffset={5}
+                >
+                    <div className="flex flex-col rounded-md">
+                        <div className="flex items-center justify-between p-2">
+                            <span className="text-sm">Use System Theme</span>
+                            <input
+                                type="checkbox"
+                                checked={useSystemTheme}
+                                onChange={toggleUseSystemTheme}
+                            />
+                        </div>
+                        {!useSystemTheme && (<div className="flex items-center justify-between p-2">
+                            <span className="text-sm">{isDarkMode ? 'Dark Mode' : 'Light Mode'}</span>
                             <button
-                                onClick={() => setShowVersions(!showVersions)}
-                                className="w-full text-left px-2 py-1.5 text-sm hover:bg-gray-700 flex justify-between items-center"
-                            >
-                                <span>Versions</span>
-                                <span className="text-xs">{showVersions ? '▼' : '▶'}</span>
+                                className={`relative inline-flex items-center h-6 rounded-full w-11 focus:outline-none border-2 ${isDarkMode
+                                    ? 'bg-gray-600 border-gray-600'
+                                    : 'bg-yellow-300 border-yellow-300'}`}
+                                onClick={() => toggleTheme()}>
+                                <span
+                                    className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform ${isDarkMode
+                                        ? 'translate-x-6' : 'translate-x-1'}`}
+                                >
+                                    {isDarkMode ? <FaMoon className="text-gray-200"/> : <FaSun
+                                        className="text-yellow-500"/>}
+                                </span>
                             </button>
-                            {showVersions && (
-                                <div className="pl-2 bg-gray-900">
-                                    {versions.available_versions.map((version) => (
-                                        <button
-                                            key={version}
-                                            onClick={() => handleVersionSelect(version)}
-                                            className={`w-full text-left px-2 py-1.5 text-sm hover:bg-gray-700 ${
-                                                version === versions.current_version ? 'text-green-400' : ''
-                                            }`}
-                                        >
-                                            {version} {version === versions.current_version && '(current)'}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </>
-                    )}
-                    
-                    <button
-                        onClick={() => {
-                            setOpen(false);
-                            window.electron.directoryChooser();
-                        }}
-                        className="w-full text-left px-2 py-1.5 text-sm hover:bg-gray-700"
-                    >
-                        Open Directory (cmd+O)
-                    </button>
-                    <button
-                        onClick={() => {
-                            setOpen(false);
-                            window.electron.createChatWindow();
-                        }}
-                        className="w-full text-left px-2 py-1.5 text-sm hover:bg-gray-700"
-                    >
-                        New Session (cmd+N)
-                    </button>
-                </div>
-            </PopoverContent>
+                        </div>)}
+                        
+                        {/* Versions Menu */}
+                        {versions && versions.available_versions.length > 0 && (
+                            <>
+                                <button
+                                    onClick={() => setShowVersions(!showVersions)}
+                                    className="w-full text-left px-2 py-1.5 text-sm hover:bg-gray-700 flex justify-between items-center"
+                                >
+                                    <span>Versions</span>
+                                    <span className="text-xs">{showVersions ? '▼' : '▶'}</span>
+                                </button>
+                                {showVersions && (
+                                    <div className="pl-2 bg-gray-900">
+                                        {versions.available_versions.map((version) => (
+                                            <button
+                                                key={version}
+                                                onClick={() => handleVersionSelect(version)}
+                                                className={`w-full text-left px-2 py-1.5 text-sm hover:bg-gray-700 ${
+                                                    version === versions.current_version ? 'text-green-400' : ''
+                                                }`}
+                                            >
+                                                {version} {version === versions.current_version && '(current)'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </>
+                        )}
+                        
+                        <button
+                            onClick={() => {
+                                setOpen(false);
+                                window.electron.directoryChooser();
+                            }}
+                            className="w-full text-left px-2 py-1.5 text-sm hover:bg-gray-700"
+                        >
+                            Open Directory (cmd+O)
+                        </button>
+                        <button
+                            onClick={() => {
+                                setOpen(false);
+                                window.electron.createChatWindow();
+                            }}
+                            className="w-full text-left px-2 py-1.5 text-sm hover:bg-gray-700"
+                        >
+                            New Session (cmd+N)
+                        </button>
+                    </div>
+                </PopoverContent>
+            </PopoverPortal>
         </Popover>
     );
 }
