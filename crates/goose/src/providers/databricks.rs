@@ -161,7 +161,7 @@ impl Provider for DatabricksProvider {
 
 #[async_trait]
 impl Moderation for DatabricksProvider {
-    async fn moderate_content(&self, content: &str) -> Result<ModerationResult> {
+    async fn moderate_content(&self, _content: &str) -> Result<ModerationResult> {
         Ok(ModerationResult::new(false, None, None))
     }
 }

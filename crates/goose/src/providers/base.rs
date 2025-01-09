@@ -9,7 +9,6 @@ use tokio::sync::RwLock;
 
 use super::configs::ModelConfig;
 use crate::message::{Message, MessageContent};
-use mcp_core::content::TextContent;
 use mcp_core::role::Role;
 use mcp_core::tool::Tool;
 
@@ -241,6 +240,7 @@ pub trait Provider: Send + Sync + Moderation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mcp_core::content::TextContent;
     use serde_json::json;
     use std::time::Duration;
     use tokio::time::sleep;

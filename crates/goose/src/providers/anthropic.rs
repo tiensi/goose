@@ -286,7 +286,7 @@ impl Provider for AnthropicProvider {
 
 #[async_trait]
 impl Moderation for AnthropicProvider {
-    async fn moderate_content(&self, content: &str) -> Result<ModerationResult> {
+    async fn moderate_content(&self, _content: &str) -> Result<ModerationResult> {
         Ok(ModerationResult::new(false, None, None))
     }
 }
@@ -346,7 +346,7 @@ mod tests {
         let messages = vec![Message::user().with_text("Hello?")];
 
         let (message, usage) = provider
-            .complete("You are a helpful assistant.", &messages, &[])
+            .complete_internal("You are a helpful assistant.", &messages, &[])
             .await?;
 
         if let MessageContent::Text(text) = &message.content[0] {
@@ -405,7 +405,7 @@ mod tests {
         );
 
         let (message, usage) = provider
-            .complete("You are a helpful assistant.", &messages, &[tool])
+            .complete_internal("You are a helpful assistant.", &messages, &[tool])
             .await?;
 
         if let MessageContent::ToolRequest(tool_request) = &message.content[0] {

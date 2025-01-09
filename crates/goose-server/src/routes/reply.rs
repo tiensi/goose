@@ -9,7 +9,6 @@ use axum::{
 use bytes::Bytes;
 use futures::{stream::StreamExt, Stream};
 use goose::message::{Message, MessageContent};
-use goose::providers::base::{Moderation, ModerationResult};
 use mcp_core::{content::Content, role::Role};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -392,7 +391,7 @@ mod tests {
     use goose::{
         agents::DefaultAgent as Agent,
         providers::{
-            base::{Provider, ProviderUsage, Usage},
+            base::{Moderation, ModerationResult, Provider, ProviderUsage, Usage},
             configs::{ModelConfig, OpenAiProviderConfig},
         },
     };
