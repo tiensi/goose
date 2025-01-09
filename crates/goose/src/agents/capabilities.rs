@@ -1,8 +1,8 @@
 use chrono::{DateTime, TimeZone, Utc};
 use rust_decimal_macros::dec;
 use std::collections::HashMap;
-use std::sync::LazyLock;
 use std::sync::Arc;
+use std::sync::LazyLock;
 use tokio::sync::Mutex;
 use tracing::{debug, instrument};
 
@@ -15,9 +15,8 @@ use mcp_core::{Content, Tool, ToolCall, ToolError, ToolResult};
 
 // By default, we set it to Jan 1, 2020 if the resource does not have a timestamp
 // This is to ensure that the resource is considered less important than resources with a more recent timestamp
-static DEFAULT_TIMESTAMP: LazyLock<DateTime<Utc>> = LazyLock::new(|| {
-    Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap()
-});
+static DEFAULT_TIMESTAMP: LazyLock<DateTime<Utc>> =
+    LazyLock::new(|| Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap());
 
 /// Manages MCP clients and their interactions
 pub struct Capabilities {
