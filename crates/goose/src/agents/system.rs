@@ -17,7 +17,7 @@ pub enum SystemError {
 
 pub type SystemResult<T> = Result<T, SystemError>;
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct Secrets {
     /// A map of environment variables to set, e.g. API_KEY -> some_secret
     #[serde(default)]
@@ -47,11 +47,16 @@ impl Secrets {
 #[serde(tag = "type")]
 pub enum SystemConfig {
     /// Server-sent events client with a URI endpoint
-    Sse { uri: String, secrets: Secrets },
+    Sse {
+        uri: String,
+        #[serde(default)]
+        secrets: Secrets,
+    },
     /// Standard I/O client with command and arguments
     Stdio {
         cmd: String,
         args: Vec<String>,
+        #[serde(default)]
         secrets: Secrets,
     },
 }
