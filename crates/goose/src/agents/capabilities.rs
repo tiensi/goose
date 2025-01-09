@@ -1,6 +1,7 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use rust_decimal_macros::dec;
 use std::collections::HashMap;
+use std::sync::LazyLock;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{debug, instrument};
@@ -11,6 +12,12 @@ use crate::providers::base::{Provider, ProviderUsage};
 use mcp_client::client::{ClientCapabilities, ClientInfo, McpClient};
 use mcp_client::transport::{SseTransport, StdioTransport, Transport};
 use mcp_core::{Content, Tool, ToolCall, ToolError, ToolResult};
+
+// By default, we set it to Jan 1, 2020 if the resource does not have a timestamp
+// This is to ensure that the resource is considered less important than resources with a more recent timestamp
+static DEFAULT_TIMESTAMP: LazyLock<DateTime<Utc>> = LazyLock::new(|| {
+    Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap()
+});
 
 /// Manages MCP clients and their interactions
 pub struct Capabilities {
@@ -199,6 +206,12 @@ impl Capabilities {
             let resources = client_guard.list_resources().await?;
 
             for resource in resources.resources {
+                // Skip reading the resource if it's not marked active
+                // This avoids blowing up the context with inactive resources
+                if !resource.is_active() {
+                    continue;
+                }
+
                 if let Ok(contents) = client_guard.read_resource(&resource.uri).await {
                     for content in contents.contents {
                         let (uri, content_str) = match content {
@@ -219,7 +232,7 @@ impl Capabilities {
                             uri,
                             resource.name.clone(),
                             content_str,
-                            resource.timestamp().unwrap().clone(),
+                            resource.timestamp().unwrap_or(*DEFAULT_TIMESTAMP),
                             resource.priority().unwrap_or(0.0),
                         ));
                     }

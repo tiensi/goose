@@ -15,9 +15,6 @@ use crate::token_counter::TokenCounter;
 use mcp_core::{Content, Tool, ToolCall};
 use serde_json::Value;
 
-// used to sort resources by priority within error margin
-const PRIORITY_EPSILON: f32 = 0.001;
-
 /// Default implementation of an Agent
 pub struct DefaultAgent {
     capabilities: Mutex<Capabilities>,
@@ -71,31 +68,25 @@ impl DefaultAgent {
                 }
             }
 
-            // Sort by priority (high to low) and timestamp (newest to oldest)
-            let mut all_items: Vec<ResourceItem> = resource_items.to_vec();
-            all_items.sort_by(|a, b| {
-                // Compare priority first (descending)
-                let diff = b.priority - a.priority;
-                if diff.abs() < PRIORITY_EPSILON {
-                    // If same priority, compare timestamp (descending = newer first)
-                    b.timestamp.cmp(&a.timestamp)
-                } else {
-                    diff.partial_cmp(&0.0).unwrap_or(std::cmp::Ordering::Equal)
-                }
-            });
+            // Get all resource items, sort, then trim till we're under target limit
+            let mut trimmed_items: Vec<ResourceItem> = resource_items.to_vec();
+
+            // Sorts by timestamp (newest to oldest)
+            // Priority will be 1.0 for active resources so no need to compare
+            trimmed_items.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
 
             // Remove resources until we're under target limit
             let mut current_tokens = approx_count;
-            while current_tokens > target_limit && !all_items.is_empty() {
-                let removed = all_items.pop().unwrap();
+            while current_tokens > target_limit && !trimmed_items.is_empty() {
+                let removed = trimmed_items.pop().unwrap();
                 // Subtract removed item’s token_count
                 if let Some(tc) = removed.token_count {
                     current_tokens = current_tokens.saturating_sub(tc as usize);
                 }
             }
 
-            // We removed some items, so let's use only the trimmed set `all_items`
-            for item in &all_items {
+            // We removed some items, so let's use only the trimmed set for status
+            for item in &trimmed_items {
                 status_content.push(format!("{}\n```\n{}\n```\n", item.name, item.content));
             }
         } else {

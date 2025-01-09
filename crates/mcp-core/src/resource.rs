@@ -6,6 +6,8 @@ use url::Url;
 
 use crate::content::Annotations;
 
+const EPSILON: f32 = 1e-6; // Tolerance for floating point comparison
+
 /// Represents a resource in the system with metadata
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -124,7 +126,6 @@ impl Resource {
 
     // Check if the resource is active
     pub fn is_active(&self) -> bool {
-        const EPSILON: f32 = 1e-6; // Tolerance for floating point comparison
         if let Some(priority) = self.priority() {
             (priority - 1.0).abs() < EPSILON
         } else {
