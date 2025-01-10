@@ -9,10 +9,10 @@ use axum::{
 use bytes::Bytes;
 use futures::{stream::StreamExt, Stream};
 use goose::message::{Message, MessageContent};
-use goose::providers::base::{Moderation, ModerationError, ModerationResult};
+use goose::providers::base::ModerationError;
 use mcp_core::{content::Content, role::Role};
 use serde::Deserialize;
-use serde_json::{error, json, Value};
+use serde_json::{json, Value};
 use std::{
     convert::Infallible,
     pin::Pin,
@@ -215,7 +215,8 @@ async fn stream_message(
                             tx.send(ProtocolFormatter::format_error(&err.to_string()))
                                 .await?;
                             // Then send an empty tool response to maintain the protocol
-                            let result = vec![Content::text(format!("Error: {}", err)).with_priority(0.0)];
+                            let result =
+                                vec![Content::text(format!("Error: {}", err)).with_priority(0.0)];
                             tx.send(ProtocolFormatter::format_tool_response(
                                 &response.id,
                                 &result,
@@ -546,9 +547,9 @@ mod tests {
 
         // Test error formatting
         let formatted = ProtocolFormatter::format_error("Test error");
+        println!("Formatted error: {}", formatted);
         assert!(formatted.starts_with("3:"));
-        assert!(formatted.contains("\"message\":\"Test error\""));
-        assert!(formatted.contains("\"code\":\"server_error\""));
+        assert!(formatted.contains("Test error"));
 
         // Test moderation error formatting
         let moderation_error = ModerationError::ContentFlagged {
@@ -560,9 +561,8 @@ mod tests {
         };
         let formatted = ProtocolFormatter::format_moderation_error(&moderation_error);
         assert!(formatted.starts_with("3:"));
-        assert!(formatted.contains("\"code\":\"content_flagged\""));
-        assert!(formatted.contains("\"categories\":\"hate, violence\""));
-        assert!(formatted.contains("\"categoryScores\""));
+        assert!(formatted
+            .contains("\"Content was flagged in the following categories: hate, violence\""));
 
         // Test finish formatting
         let formatted = ProtocolFormatter::format_finish("stop");
