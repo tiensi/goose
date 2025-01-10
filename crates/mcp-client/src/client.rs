@@ -1,5 +1,3 @@
-use std::sync::atomic::{AtomicU64, Ordering};
-
 use mcp_core::protocol::{
     CallToolResult, InitializeResult, JsonRpcError, JsonRpcMessage, JsonRpcNotification,
     JsonRpcRequest, JsonRpcResponse, ListResourcesResult, ListToolsResult, ReadResourceResult,
@@ -7,8 +5,10 @@ use mcp_core::protocol::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::sync::atomic::{AtomicU64, Ordering};
 use thiserror::Error;
-use tower::Service;
+use tokio::sync::Mutex;
+use tower::{Service, ServiceExt}; // for Service::ready()
 
 /// Error type for MCP client operations.
 #[derive(Debug, Error)]
@@ -22,8 +22,8 @@ pub enum Error {
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
 
-    #[error("Unexpected response from server")]
-    UnexpectedResponse,
+    #[error("Unexpected response from server: {0}")]
+    UnexpectedResponse(String),
 
     #[error("Not initialized")]
     NotInitialized,
@@ -85,7 +85,7 @@ where
     S::Error: Into<Error>,
     S::Future: Send,
 {
-    service: S,
+    service: Mutex<S>,
     next_id: AtomicU64,
     server_capabilities: Option<ServerCapabilities>,
 }
@@ -98,7 +98,7 @@ where
 {
     pub fn new(service: S) -> Self {
         Self {
-            service,
+            service: Mutex::new(service),
             next_id: AtomicU64::new(1),
             server_capabilities: None,
         }
@@ -109,6 +109,9 @@ where
     where
         R: for<'de> Deserialize<'de>,
     {
+        let mut service = self.service.lock().await;
+        service.ready().await.map_err(|_| Error::NotReady)?;
+
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let request = JsonRpcMessage::Request(JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
@@ -117,7 +120,6 @@ where
             params: Some(params),
         });
 
-        let mut service = self.service.clone();
         let response_msg = service.call(request).await.map_err(Into::into)?;
 
         match response_msg {
@@ -126,7 +128,9 @@ where
             }) => {
                 // Verify id matches
                 if id != Some(self.next_id.load(Ordering::SeqCst) - 1) {
-                    return Err(Error::UnexpectedResponse);
+                    return Err(Error::UnexpectedResponse(
+                        "id mismatch for JsonRpcResponse".to_string(),
+                    ));
                 }
                 if let Some(err) = error {
                     Err(Error::RpcError {
@@ -136,12 +140,14 @@ where
                 } else if let Some(r) = result {
                     Ok(serde_json::from_value(r)?)
                 } else {
-                    Err(Error::UnexpectedResponse)
+                    Err(Error::UnexpectedResponse("missing result".to_string()))
                 }
             }
             JsonRpcMessage::Error(JsonRpcError { id, error, .. }) => {
                 if id != Some(self.next_id.load(Ordering::SeqCst) - 1) {
-                    return Err(Error::UnexpectedResponse);
+                    return Err(Error::UnexpectedResponse(
+                        "id mismatch for JsonRpcError".to_string(),
+                    ));
                 }
                 Err(Error::RpcError {
                     code: error.code,
@@ -150,20 +156,24 @@ where
             }
             _ => {
                 // Requests/notifications not expected as a response
-                Err(Error::UnexpectedResponse)
+                Err(Error::UnexpectedResponse(
+                    "unexpected message type".to_string(),
+                ))
             }
         }
     }
 
     /// Send a JSON-RPC notification.
     async fn send_notification(&self, method: &str, params: Value) -> Result<(), Error> {
+        let mut service = self.service.lock().await;
+        service.ready().await.map_err(|_| Error::NotReady)?;
+
         let notification = JsonRpcMessage::Notification(JsonRpcNotification {
             jsonrpc: "2.0".to_string(),
             method: method.to_string(),
             params: Some(params),
         });
 
-        let mut service = self.service.clone();
         service.call(notification).await.map_err(Into::into)?;
         Ok(())
     }

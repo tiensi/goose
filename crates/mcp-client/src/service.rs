@@ -1,5 +1,6 @@
 use futures::future::BoxFuture;
 use mcp_core::protocol::JsonRpcMessage;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 use tower::{timeout::Timeout, Service, ServiceBuilder};
 
@@ -7,17 +8,15 @@ use crate::transport::{Error, TransportHandle};
 
 /// A wrapper service that implements Tower's Service trait for MCP transport
 #[derive(Clone)]
-pub struct McpService<T> {
-    inner: T,
+pub struct McpService<T: TransportHandle> {
+    inner: Arc<T>,
 }
 
-impl<T> McpService<T> {
+impl<T: TransportHandle> McpService<T> {
     pub fn new(transport: T) -> Self {
-        Self { inner: transport }
-    }
-
-    pub fn into_inner(self) -> T {
-        self.inner
+        Self {
+            inner: Arc::new(transport),
+        }
     }
 }
 
