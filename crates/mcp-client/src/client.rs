@@ -61,11 +61,29 @@ pub struct InitializeParams {
     pub client_info: ClientInfo,
 }
 
+#[async_trait::async_trait]
+pub trait McpClientTrait: Send + Sync {
+    async fn initialize(
+        &mut self,
+        info: ClientInfo,
+        capabilities: ClientCapabilities,
+    ) -> Result<InitializeResult, Error>;
+
+    async fn list_resources(&self) -> Result<ListResourcesResult, Error>;
+
+    async fn read_resource(&self, uri: &str) -> Result<ReadResourceResult, Error>;
+
+    async fn list_tools(&self) -> Result<ListToolsResult, Error>;
+
+    async fn call_tool(&self, name: &str, arguments: Value) -> Result<CallToolResult, Error>;
+}
+
 /// The MCP client is the interface for MCP operations.
 pub struct McpClient<S>
 where
-    S: Service<JsonRpcMessage, Response = JsonRpcMessage> + Clone + Send + 'static,
+    S: Service<JsonRpcMessage, Response = JsonRpcMessage> + Clone + Send + Sync + 'static,
     S::Error: Into<Error>,
+    S::Future: Send,
 {
     service: S,
     next_id: AtomicU64,
@@ -74,8 +92,9 @@ where
 
 impl<S> McpClient<S>
 where
-    S: Service<JsonRpcMessage, Response = JsonRpcMessage> + Clone + Send + 'static,
+    S: Service<JsonRpcMessage, Response = JsonRpcMessage> + Clone + Send + Sync + 'static,
     S::Error: Into<Error>,
+    S::Future: Send,
 {
     pub fn new(service: S) -> Self {
         Self {
@@ -149,7 +168,20 @@ where
         Ok(())
     }
 
-    pub async fn initialize(
+    // Check if the client has completed initialization
+    fn completed_initialization(&self) -> bool {
+        self.server_capabilities.is_some()
+    }
+}
+
+#[async_trait::async_trait]
+impl<S> McpClientTrait for McpClient<S>
+where
+    S: Service<JsonRpcMessage, Response = JsonRpcMessage> + Clone + Send + Sync + 'static,
+    S::Error: Into<Error>,
+    S::Future: Send,
+{
+    async fn initialize(
         &mut self,
         info: ClientInfo,
         capabilities: ClientCapabilities,
@@ -171,11 +203,7 @@ where
         Ok(result)
     }
 
-    fn completed_initialization(&self) -> bool {
-        self.server_capabilities.is_some()
-    }
-
-    pub async fn list_resources(&self) -> Result<ListResourcesResult, Error> {
+    async fn list_resources(&self) -> Result<ListResourcesResult, Error> {
         if !self.completed_initialization() {
             return Err(Error::NotInitialized);
         }
@@ -194,7 +222,7 @@ where
             .await
     }
 
-    pub async fn read_resource(&self, uri: &str) -> Result<ReadResourceResult, Error> {
+    async fn read_resource(&self, uri: &str) -> Result<ReadResourceResult, Error> {
         if !self.completed_initialization() {
             return Err(Error::NotInitialized);
         }
@@ -216,7 +244,7 @@ where
         self.send_request("resources/read", params).await
     }
 
-    pub async fn list_tools(&self) -> Result<ListToolsResult, Error> {
+    async fn list_tools(&self) -> Result<ListToolsResult, Error> {
         if !self.completed_initialization() {
             return Err(Error::NotInitialized);
         }
@@ -228,7 +256,7 @@ where
         self.send_request("tools/list", serde_json::json!({})).await
     }
 
-    pub async fn call_tool(&self, name: &str, arguments: Value) -> Result<CallToolResult, Error> {
+    async fn call_tool(&self, name: &str, arguments: Value) -> Result<CallToolResult, Error> {
         if !self.completed_initialization() {
             return Err(Error::NotInitialized);
         }

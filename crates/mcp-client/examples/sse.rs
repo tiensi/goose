@@ -1,5 +1,5 @@
 use anyhow::Result;
-use mcp_client::client::{ClientCapabilities, ClientInfo, McpClient};
+use mcp_client::client::{ClientCapabilities, ClientInfo, McpClient, McpClientTrait};
 use mcp_client::transport::{SseTransport, Transport};
 use mcp_client::McpService;
 use std::time::Duration;

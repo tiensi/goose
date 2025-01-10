@@ -1,7 +1,7 @@
 use anyhow::Result;
 use mcp_client::{
-    ClientCapabilities, ClientInfo, Error as ClientError, McpClient, McpService, StdioTransport,
-    Transport,
+    ClientCapabilities, ClientInfo, Error as ClientError, McpClient, McpClientTrait, McpService,
+    StdioTransport, Transport,
 };
 use std::time::Duration;
 use tracing_subscriber::EnvFilter;

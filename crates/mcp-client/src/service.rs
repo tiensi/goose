@@ -1,6 +1,6 @@
-use std::task::{Context, Poll};
 use futures::future::BoxFuture;
 use mcp_core::protocol::JsonRpcMessage;
+use std::task::{Context, Poll};
 use tower::{timeout::Timeout, Service, ServiceBuilder};
 
 use crate::transport::{Error, TransportHandle};
@@ -23,7 +23,7 @@ impl<T> McpService<T> {
 
 impl<T> Service<JsonRpcMessage> for McpService<T>
 where
-    T: TransportHandle,
+    T: TransportHandle + Send + Sync + 'static,
 {
     type Response = JsonRpcMessage;
     type Error = Error;
