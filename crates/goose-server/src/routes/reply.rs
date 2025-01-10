@@ -174,7 +174,7 @@ impl ProtocolFormatter {
                 )
             }
         };
-        format!("3:{}\n", error_part)
+        format!("3:\"{}\"\n", error_part)
     }
 
     fn format_finish(reason: &str) -> String {
@@ -215,7 +215,7 @@ async fn stream_message(
                             tx.send(ProtocolFormatter::format_error(&err.to_string()))
                                 .await?;
                             // Then send an empty tool response to maintain the protocol
-                            let result = vec![Content::text("Error occurred").with_priority(0.0)];
+                            let result = vec![Content::text(format!("Error: {}", err)).with_priority(0.0)];
                             tx.send(ProtocolFormatter::format_tool_response(
                                 &response.id,
                                 &result,
@@ -240,10 +240,6 @@ async fn stream_message(
                                 .await?;
                             }
                             Err(err) => {
-                                println!("Error: {}", err);
-                                // Send error message for invalid tool call
-                                tx.send(ProtocolFormatter::format_error(&err.to_string()))
-                                    .await?;
                                 // Send a placeholder tool call to maintain protocol
                                 tx.send(ProtocolFormatter::format_tool_call(
                                     &request.id,
