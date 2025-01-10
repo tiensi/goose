@@ -10,7 +10,7 @@ use mcp_core::{
     prompt::{Prompt, PromptMessage, PromptMessageRole},
     protocol::{
         CallToolResult, Implementation, InitializeResult, JsonRpcRequest, JsonRpcResponse,
-        ListResourcesResult, ListToolsResult, PromptsCapability, ReadResourceResult,
+        GetPromptResult, ListPromptsResult, ListResourcesResult, ListToolsResult, PromptsCapability, ReadResourceResult,
         ResourcesCapability, ServerCapabilities, ToolsCapability,
     },
     ResourceContents,
@@ -253,14 +253,12 @@ pub trait Router: Send + Sync + 'static {
         async move {
             let prompts = self.list_prompts().unwrap_or_default();
 
-            // Create the response object
-            let result = serde_json::json!({
-                "prompts": prompts, // Assuming `prompts` is a Vec<Prompt> that serializes correctly
-                "nextCursor": "next-page-cursor" // Static cursor for now, TODO: replace with actual logic
-            });
+            let result = ListPromptsResult { prompts };
 
             let mut response = self.create_response(req.id);
-            response.result = Some(result);
+            response.result = Some(serde_json::to_value(result).map_err(|e| {
+                RouterError::Internal(format!("JSON serialization error: {}", e))
+            })?);
 
             Ok(response)
         }
@@ -290,15 +288,24 @@ pub trait Router: Send + Sync + 'static {
 
             // Fetch the prompt definition first
             let prompt = match self.list_prompts() {
-                Some(prompts) => prompts.into_iter()
+                Some(prompts) => prompts
+                    .into_iter()
                     .find(|p| p.name == prompt_name)
-                    .ok_or_else(|| RouterError::NotFound(format!("Prompt '{}' not found", prompt_name)))?,
-                None => return Err(RouterError::NotFound("No prompts available".into()))
+                    .ok_or_else(|| {
+                        RouterError::PromptNotFound(format!("Prompt '{}' not found", prompt_name))
+                    })?,
+                None => return Err(RouterError::PromptNotFound("No prompts available".into())),
             };
 
             // Validate required arguments
             for arg in &prompt.arguments {
-                if arg.required && (!arguments.contains_key(&arg.name) || arguments.get(&arg.name).and_then(Value::as_str).map_or(true, str::is_empty)) {
+                if arg.required
+                    && (!arguments.contains_key(&arg.name)
+                        || arguments
+                            .get(&arg.name)
+                            .and_then(Value::as_str)
+                            .map_or(true, str::is_empty))
+                {
                     return Err(RouterError::InvalidParams(format!(
                         "Missing required argument: '{}'",
                         arg.name
@@ -307,8 +314,9 @@ pub trait Router: Send + Sync + 'static {
             }
 
             // Now get the prompt content
-            let description = self.get_prompt(prompt_name)
-                .ok_or_else(|| RouterError::NotFound("Prompt not found".into()))?
+            let description = self
+                .get_prompt(prompt_name)
+                .ok_or_else(|| RouterError::PromptNotFound("Prompt not found".into()))?
                 .await
                 .map_err(|e| RouterError::Internal(e.to_string()))?;
 
@@ -353,13 +361,10 @@ pub trait Router: Send + Sync + 'static {
             // Replace each argument placeholder with its value from the arguments object
             for (key, value) in arguments {
                 let placeholder = format!("{{{}}}", key);
-                description_filled = description_filled.replace(
-                    &placeholder,
-                    value.as_str().unwrap_or_default()
-                );
+                description_filled =
+                    description_filled.replace(&placeholder, value.as_str().unwrap_or_default());
             }
 
-            // Construct the message using PromptMessage
             let messages = vec![PromptMessage::new_text(
                 PromptMessageRole::User,
                 format!("{}", description_filled),
@@ -367,10 +372,12 @@ pub trait Router: Send + Sync + 'static {
 
             // Build the final response
             let mut response = self.create_response(req.id);
-            response.result = Some(serde_json::json!({
-                "description": description,
-                "messages": messages
-            }));
+            response.result = Some(serde_json::to_value(GetPromptResult {
+                description: Some(description_filled),
+                messages
+            }).map_err(|e| {
+                RouterError::Internal(format!("JSON serialization error: {}", e))
+            })?);
             Ok(response)
         }
     }

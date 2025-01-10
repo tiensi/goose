@@ -1,4 +1,6 @@
+use crate::content::{Annotations, EmbeddedResource, ImageContent};
 use crate::handler::PromptError;
+use crate::resource::ResourceContents;
 use base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine};
 use serde::{Deserialize, Serialize};
 
@@ -56,25 +58,9 @@ pub enum PromptMessageContent {
     /// Plain text content
     Text { text: String },
     /// Image content with base64-encoded data
-    Image {
-        data: String,
-        #[serde(rename = "mimeType")]
-        mime_type: String,
-    },
+    Image { image: ImageContent },
     /// Embedded server-side resource
-    Resource { resource: ResourceContent },
-}
-
-/// Content of an embedded resource in a message
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ResourceContent {
-    pub uri: String,
-    #[serde(rename = "mimeType")]
-    pub mime_type: String,
-    #[serde(default)]
-    pub text: Option<String>,
-    #[serde(default)]
-    pub blob: Option<String>,
+    Resource { resource: EmbeddedResource },
 }
 
 /// A message in a prompt conversation
@@ -99,6 +85,7 @@ impl PromptMessage {
         role: PromptMessageRole,
         data: S,
         mime_type: S,
+        annotations: Option<Annotations>,
     ) -> Result<Self, PromptError> {
         let data = data.into();
         let mime_type = mime_type.into();
@@ -117,7 +104,13 @@ impl PromptMessage {
 
         Ok(Self {
             role,
-            content: PromptMessageContent::Image { data, mime_type },
+            content: PromptMessageContent::Image {
+                image: ImageContent {
+                    data,
+                    mime_type,
+                    annotations,
+                },
+            },
         })
     }
 
@@ -127,16 +120,20 @@ impl PromptMessage {
         uri: String,
         mime_type: String,
         text: Option<String>,
-        blob: Option<String>,
+        annotations: Option<Annotations>,
     ) -> Self {
+        let resource_contents = ResourceContents::TextResourceContents {
+            uri,
+            mime_type: Some(mime_type),
+            text: text.unwrap_or_default(),
+        };
+
         Self {
             role,
             content: PromptMessageContent::Resource {
-                resource: ResourceContent {
-                    uri,
-                    mime_type,
-                    text,
-                    blob,
+                resource: EmbeddedResource {
+                    resource: resource_contents,
+                    annotations,
                 },
             },
         }

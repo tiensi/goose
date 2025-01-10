@@ -1,6 +1,6 @@
+mod developer_prompt;
 mod lang;
 mod process_store;
-mod developer_prompt;
 
 use anyhow::Result;
 use base64::Engine;

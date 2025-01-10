@@ -53,7 +53,7 @@ pub enum RouterError {
     ResourceNotFound(String),
 
     #[error("Not found: {0}")]
-    NotFound(String),
+    PromptNotFound(String),
 }
 
 impl From<RouterError> for mcp_core::protocol::ErrorData {
@@ -85,7 +85,7 @@ impl From<RouterError> for mcp_core::protocol::ErrorData {
                 message: msg,
                 data: None,
             },
-            RouterError::NotFound(msg) => ErrorData {
+            RouterError::PromptNotFound(msg) => ErrorData {
                 code: INVALID_REQUEST,
                 message: msg,
                 data: None,
