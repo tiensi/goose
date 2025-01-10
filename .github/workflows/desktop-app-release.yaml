@@ -131,8 +131,8 @@ jobs:
           cat "$LOGFILE"
           echo "============================="
 
-          # Check for "Starting goosed" in the logs
-          if grep -F "Starting goosed" "$LOGFILE"; then
+          # Check for evidence it ran in the logs:
+          if grep -F "ChatWindow loaded" "$LOGFILE"; then
             echo "Confirmed: 'Starting goosed' found in logs!"
           else
             echo "Did not find 'Starting goosed' in logs. Failing..."
