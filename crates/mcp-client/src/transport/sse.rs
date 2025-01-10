@@ -9,7 +9,7 @@ use tokio::sync::{mpsc, RwLock};
 use tokio::time::{timeout, Duration};
 use tracing::warn;
 
-use super::{Transport, TransportHandle};
+use super::{send_message, Transport, TransportHandle};
 
 // Timeout for the endpoint discovery
 const ENDPOINT_TIMEOUT_SECS: u64 = 5;
@@ -203,6 +203,18 @@ impl SseActor {
 }
 
 #[derive(Clone)]
+pub struct SseTransportHandle {
+    sender: mpsc::Sender<TransportMessage>,
+}
+
+#[async_trait::async_trait]
+impl TransportHandle for SseTransportHandle {
+    async fn send(&self, message: JsonRpcMessage) -> Result<JsonRpcMessage, Error> {
+        send_message(&self.sender, message).await
+    }
+}
+
+#[derive(Clone)]
 pub struct SseTransport {
     sse_url: String,
 }
@@ -237,7 +249,9 @@ impl SseTransport {
 
 #[async_trait]
 impl Transport for SseTransport {
-    async fn start(&self) -> Result<TransportHandle, Error> {
+    type Handle = SseTransportHandle;
+
+    async fn start(&self) -> Result<Self::Handle, Error> {
         // Create a channel for outgoing TransportMessages
         let (tx, rx) = mpsc::channel(32);
 
@@ -262,7 +276,7 @@ impl Transport for SseTransport {
         )
         .await
         {
-            Ok(_) => Ok(TransportHandle { sender: tx }),
+            Ok(_) => Ok(SseTransportHandle { sender: tx }),
             Err(e) => Err(Error::SseConnection(e.to_string())),
         }
     }

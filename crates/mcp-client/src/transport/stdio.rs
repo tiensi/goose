@@ -6,7 +6,7 @@ use mcp_core::protocol::JsonRpcMessage;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::sync::mpsc;
 
-use super::{Error, PendingRequests, Transport, TransportHandle, TransportMessage};
+use super::{send_message, Error, PendingRequests, Transport, TransportHandle, TransportMessage};
 
 /// A `StdioTransport` uses a child process's stdin/stdout as a communication channel.
 ///
@@ -100,6 +100,18 @@ impl StdioActor {
     }
 }
 
+#[derive(Clone)]
+pub struct StdioTransportHandle {
+    sender: mpsc::Sender<TransportMessage>,
+}
+
+#[async_trait::async_trait]
+impl TransportHandle for StdioTransportHandle {
+    async fn send(&self, message: JsonRpcMessage) -> Result<JsonRpcMessage, Error> {
+        send_message(&self.sender, message).await
+    }
+}
+
 pub struct StdioTransport {
     command: String,
     args: Vec<String>,
@@ -141,7 +153,9 @@ impl StdioTransport {
 
 #[async_trait]
 impl Transport for StdioTransport {
-    async fn start(&self) -> Result<TransportHandle, Error> {
+    type Handle = StdioTransportHandle;
+
+    async fn start(&self) -> Result<Self::Handle, Error> {
         let (process, stdin, stdout) = self.spawn_process().await?;
         let (message_tx, message_rx) = mpsc::channel(32);
 
@@ -155,7 +169,7 @@ impl Transport for StdioTransport {
 
         tokio::spawn(actor.run());
 
-        let handle = TransportHandle { sender: message_tx };
+        let handle = StdioTransportHandle { sender: message_tx };
         Ok(handle)
     }
 

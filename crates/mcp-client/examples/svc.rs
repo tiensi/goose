@@ -1,7 +1,7 @@
+use futures::future::{BoxFuture, FutureExt};
+use std::task::{Context, Poll};
 use tokio::time::{sleep, Duration};
 use tower::{Service, ServiceBuilder};
-use std::task::{Context, Poll};
-use futures::future::{BoxFuture, FutureExt};
 
 // Define a simple service that takes some time to respond
 struct SlowService;

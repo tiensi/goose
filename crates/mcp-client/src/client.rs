@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
 use tokio::sync::Mutex;
-use tower::{Service, ServiceExt}; // for Service::ready()
+use tower::Service;
 
 /// Error type for MCP client operations.
 #[derive(Debug, Error)]
@@ -55,19 +55,26 @@ pub struct InitializeParams {
 }
 
 /// The MCP client is the interface for MCP operations.
-pub struct McpClient {
-    service: Mutex<TransportHandle>,
+pub struct McpClient<S>
+where
+    S: Service<JsonRpcMessage, Response = JsonRpcMessage> + Clone + Send + 'static,
+    S::Error: Into<Error>,
+{
+    service: S,
     next_id: AtomicU64,
     server_capabilities: Option<ServerCapabilities>,
 }
 
-impl McpClient {
-    pub fn new(transport_handle: TransportHandle) -> Self {
-        // Takes TransportHandle directly
+impl<S> McpClient<S>
+where
+    S: Service<JsonRpcMessage, Response = JsonRpcMessage> + Clone + Send + 'static,
+    S::Error: Into<Error>,
+{
+    pub fn new(service: S) -> Self {
         Self {
-            service: Mutex::new(transport_handle),
+            service,
             next_id: AtomicU64::new(1),
-            server_capabilities: None, // set during initialization
+            server_capabilities: None,
         }
     }
 
@@ -76,9 +83,6 @@ impl McpClient {
     where
         R: for<'de> Deserialize<'de>,
     {
-        let mut service = self.service.lock().await;
-        service.ready().await.map_err(|_| Error::NotReady)?;
-
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let request = JsonRpcMessage::Request(JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
@@ -87,7 +91,8 @@ impl McpClient {
             params: Some(params),
         });
 
-        let response_msg = service.call(request).await?;
+        let mut service = self.service.clone();
+        let response_msg = service.call(request).await.map_err(Into::into)?;
 
         match response_msg {
             JsonRpcMessage::Response(JsonRpcResponse {
@@ -126,16 +131,14 @@ impl McpClient {
 
     /// Send a JSON-RPC notification.
     async fn send_notification(&self, method: &str, params: Value) -> Result<(), Error> {
-        let mut service = self.service.lock().await;
-        service.ready().await.map_err(|_| Error::NotReady)?;
-
         let notification = JsonRpcMessage::Notification(JsonRpcNotification {
             jsonrpc: "2.0".to_string(),
             method: method.to_string(),
             params: Some(params),
         });
 
-        service.call(notification).await?;
+        let mut service = self.service.clone();
+        service.call(notification).await.map_err(Into::into)?;
         Ok(())
     }
 
