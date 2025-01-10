@@ -107,7 +107,8 @@ jobs:
       run: |
         # Ensure no quarantine attributes (if needed)
         xattr -cr "ui/desktop/out/Goose-darwin-arm64/Goose.app"
-        
+
+
         echo "Opening Goose.app..."
         open -g "ui/desktop/out/Goose-darwin-arm64/Goose.app"
         
