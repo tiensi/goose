@@ -1,6 +1,6 @@
 use mcp_client::{
     client::{ClientCapabilities, ClientInfo, McpClient},
-    transport::{SseTransport, StdioTransport, Transport},
+    transport::{SseTransport, StdioTransport, Transport}, McpService,
 };
 use rand::Rng;
 use rand::SeedableRng;
@@ -123,7 +123,9 @@ async fn create_stdio_client(
     _version: &str,
 ) -> Result<McpClient, Box<dyn std::error::Error>> {
     let transport = StdioTransport::new("uvx", vec!["mcp-server-git".to_string()]);
-    Ok(McpClient::new(transport.start().await?))
+    let handle = transport.start().await?;
+    let service = McpService::with_timeout(handle, Duration::from_secs(10));
+    Ok(McpClient::new(service))
 }
 
 async fn create_sse_client(
@@ -131,5 +133,7 @@ async fn create_sse_client(
     _version: &str,
 ) -> Result<McpClient, Box<dyn std::error::Error>> {
     let transport = SseTransport::new("http://localhost:8000/sse");
-    Ok(McpClient::new(transport.start().await?))
+    let handle = transport.start().await?;
+    let service = McpService::with_timeout(handle, Duration::from_secs(3));
+    Ok(McpClient::new(service))
 }

@@ -1,9 +1,4 @@
-use std::{
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll},
-};
-
+use std::task::{Context, Poll};
 use futures::future::BoxFuture;
 use mcp_core::protocol::JsonRpcMessage;
 use tower::{timeout::Timeout, Service, ServiceBuilder};

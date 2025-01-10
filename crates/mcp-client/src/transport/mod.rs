@@ -1,12 +1,5 @@
-use std::{
-    collections::HashMap,
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll},
-};
-
+use std::collections::HashMap;
 use async_trait::async_trait;
-use futures::future::BoxFuture;
 use mcp_core::protocol::JsonRpcMessage;
 use thiserror::Error;
 use tokio::sync::{mpsc, oneshot, RwLock};

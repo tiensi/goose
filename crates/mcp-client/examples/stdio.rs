@@ -24,7 +24,7 @@ async fn main() -> Result<(), ClientError> {
     let transport_handle = transport.start().await?;
 
     // 3) Create the service with timeout middleware
-    let service = McpService::with_timeout(transport_handle, Duration::from_secs(30));
+    let service = McpService::with_timeout(transport_handle, Duration::from_secs(10));
 
     // 4) Create the client with the middleware-wrapped service
     let mut client = McpClient::new(service);

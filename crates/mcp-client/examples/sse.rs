@@ -1,6 +1,7 @@
 use anyhow::Result;
 use mcp_client::client::{ClientCapabilities, ClientInfo, McpClient};
 use mcp_client::transport::{SseTransport, Transport};
+use mcp_client::McpService;
 use std::time::Duration;
 use tracing_subscriber::EnvFilter;
 
@@ -21,8 +22,11 @@ async fn main() -> Result<()> {
     // Start transport
     let handle = transport.start().await?;
 
+    // Create the service with timeout middleware
+    let service = McpService::with_timeout(handle, Duration::from_secs(3));
+
     // Create client
-    let mut client = McpClient::new(handle);
+    let mut client = McpClient::new(service);
     println!("Client created\n");
 
     // Initialize
