@@ -168,7 +168,10 @@ impl ProtocolFormatter {
     fn format_moderation_error(error: &ModerationError) -> String {
         let error_part = match error {
             ModerationError::ContentFlagged { categories, .. } => {
-                format!("Content was flagged in the following categories: {}", categories)
+                format!(
+                    "Content was flagged in the following categories: {}",
+                    categories
+                )
             }
         };
         format!("3:{}\n", error_part)
@@ -209,7 +212,8 @@ async fn stream_message(
                         }
                         Err(err) => {
                             // Send an error message first
-                            tx.send(ProtocolFormatter::format_error(&err.to_string())).await?;
+                            tx.send(ProtocolFormatter::format_error(&err.to_string()))
+                                .await?;
                             // Then send an empty tool response to maintain the protocol
                             let result = vec![Content::text("Error occurred").with_priority(0.0)];
                             tx.send(ProtocolFormatter::format_tool_response(
@@ -238,7 +242,8 @@ async fn stream_message(
                             Err(err) => {
                                 println!("Error: {}", err);
                                 // Send error message for invalid tool call
-                                tx.send(ProtocolFormatter::format_error(&err.to_string())).await?;
+                                tx.send(ProtocolFormatter::format_error(&err.to_string()))
+                                    .await?;
                                 // Send a placeholder tool call to maintain protocol
                                 tx.send(ProtocolFormatter::format_tool_call(
                                     &request.id,
@@ -302,10 +307,14 @@ async fn handler(
                 tracing::error!("Failed to start reply stream: {}", e);
                 // Check if it's a moderation error
                 if let Some(moderation_error) = e.downcast_ref::<ModerationError>() {
-                    let _ = tx.send(ProtocolFormatter::format_moderation_error(moderation_error)).await;
+                    let _ = tx
+                        .send(ProtocolFormatter::format_moderation_error(moderation_error))
+                        .await;
                 } else {
                     // Send a generic error message
-                    let _ = tx.send(ProtocolFormatter::format_error(&e.to_string())).await;
+                    let _ = tx
+                        .send(ProtocolFormatter::format_error(&e.to_string()))
+                        .await;
                 }
                 // Send a finish message with error as the reason
                 let _ = tx.send(ProtocolFormatter::format_finish("error")).await;

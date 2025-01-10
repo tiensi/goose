@@ -4,9 +4,9 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
+use thiserror::Error;
 use tokio::select;
 use tokio::sync::RwLock;
-use thiserror::Error;
 
 use super::configs::ModelConfig;
 use crate::message::{Message, MessageContent};
@@ -19,7 +19,7 @@ pub enum ModerationError {
     ContentFlagged {
         categories: String,
         category_scores: Option<serde_json::Value>,
-    }
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

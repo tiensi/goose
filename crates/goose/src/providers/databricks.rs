@@ -158,7 +158,7 @@ impl Moderation for DatabricksProvider {
         );
 
         let auth_header = self.ensure_auth_header().await?;
-        let payload = json!({            
+        let payload = json!({
             "messages": [
                 {
                     "role": "user",
