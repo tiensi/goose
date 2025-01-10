@@ -1,6 +1,5 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::transport::TransportHandle;
 use mcp_core::protocol::{
     CallToolResult, InitializeResult, JsonRpcError, JsonRpcMessage, JsonRpcNotification,
     JsonRpcRequest, JsonRpcResponse, ListResourcesResult, ListToolsResult, ReadResourceResult,
@@ -9,7 +8,6 @@ use mcp_core::protocol::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
-use tokio::sync::Mutex;
 use tower::Service;
 
 /// Error type for MCP client operations.
@@ -32,6 +30,15 @@ pub enum Error {
 
     #[error("Timeout or service not ready")]
     NotReady,
+
+    #[error("Box error: {0}")]
+    BoxError(Box<dyn std::error::Error + Send + Sync>),
+}
+
+impl From<Box<dyn std::error::Error + Send + Sync>> for Error {
+    fn from(err: Box<dyn std::error::Error + Send + Sync>) -> Self {
+        Error::BoxError(err)
+    }
 }
 
 #[derive(Serialize, Deserialize)]

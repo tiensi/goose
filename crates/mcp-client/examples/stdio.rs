@@ -1,9 +1,9 @@
 use anyhow::Result;
 use mcp_client::{
     ClientCapabilities, ClientInfo, Error as ClientError, McpClient, McpService, StdioTransport,
+    Transport,
 };
 use std::time::Duration;
-use tower::ServiceBuilder;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -24,10 +24,7 @@ async fn main() -> Result<(), ClientError> {
     let transport_handle = transport.start().await?;
 
     // 3) Create the service with timeout middleware
-    let service = McpService::new(transport_handle);
-    let service = ServiceBuilder::new()
-        .timeout(Duration::from_secs(30))
-        .service(service);
+    let service = McpService::with_timeout(transport_handle, Duration::from_secs(30));
 
     // 4) Create the client with the middleware-wrapped service
     let mut client = McpClient::new(service);

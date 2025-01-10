@@ -46,6 +46,15 @@ pub enum Error {
 
     #[error("Unexpected transport error: {0}")]
     Other(String),
+
+    #[error("Box error: {0}")]
+    BoxError(Box<dyn std::error::Error + Send + Sync>),
+}
+
+impl From<Box<dyn std::error::Error + Send + Sync>> for Error {
+    fn from(err: Box<dyn std::error::Error + Send + Sync>) -> Self {
+        Error::BoxError(err)
+    }
 }
 
 /// A message that can be sent through the transport

@@ -6,7 +6,7 @@ use std::{
 
 use futures::future::BoxFuture;
 use mcp_core::protocol::JsonRpcMessage;
-use tower::Service;
+use tower::{timeout::Timeout, Service, ServiceBuilder};
 
 use crate::transport::{Error, TransportHandle};
 
@@ -42,5 +42,24 @@ where
     fn call(&mut self, request: JsonRpcMessage) -> Self::Future {
         let transport = self.inner.clone();
         Box::pin(async move { transport.send(request).await })
+    }
+}
+
+// Add a convenience constructor for creating a service with timeout
+impl<T> McpService<T>
+where
+    T: TransportHandle,
+{
+    pub fn with_timeout(transport: T, timeout: std::time::Duration) -> Timeout<McpService<T>> {
+        ServiceBuilder::new()
+            .timeout(timeout)
+            .service(McpService::new(transport))
+    }
+}
+
+// Implement From<tower::timeout::error::Elapsed> for our Error type
+impl From<tower::timeout::error::Elapsed> for Error {
+    fn from(_: tower::timeout::error::Elapsed) -> Self {
+        Error::Timeout
     }
 }
