@@ -1,4 +1,4 @@
-name: Desktop App Release
+name: Desktop App Build
 
 on:
   push:

@@ -18,6 +18,7 @@ export function loadZshEnv(isProduction: boolean = false): void {
 
     // if no file then return
     if (!fs.existsSync(zshrcPath)) {
+      console.log('No zshrc file found');
       return;
     }
 

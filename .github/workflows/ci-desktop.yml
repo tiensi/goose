@@ -1,4 +1,4 @@
-name: Desktop App CI
+name: Desktop App Lint
 
 on:
   push:
