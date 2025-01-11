@@ -92,8 +92,8 @@ impl Capabilities {
                 let transport = SseTransport::new(uri);
                 McpClient::new(transport.start().await?)
             }
-            SystemConfig::Stdio { ref cmd, ref args } => {
-                let transport = StdioTransport::new(cmd, args.to_vec());
+            SystemConfig::Stdio { ref cmd, ref args, ref env } => {
+                let transport = StdioTransport::new(cmd, args.to_vec()).with_env(env.clone());
                 McpClient::new(transport.start().await?)
             }
         };

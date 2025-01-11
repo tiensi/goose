@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 
@@ -103,6 +104,7 @@ impl StdioActor {
 pub struct StdioTransport {
     command: String,
     args: Vec<String>,
+    env: Option<HashMap<String, String>>,
 }
 
 impl StdioTransport {
@@ -110,18 +112,31 @@ impl StdioTransport {
         Self {
             command: command.into(),
             args,
+            env: None,
         }
     }
 
+    pub fn with_env(mut self, env: Option<HashMap<String, String>>) -> Self {
+        self.env = env;
+        self
+    }
+
     async fn spawn_process(&self) -> Result<(Child, ChildStdin, ChildStdout), Error> {
-        let mut process = Command::new(&self.command)
+        let mut command = Command::new(&self.command);
+        command
             .args(&self.args)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::inherit())
             .kill_on_drop(true)
             // 0 sets the process group ID equal to the process ID
-            .process_group(0) // don't inherit signal handling from parent process
+            .process_group(0); // don't inherit signal handling from parent process
+
+        if let Some(env) = &self.env {
+            command.envs(env);
+        }
+
+        let mut process = command
             .spawn()
             .map_err(|e| Error::Other(e.to_string()))?;
 

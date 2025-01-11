@@ -1,5 +1,6 @@
 use mcp_client::client::Error as ClientError;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use thiserror::Error;
 
 /// Errors from System operation
@@ -22,7 +23,11 @@ pub enum SystemConfig {
     /// Server-sent events client with a URI endpoint
     Sse { uri: String },
     /// Standard I/O client with command and arguments
-    Stdio { cmd: String, args: Vec<String> },
+    Stdio {
+        cmd: String,
+        args: Vec<String>,
+        env: Option<HashMap<String, String>>,
+    },
 }
 
 impl SystemConfig {
@@ -34,6 +39,7 @@ impl SystemConfig {
         Self::Stdio {
             cmd: cmd.into(),
             args: vec![],
+            env: None,
         }
     }
 
@@ -43,9 +49,26 @@ impl SystemConfig {
         S: Into<String>,
     {
         match self {
-            Self::Stdio { cmd, .. } => Self::Stdio {
+            Self::Stdio { cmd, env, .. } => Self::Stdio {
                 cmd,
                 args: args.into_iter().map(Into::into).collect(),
+                env,
+            },
+            other => other,
+        }
+    }
+
+    pub fn with_env<I, K, V>(self, env_vars: I) -> Self
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<String>,
+        V: Into<String>,
+    {
+        match self {
+            Self::Stdio { cmd, args, .. } => Self::Stdio {
+                cmd,
+                args,
+                env: Some(env_vars.into_iter().map(|(k, v)| (k.into(), v.into())).collect()),
             },
             other => other,
         }
@@ -56,7 +79,12 @@ impl std::fmt::Display for SystemConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SystemConfig::Sse { uri } => write!(f, "SSE({})", uri),
-            SystemConfig::Stdio { cmd, args } => write!(f, "Stdio({} {})", cmd, args.join(" ")),
+            SystemConfig::Stdio { cmd, args, env } => {
+                let env_str = env.as_ref().map_or(String::new(), |e| {
+                    format!(" with env: {}", e.iter().map(|(k,v)| format!("{}={}", k, v)).collect::<Vec<_>>().join(","))
+                });
+                write!(f, "Stdio({} {}{})", cmd, args.join(" "), env_str)
+            },
         }
     }
 }
