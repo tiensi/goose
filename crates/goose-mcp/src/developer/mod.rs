@@ -213,24 +213,6 @@ impl DeveloperRouter {
         }
     }
 
-    // Helper method to mark a resource as active, and insert it into the active_resources map
-    fn add_active_resource(&self, uri: &str, resource: Resource) {
-        self.active_resources
-            .lock()
-            .unwrap()
-            .insert(uri.to_string(), resource.mark_active());
-    }
-
-    // Helper method to check if a resource is already an active one
-    // Tries to get the resource and then checks if it is active
-    fn is_active_resource(&self, uri: &str) -> bool {
-        self.active_resources
-            .lock()
-            .unwrap()
-            .get(uri)
-            .map_or(false, |r| r.is_active())
-    }
-
     // Helper method to resolve a path relative to cwd
     fn resolve_path(&self, path_str: &str) -> Result<PathBuf, ToolError> {
         let cwd = self.cwd.lock().unwrap();
@@ -405,7 +387,7 @@ impl DeveloperRouter {
                     ToolError::ExecutionError(format!("Failed to create resource: {}", e))
                 })?;
 
-            self.add_active_resource(&uri, resource);
+            self.active_resources.lock().unwrap().insert(uri, resource);
 
             let language = lang::get_language_identifier(path);
             let formatted = formatdoc! {"
@@ -450,7 +432,7 @@ impl DeveloperRouter {
             .to_string();
 
         // Check if file already exists and is active
-        if path.exists() && !self.is_active_resource(&uri) {
+        if path.exists() && !self.active_resources.lock().unwrap().contains_key(&uri) {
             return Err(ToolError::InvalidParameters(format!(
                 "File '{}' exists but is not active. View it first before overwriting.",
                 path.display()
@@ -468,7 +450,7 @@ impl DeveloperRouter {
 
         let resource = Resource::new(uri.clone(), Some("text".to_string()), None)
             .map_err(|e| ToolError::ExecutionError(e.to_string()))?;
-        self.add_active_resource(&uri, resource);
+        self.active_resources.lock().unwrap().insert(uri, resource);
 
         // Try to detect the language from the file extension
         let language = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
@@ -509,7 +491,7 @@ impl DeveloperRouter {
                 path.display()
             )));
         }
-        if !self.is_active_resource(&uri) {
+        if !self.active_resources.lock().unwrap().contains_key(&uri) {
             return Err(ToolError::InvalidParameters(format!(
                 "You must view '{}' before editing it",
                 path.display()

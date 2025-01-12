@@ -1,8 +1,6 @@
-use chrono::{DateTime, TimeZone, Utc};
 use rust_decimal_macros::dec;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::LazyLock;
 use tokio::sync::Mutex;
 use tracing::{debug, instrument};
 
@@ -11,12 +9,7 @@ use crate::prompt_template::load_prompt_file;
 use crate::providers::base::{Provider, ProviderUsage};
 use mcp_client::client::{ClientCapabilities, ClientInfo, McpClient};
 use mcp_client::transport::{SseTransport, StdioTransport, Transport};
-use mcp_core::{Content, Tool, ToolCall, ToolError, ToolResult};
-
-// By default, we set it to Jan 1, 2020 if the resource does not have a timestamp
-// This is to ensure that the resource is considered less important than resources with a more recent timestamp
-static DEFAULT_TIMESTAMP: LazyLock<DateTime<Utc>> =
-    LazyLock::new(|| Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap());
+use mcp_core::{Content, Resource, Tool, ToolCall, ToolError, ToolResult};
 
 /// Manages MCP clients and their interactions
 pub struct Capabilities {
@@ -24,39 +17,6 @@ pub struct Capabilities {
     instructions: HashMap<String, String>,
     provider: Box<dyn Provider>,
     provider_usage: Mutex<Vec<ProviderUsage>>,
-}
-
-/// A flattened representation of a resource used by the agent to prepare inference
-#[derive(Debug, Clone)]
-pub struct ResourceItem {
-    pub client_name: String,      // The name of the client that owns the resource
-    pub uri: String,              // The URI of the resource
-    pub name: String,             // The name of the resource
-    pub content: String,          // The content of the resource
-    pub timestamp: DateTime<Utc>, // The timestamp of the resource
-    pub priority: f32,            // The priority of the resource
-    pub token_count: Option<u32>, // The token count of the resource (filled in by the agent)
-}
-
-impl ResourceItem {
-    pub fn new(
-        client_name: String,
-        uri: String,
-        name: String,
-        content: String,
-        timestamp: DateTime<Utc>,
-        priority: f32,
-    ) -> Self {
-        Self {
-            client_name,
-            uri,
-            name,
-            content,
-            timestamp,
-            priority,
-            token_count: None,
-        }
-    }
 }
 
 /// Sanitizes a string by replacing invalid characters with underscores.
@@ -197,20 +157,17 @@ impl Capabilities {
     }
 
     /// Get client resources and their contents
-    pub async fn get_resources(&self) -> SystemResult<Vec<ResourceItem>> {
-        let mut result: Vec<ResourceItem> = Vec::new();
-
+    // TODO this data model needs flattening
+    pub async fn get_resources(
+        &self,
+    ) -> SystemResult<HashMap<String, HashMap<String, (Resource, String)>>> {
+        let mut client_resource_content = HashMap::new();
         for (name, client) in &self.clients {
             let client_guard = client.lock().await;
             let resources = client_guard.list_resources().await?;
 
+            let mut resource_content = HashMap::new();
             for resource in resources.resources {
-                // Skip reading the resource if it's not marked active
-                // This avoids blowing up the context with inactive resources
-                if !resource.is_active() {
-                    continue;
-                }
-
                 if let Ok(contents) = client_guard.read_resource(&resource.uri).await {
                     for content in contents.contents {
                         let (uri, content_str) = match content {
@@ -225,20 +182,13 @@ impl Capabilities {
                                 ..
                             } => (uri, blob),
                         };
-
-                        result.push(ResourceItem::new(
-                            name.clone(),
-                            uri,
-                            resource.name.clone(),
-                            content_str,
-                            resource.timestamp().unwrap_or(*DEFAULT_TIMESTAMP),
-                            resource.priority().unwrap_or(0.0),
-                        ));
+                        resource_content.insert(uri, (resource.clone(), content_str));
                     }
                 }
             }
+            client_resource_content.insert(name.clone(), resource_content);
         }
-        Ok(result)
+        Ok(client_resource_content)
     }
 
     /// Get the system prompt including client instructions
