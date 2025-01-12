@@ -68,7 +68,12 @@ impl SystemConfig {
             Self::Stdio { cmd, args, .. } => Self::Stdio {
                 cmd,
                 args,
-                env: Some(env_vars.into_iter().map(|(k, v)| (k.into(), v.into())).collect()),
+                env: Some(
+                    env_vars
+                        .into_iter()
+                        .map(|(k, v)| (k.into(), v.into()))
+                        .collect(),
+                ),
             },
             other => other,
         }
@@ -81,10 +86,16 @@ impl std::fmt::Display for SystemConfig {
             SystemConfig::Sse { uri } => write!(f, "SSE({})", uri),
             SystemConfig::Stdio { cmd, args, env } => {
                 let env_str = env.as_ref().map_or(String::new(), |e| {
-                    format!(" with env: {}", e.iter().map(|(k,v)| format!("{}={}", k, v)).collect::<Vec<_>>().join(","))
+                    format!(
+                        " with env: {}",
+                        e.iter()
+                            .map(|(k, v)| format!("{}={}", k, v))
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    )
                 });
                 write!(f, "Stdio({} {}{})", cmd, args.join(" "), env_str)
-            },
+            }
         }
     }
 }

@@ -136,9 +136,7 @@ impl StdioTransport {
             command.envs(env);
         }
 
-        let mut process = command
-            .spawn()
-            .map_err(|e| Error::Other(e.to_string()))?;
+        let mut process = command.spawn().map_err(|e| Error::Other(e.to_string()))?;
 
         let stdin = process
             .stdin
