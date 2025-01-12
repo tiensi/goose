@@ -307,6 +307,7 @@ async fn handler(
                     let _ = tx
                         .send(ProtocolFormatter::format_moderation_error(moderation_error))
                         .await;
+                    // Kill the stream since we encountered a moderation error
                 } else {
                     // Send a generic error message
                     let _ = tx

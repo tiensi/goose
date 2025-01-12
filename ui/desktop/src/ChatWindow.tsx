@@ -89,6 +89,16 @@ function ChatContent({
       if (!response.ok) {
         setProgressMessage('An error occurred while receiving the response.');
         updateWorking(Working.Idle);
+        
+        // Check if this is a moderation error
+        if (response.status === 400) {
+          response.json().then(data => {
+            if (data.error && data.error.includes('moderation')) {
+              // Kill the goosed process for moderation violations
+              window.electron.stopGooseProcess();
+            }
+          });
+        }
       } else {
         setProgressMessage('thinking...');
         updateWorking(Working.Working);
