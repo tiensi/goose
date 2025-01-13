@@ -66,28 +66,24 @@ impl TruncateAgent {
         if approx_count > target_limit {
             println!("[WARNING] Token budget exceeded. Current count: {} \n Difference: {} tokens over budget. Removing context", approx_count, approx_count - target_limit);
 
-            // Get all resource items, sort, then trim till we're under target limit
             let mut trimmed_items: VecDeque<Message> = VecDeque::from(messages.to_vec());
-            let mut message_sizes: VecDeque<u32> = VecDeque::new();
+            let mut current_tokens = approx_count;
 
-            for msg in trimmed_items.iter_mut() {
+            // Remove messages until we're under target limit
+            for msg in messages.iter() {
                 if let Some(content) = msg.content.first() {
                     if let Some(text) = content.as_text() {
                         let count = self.token_counter.count_tokens(text, Some(model_name)) as u32;
-                        message_sizes.push_back(count);
+                        if current_tokens > target_limit && !trimmed_items.is_empty() {
+                            let _ = trimmed_items.pop_front().unwrap();
+                            // Subtract removed message’s token_count
+                            current_tokens = current_tokens.saturating_sub(count as usize);
+                        }
                     }
                 }
             }
 
-            // Remove messages until we're under target limit
-            let mut current_tokens = approx_count;
-            while current_tokens > target_limit && !trimmed_items.is_empty() {
-                let _ = trimmed_items.pop_front().unwrap();
-                let tc = message_sizes.pop_front().unwrap();
-                // Subtract removed message’s token_count
-                current_tokens = current_tokens.saturating_sub(tc as usize);
-            }
-            if current_tokens > target_limit || trimmed_items.is_empty() {
+            if trimmed_items.is_empty() {
                 return Err(SystemError::ContextLimit());
             }
 
