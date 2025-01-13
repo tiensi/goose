@@ -1,5 +1,11 @@
 /// The protocol messages exchanged between client and server
-use crate::{content::Content, prompt::{Prompt, PromptMessage}, resource::Resource, resource::ResourceContents, tool::Tool};
+use crate::{
+    content::Content,
+    prompt::{Prompt, PromptMessage},
+    resource::Resource,
+    resource::ResourceContents,
+    tool::Tool,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -188,8 +194,11 @@ pub struct ToolsCapability {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct ListResourcesResult {
     pub resources: Vec<Resource>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -198,8 +207,11 @@ pub struct ReadResourceResult {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct ListToolsResult {
     pub tools: Vec<Tool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -218,7 +230,7 @@ pub struct ListPromptsResult {
 pub struct GetPromptResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    pub messages: Vec<PromptMessage>
+    pub messages: Vec<PromptMessage>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

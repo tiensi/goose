@@ -1,5 +1,5 @@
-use mcp_core::prompt::{Prompt, PromptArgument, PromptTemplate};
 use include_dir::{include_dir, Dir};
+use mcp_core::prompt::{Prompt, PromptArgument, PromptTemplate};
 
 static PROMPTS_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/src/developer/prompts");
 

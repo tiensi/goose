@@ -9,9 +9,10 @@ use mcp_core::{
     handler::{PromptError, ResourceError, ToolError},
     prompt::{Prompt, PromptMessage, PromptMessageRole},
     protocol::{
-        CallToolResult, Implementation, InitializeResult, JsonRpcRequest, JsonRpcResponse,
-        GetPromptResult, ListPromptsResult, ListResourcesResult, ListToolsResult, PromptsCapability, ReadResourceResult,
-        ResourcesCapability, ServerCapabilities, ToolsCapability,
+        CallToolResult, GetPromptResult, Implementation, InitializeResult, JsonRpcRequest,
+        JsonRpcResponse, ListPromptsResult, ListResourcesResult, ListToolsResult,
+        PromptsCapability, ReadResourceResult, ResourcesCapability, ServerCapabilities,
+        ToolsCapability,
     },
     ResourceContents,
 };
@@ -146,7 +147,10 @@ pub trait Router: Send + Sync + 'static {
         async move {
             let tools = self.list_tools();
 
-            let result = ListToolsResult { tools };
+            let result = ListToolsResult {
+                tools,
+                next_cursor: None,
+            };
             let mut response = self.create_response(req.id);
             response.result =
                 Some(serde_json::to_value(result).map_err(|e| {
@@ -201,7 +205,10 @@ pub trait Router: Send + Sync + 'static {
         async move {
             let resources = self.list_resources();
 
-            let result = ListResourcesResult { resources };
+            let result = ListResourcesResult {
+                resources,
+                next_cursor: None,
+            };
             let mut response = self.create_response(req.id);
             response.result =
                 Some(serde_json::to_value(result).map_err(|e| {
@@ -256,9 +263,10 @@ pub trait Router: Send + Sync + 'static {
             let result = ListPromptsResult { prompts };
 
             let mut response = self.create_response(req.id);
-            response.result = Some(serde_json::to_value(result).map_err(|e| {
-                RouterError::Internal(format!("JSON serialization error: {}", e))
-            })?);
+            response.result =
+                Some(serde_json::to_value(result).map_err(|e| {
+                    RouterError::Internal(format!("JSON serialization error: {}", e))
+                })?);
 
             Ok(response)
         }
@@ -372,12 +380,13 @@ pub trait Router: Send + Sync + 'static {
 
             // Build the final response
             let mut response = self.create_response(req.id);
-            response.result = Some(serde_json::to_value(GetPromptResult {
-                description: Some(description_filled),
-                messages
-            }).map_err(|e| {
-                RouterError::Internal(format!("JSON serialization error: {}", e))
-            })?);
+            response.result = Some(
+                serde_json::to_value(GetPromptResult {
+                    description: Some(description_filled),
+                    messages,
+                })
+                .map_err(|e| RouterError::Internal(format!("JSON serialization error: {}", e)))?,
+            );
             Ok(response)
         }
     }
