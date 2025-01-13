@@ -96,7 +96,11 @@ impl Capabilities {
                 let service = McpService::with_timeout(handle, Duration::from_secs(10));
                 Box::new(McpClient::new(service))
             }
-            SystemConfig::Stdio { ref cmd, ref args, ref envs } => {
+            SystemConfig::Stdio {
+                ref cmd,
+                ref args,
+                ref envs,
+            } => {
                 let transport = StdioTransport::new(cmd, args.to_vec(), envs.get_env());
                 let handle = transport.start().await?;
                 let service = McpService::with_timeout(handle, Duration::from_secs(10));
