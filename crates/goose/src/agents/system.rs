@@ -18,14 +18,14 @@ pub enum SystemError {
 pub type SystemResult<T> = Result<T, SystemError>;
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-pub struct Secrets {
-    /// A map of environment variables to set, e.g. API_KEY -> some_secret
+pub struct Envs {
+    /// A map of environment variables to set, e.g. API_KEY -> some_secret, HOST -> host
     #[serde(default)]
     #[serde(flatten)]
     map: HashMap<String, String>,
 }
 
-impl Secrets {
+impl Envs {
     pub fn new(map: HashMap<String, String>) -> Self {
         Self { map }
     }
@@ -50,14 +50,14 @@ pub enum SystemConfig {
     Sse {
         uri: String,
         #[serde(default)]
-        secrets: Secrets,
+        envs: Envs,
     },
     /// Standard I/O client with command and arguments
     Stdio {
         cmd: String,
         args: Vec<String>,
         #[serde(default)]
-        secrets: Secrets,
+        envs: Envs,
     },
 }
 
@@ -65,7 +65,7 @@ impl SystemConfig {
     pub fn sse<S: Into<String>>(uri: S) -> Self {
         Self::Sse {
             uri: uri.into(),
-            secrets: Secrets::default(),
+            envs: Envs::default(),
         }
     }
 
@@ -73,7 +73,7 @@ impl SystemConfig {
         Self::Stdio {
             cmd: cmd.into(),
             args: vec![],
-            secrets: Secrets::default(),
+            envs: Envs::default(),
         }
     }
 
@@ -83,9 +83,9 @@ impl SystemConfig {
         S: Into<String>,
     {
         match self {
-            Self::Stdio { cmd, secrets, .. } => Self::Stdio {
+            Self::Stdio { cmd, envs, .. } => Self::Stdio {
                 cmd,
-                secrets,
+                envs,
                 args: args.into_iter().map(Into::into).collect(),
             },
             other => other,
