@@ -104,39 +104,34 @@ impl StdioActor {
 pub struct StdioTransport {
     command: String,
     args: Vec<String>,
-    env: Option<HashMap<String, String>>,
+    env: HashMap<String, String>,
 }
 
 impl StdioTransport {
-    pub fn new<S: Into<String>>(command: S, args: Vec<String>) -> Self {
+    pub fn new<S: Into<String>>(
+        command: S,
+        args: Vec<String>,
+        env: HashMap<String, String>,
+    ) -> Self {
         Self {
             command: command.into(),
             args,
-            env: None,
+            env: env,
         }
     }
 
-    pub fn with_env(mut self, env: Option<HashMap<String, String>>) -> Self {
-        self.env = env;
-        self
-    }
-
     async fn spawn_process(&self) -> Result<(Child, ChildStdin, ChildStdout), Error> {
-        let mut command = Command::new(&self.command);
-        command
+        let mut process = Command::new(&self.command)
+            .envs(&self.env)
             .args(&self.args)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::inherit())
             .kill_on_drop(true)
             // 0 sets the process group ID equal to the process ID
-            .process_group(0); // don't inherit signal handling from parent process
-
-        if let Some(env) = &self.env {
-            command.envs(env);
-        }
-
-        let mut process = command.spawn().map_err(|e| Error::Other(e.to_string()))?;
+            .process_group(0) // don't inherit signal handling from parent process
+            .spawn()
+            .map_err(|e| Error::Other(e.to_string()))?;
 
         let stdin = process
             .stdin
