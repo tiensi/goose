@@ -93,7 +93,6 @@ impl TruncateAgent {
 
             // use trimmed message-history
             new_messages = Vec::from(trimmed_items);
-        } else {
         }
 
         // Finally add the status messages
