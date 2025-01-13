@@ -1,6 +1,6 @@
 ### Test with MCP Inspector
 
-Update main.rs to use the appropriate the MCP server (eg. DeveloperRouter)
+Update examples/mcp.rs to use the appropriate the MCP server (eg. DeveloperRouter)
 
 ```bash
 npx @modelcontextprotocol/inspector cargo run -p goose-mcp --example mcp
