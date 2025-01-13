@@ -84,7 +84,7 @@ impl TruncateAgent {
             }
 
             if trimmed_items.is_empty() {
-                return Err(SystemError::ContextLimit());
+                return Err(SystemError::ContextLimit);
             }
 
             // use trimmed message-history
