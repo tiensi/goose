@@ -4,8 +4,8 @@ use mcp_client::{
 };
 use rand::Rng;
 use rand::SeedableRng;
-use std::sync::Arc;
 use std::time::Duration;
+use std::{collections::HashMap, sync::Arc};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -40,7 +40,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // List tools for all clients
     for (i, client) in clients.iter_mut().enumerate() {
-        let tools = client.list_tools().await?;
+        let tools = client.list_tools(None).await?;
         println!("\nClient {} tools: {:?}", i + 1, tools);
     }
 
@@ -61,7 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             match rng.gen_range(0..4) {
                 0 => {
                     println!("\n{i}: Listing tools for client 1 (stdio)");
-                    match clients[0].list_tools().await {
+                    match clients[0].list_tools(None).await {
                         Ok(tools) => {
                             println!("  {i}: -> Got tools, first one: {:?}", tools.tools.first())
                         }
@@ -83,7 +83,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 2 => {
                     println!("\n{i}: Listing tools for client 3 (sse)");
-                    match clients[2].list_tools().await {
+                    match clients[2].list_tools(None).await {
                         Ok(tools) => {
                             println!("  {i}: -> Got tools, first one: {:?}", tools.tools.first())
                         }
@@ -122,7 +122,7 @@ async fn create_stdio_client(
     _name: &str,
     _version: &str,
 ) -> Result<McpClient, Box<dyn std::error::Error>> {
-    let transport = StdioTransport::new("uvx", vec!["mcp-server-git".to_string()]);
+    let transport = StdioTransport::new("uvx", vec!["mcp-server-git".to_string()], HashMap::new());
     Ok(McpClient::new(transport.start().await?))
 }
 
@@ -130,6 +130,6 @@ async fn create_sse_client(
     _name: &str,
     _version: &str,
 ) -> Result<McpClient, Box<dyn std::error::Error>> {
-    let transport = SseTransport::new("http://localhost:8000/sse");
+    let transport = SseTransport::new("http://localhost:8000/sse", HashMap::new());
     Ok(McpClient::new(transport.start().await?))
 }

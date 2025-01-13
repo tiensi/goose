@@ -4,6 +4,7 @@ use eventsource_client::{Client, SSE};
 use futures::TryStreamExt;
 use mcp_core::protocol::{JsonRpcMessage, JsonRpcRequest};
 use reqwest::Client as HttpClient;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tokio::time::{timeout, Duration};
@@ -205,13 +206,15 @@ impl SseActor {
 #[derive(Clone)]
 pub struct SseTransport {
     sse_url: String,
+    env: HashMap<String, String>,
 }
 
 /// The SSE transport spawns an `SseActor` on `start()`.
 impl SseTransport {
-    pub fn new<S: Into<String>>(sse_url: S) -> Self {
+    pub fn new<S: Into<String>>(sse_url: S, env: HashMap<String, String>) -> Self {
         Self {
             sse_url: sse_url.into(),
+            env: env,
         }
     }
 
@@ -238,6 +241,11 @@ impl SseTransport {
 #[async_trait]
 impl Transport for SseTransport {
     async fn start(&self) -> Result<TransportHandle, Error> {
+        // Set environment variables
+        for (key, value) in &self.env {
+            std::env::set_var(key, value);
+        }
+
         // Create a channel for outgoing TransportMessages
         let (tx, rx) = mpsc::channel(32);
 
