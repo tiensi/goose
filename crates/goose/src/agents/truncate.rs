@@ -107,32 +107,6 @@ impl TruncateAgent {
 
 #[async_trait]
 impl Agent for TruncateAgent {
-    async fn add_system(&mut self, system: SystemConfig) -> SystemResult<()> {
-        let mut capabilities = self.capabilities.lock().await;
-        capabilities.add_system(system).await
-    }
-
-    async fn remove_system(&mut self, name: &str) {
-        let mut capabilities = self.capabilities.lock().await;
-        capabilities
-            .remove_system(name)
-            .await
-            .expect("Failed to remove system");
-    }
-
-    async fn list_systems(&self) -> Vec<String> {
-        let capabilities = self.capabilities.lock().await;
-        capabilities
-            .list_systems()
-            .await
-            .expect("Failed to list systems")
-    }
-
-    async fn passthrough(&self, _system: &str, _request: Value) -> SystemResult<Value> {
-        // TODO implement
-        Ok(Value::Null)
-    }
-
     #[instrument(skip(self, messages), fields(user_message))]
     async fn reply(
         &self,
@@ -231,6 +205,32 @@ impl Agent for TruncateAgent {
                 messages = self.prepare_inference(&system_prompt, &tools, &messages, estimated_limit, &capabilities.provider().get_model_config().model_name, &mut capabilities.get_resources().await?).await?;
             }
         }))
+    }
+
+    async fn add_system(&mut self, system: SystemConfig) -> SystemResult<()> {
+        let mut capabilities = self.capabilities.lock().await;
+        capabilities.add_system(system).await
+    }
+
+    async fn remove_system(&mut self, name: &str) {
+        let mut capabilities = self.capabilities.lock().await;
+        capabilities
+            .remove_system(name)
+            .await
+            .expect("Failed to remove system");
+    }
+
+    async fn list_systems(&self) -> Vec<String> {
+        let capabilities = self.capabilities.lock().await;
+        capabilities
+            .list_systems()
+            .await
+            .expect("Failed to list systems")
+    }
+
+    async fn passthrough(&self, _system: &str, _request: Value) -> SystemResult<Value> {
+        // TODO implement
+        Ok(Value::Null)
     }
 
     async fn usage(&self) -> Vec<ProviderUsage> {
