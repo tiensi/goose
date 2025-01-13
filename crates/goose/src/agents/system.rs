@@ -7,7 +7,7 @@ use thiserror::Error;
 pub enum SystemError {
     #[error("Failed to start the MCP server from configuration `{0}` within 60 seconds")]
     Initialization(SystemConfig),
-    #[error("Failed a client call to an MCP server")]
+    #[error("Failed a client call to an MCP server: {0}")]
     Client(#[from] ClientError),
     #[error("Transport error: {0}")]
     Transport(#[from] mcp_client::transport::Error),
