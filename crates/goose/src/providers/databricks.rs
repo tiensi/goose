@@ -19,6 +19,7 @@ use mcp_core::tool::Tool;
 pub const DATABRICKS_DEFAULT_MODEL: &str = "claude-3-5-sonnet-2";
 pub const INPUT_GUARDRAIL: &str = "input_guardrail";
 
+#[derive(Debug)]
 pub struct DatabricksProvider {
     client: Client,
     config: DatabricksProviderConfig,
@@ -67,6 +68,35 @@ impl DatabricksProvider {
 
         handle_response(payload, response).await?
     }
+
+    async fn handle_moderation_response(&self, response: reqwest::Response) -> Result<Value> {
+        match response.status() {
+            reqwest::StatusCode::OK => {
+                let payload = response.json().await?;
+                Ok(payload)
+            }
+            reqwest::StatusCode::BAD_REQUEST => {
+                let error_body: Value = response.json().await?;
+
+                // Check if this is a moderation error
+                if let Some(finish_reason) = error_body.get("finishReason") {
+                    if finish_reason == "input_guardrail_triggered" {
+                        return Ok(error_body);
+                    }
+                }
+                // Not a moderation error, return the original error
+                Err(anyhow::anyhow!("Bad request: {}", error_body))
+            }
+            status => {
+                let error_body: Value = response.json().await?;
+                Err(anyhow::anyhow!(
+                    "Moderation request failed with status: {}\nPayload {}",
+                    status,
+                    error_body
+                ))
+            }
+        }
+    }
 }
 
 #[async_trait]
@@ -75,6 +105,18 @@ impl Provider for DatabricksProvider {
         self.config.model_config()
     }
 
+    #[tracing::instrument(
+        skip(self, system, messages, tools),
+        fields(
+            model_config,
+            input,
+            output,
+            input_tokens,
+            output_tokens,
+            total_tokens,
+            cost
+        )
+    )]
     async fn complete_internal(
         &self,
         system: &str,
@@ -123,7 +165,7 @@ impl Provider for DatabricksProvider {
         );
 
         // Make request
-        let response = self.post(payload).await?;
+        let response = self.post(payload.clone()).await?;
 
         // Raise specific error if context length is exceeded
         if let Some(error) = response.get("error") {
@@ -140,6 +182,7 @@ impl Provider for DatabricksProvider {
         let usage = self.get_usage(&response)?;
         let model = get_model(&response);
         let cost = cost(&usage, &model_pricing_for(&model));
+        super::utils::emit_debug_trace(&self.config, &payload, &response, &usage, cost);
 
         Ok((message, ProviderUsage::new(model, usage, cost)))
     }
@@ -175,7 +218,9 @@ impl Moderation for DatabricksProvider {
             .send()
             .await?;
 
-        let response = handle_response(payload, response).await??;
+        // let response: Value = response.json().await?;
+        // let response = handle_response(payload, response).await??;
+        let response = self.handle_moderation_response(response).await?;
 
         // Check if we got a moderation result
         if let Some(input_guardrail) = response.get(INPUT_GUARDRAIL) {

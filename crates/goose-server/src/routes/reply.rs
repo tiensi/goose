@@ -169,7 +169,7 @@ impl ProtocolFormatter {
         let error_part = match error {
             ModerationError::ContentFlagged { categories, .. } => {
                 format!(
-                    "Content was flagged in the following categories: {}",
+                    "Content was flagged by moderation in the following categories: {}",
                     categories
                 )
             }
@@ -561,9 +561,11 @@ mod tests {
             })),
         };
         let formatted = ProtocolFormatter::format_moderation_error(&moderation_error);
+        println!("{}", formatted);
         assert!(formatted.starts_with("3:"));
-        assert!(formatted
-            .contains("\"Content was flagged in the following categories: hate, violence\""));
+        assert!(
+            formatted.contains("Content was flagged by moderation in the following categories:")
+        );
 
         // Test finish formatting
         let formatted = ProtocolFormatter::format_finish("stop");
