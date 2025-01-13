@@ -2,6 +2,7 @@ use anyhow::Result;
 use mcp_client::client::{ClientCapabilities, ClientInfo, McpClient, McpClientTrait};
 use mcp_client::transport::{SseTransport, Transport};
 use mcp_client::McpService;
+use std::collections::HashMap;
 use std::time::Duration;
 use tracing_subscriber::EnvFilter;
 
@@ -17,7 +18,7 @@ async fn main() -> Result<()> {
         .init();
 
     // Create the base transport
-    let transport = SseTransport::new("http://localhost:8000/sse");
+    let transport = SseTransport::new("http://localhost:8000/sse", HashMap::new());
 
     // Start transport
     let handle = transport.start().await?;
@@ -45,7 +46,7 @@ async fn main() -> Result<()> {
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // List tools
-    let tools = client.list_tools().await?;
+    let tools = client.list_tools(None).await?;
     println!("Available tools: {tools:?}\n");
 
     // Call tool
@@ -58,7 +59,7 @@ async fn main() -> Result<()> {
     println!("Tool result: {tool_result:?}\n");
 
     // List resources
-    let resources = client.list_resources().await?;
+    let resources = client.list_resources(None).await?;
     println!("Resources: {resources:?}\n");
 
     // Read resource

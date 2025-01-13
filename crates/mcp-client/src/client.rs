@@ -69,11 +69,14 @@ pub trait McpClientTrait: Send + Sync {
         capabilities: ClientCapabilities,
     ) -> Result<InitializeResult, Error>;
 
-    async fn list_resources(&self) -> Result<ListResourcesResult, Error>;
+    async fn list_resources(
+        &self,
+        next_cursor: Option<String>,
+    ) -> Result<ListResourcesResult, Error>;
 
     async fn read_resource(&self, uri: &str) -> Result<ReadResourceResult, Error>;
 
-    async fn list_tools(&self) -> Result<ListToolsResult, Error>;
+    async fn list_tools(&self, next_cursor: Option<String>) -> Result<ListToolsResult, Error>;
 
     async fn call_tool(&self, name: &str, arguments: Value) -> Result<CallToolResult, Error>;
 }
@@ -213,7 +216,10 @@ where
         Ok(result)
     }
 
-    async fn list_resources(&self) -> Result<ListResourcesResult, Error> {
+    async fn list_resources(
+        &self,
+        next_cursor: Option<String>,
+    ) -> Result<ListResourcesResult, Error> {
         if !self.completed_initialization() {
             return Err(Error::NotInitialized);
         }
@@ -225,11 +231,17 @@ where
             .resources
             .is_none()
         {
-            return Ok(ListResourcesResult { resources: vec![] });
+            return Ok(ListResourcesResult {
+                resources: vec![],
+                next_cursor: None,
+            });
         }
 
-        self.send_request("resources/list", serde_json::json!({}))
-            .await
+        let payload = next_cursor
+            .map(|cursor| serde_json::json!({"cursor": cursor}))
+            .unwrap_or_else(|| serde_json::json!({}));
+
+        self.send_request("resources/list", payload).await
     }
 
     async fn read_resource(&self, uri: &str) -> Result<ReadResourceResult, Error> {
@@ -254,16 +266,23 @@ where
         self.send_request("resources/read", params).await
     }
 
-    async fn list_tools(&self) -> Result<ListToolsResult, Error> {
+    async fn list_tools(&self, next_cursor: Option<String>) -> Result<ListToolsResult, Error> {
         if !self.completed_initialization() {
             return Err(Error::NotInitialized);
         }
         // If tools is not supported, return an empty list
         if self.server_capabilities.as_ref().unwrap().tools.is_none() {
-            return Ok(ListToolsResult { tools: vec![] });
+            return Ok(ListToolsResult {
+                tools: vec![],
+                next_cursor: None,
+            });
         }
 
-        self.send_request("tools/list", serde_json::json!({})).await
+        let payload = next_cursor
+            .map(|cursor| serde_json::json!({"cursor": cursor}))
+            .unwrap_or_else(|| serde_json::json!({}));
+
+        self.send_request("tools/list", payload).await
     }
 
     async fn call_tool(&self, name: &str, arguments: Value) -> Result<CallToolResult, Error> {

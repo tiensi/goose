@@ -90,14 +90,14 @@ impl Capabilities {
     // TODO IMPORTANT need to ensure this times out if the system command is broken!
     pub async fn add_system(&mut self, config: SystemConfig) -> SystemResult<()> {
         let mut client: Box<dyn McpClientTrait> = match config {
-            SystemConfig::Sse { ref uri } => {
-                let transport = SseTransport::new(uri);
+            SystemConfig::Sse { ref uri, ref envs } => {
+                let transport = SseTransport::new(uri, envs.get_env());
                 let handle = transport.start().await?;
                 let service = McpService::with_timeout(handle, Duration::from_secs(10));
                 Box::new(McpClient::new(service))
             }
-            SystemConfig::Stdio { ref cmd, ref args } => {
-                let transport = StdioTransport::new(cmd, args.to_vec());
+            SystemConfig::Stdio { ref cmd, ref args, ref envs } => {
+                let transport = StdioTransport::new(cmd, args.to_vec(), envs.get_env());
                 let handle = transport.start().await?;
                 let service = McpService::with_timeout(handle, Duration::from_secs(10));
                 Box::new(McpClient::new(service))
@@ -189,14 +189,23 @@ impl Capabilities {
         let mut tools = Vec::new();
         for (name, client) in &self.clients {
             let client_guard = client.lock().await;
-            let client_tools = client_guard.list_tools().await?;
+            let mut client_tools = client_guard.list_tools(None).await?;
 
-            for tool in client_tools.tools {
-                tools.push(Tool::new(
-                    format!("{}__{}", name, tool.name),
-                    &tool.description,
-                    tool.input_schema,
-                ));
+            loop {
+                for tool in client_tools.tools {
+                    tools.push(Tool::new(
+                        format!("{}__{}", name, tool.name),
+                        &tool.description,
+                        tool.input_schema,
+                    ));
+                }
+
+                // exit loop when there are no more pages
+                if client_tools.next_cursor.is_none() {
+                    break;
+                }
+
+                client_tools = client_guard.list_tools(client_tools.next_cursor).await?;
             }
         }
         Ok(tools)
@@ -208,7 +217,7 @@ impl Capabilities {
 
         for (name, client) in &self.clients {
             let client_guard = client.lock().await;
-            let resources = client_guard.list_resources().await?;
+            let resources = client_guard.list_resources(None).await?;
 
             for resource in resources.resources {
                 // Skip reading the resource if it's not marked active

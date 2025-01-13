@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 // This example shows how to use the mcp-client crate to interact with a server that has a simple counter tool.
 // The server is started by running `cargo run -p mcp-server` in the root of the mcp-server crate.
 use anyhow::Result;
@@ -8,6 +6,8 @@ use mcp_client::client::{
 };
 use mcp_client::transport::{StdioTransport, Transport};
 use mcp_client::McpService;
+use std::collections::HashMap;
+use std::time::Duration;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -28,6 +28,7 @@ async fn main() -> Result<(), ClientError> {
             .into_iter()
             .map(|s| s.to_string())
             .collect(),
+        HashMap::new(),
     );
 
     // Start the transport to get a handle
@@ -52,7 +53,7 @@ async fn main() -> Result<(), ClientError> {
     println!("Connected to server: {server_info:?}\n");
 
     // List tools
-    let tools = client.list_tools().await?;
+    let tools = client.list_tools(None).await?;
     println!("Available tools: {tools:?}\n");
 
     // Call tool 'increment' tool 3 times
@@ -74,7 +75,7 @@ async fn main() -> Result<(), ClientError> {
     println!("Tool result for 'get_value': {get_value_result:?}\n");
 
     // List resources
-    let resources = client.list_resources().await?;
+    let resources = client.list_resources(None).await?;
     println!("Resources: {resources:?}\n");
 
     // Read resource
