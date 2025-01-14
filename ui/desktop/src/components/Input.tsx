@@ -112,7 +112,7 @@ export default function Input({
         variant="ghost"
         onClick={handleFileSelect}
         disabled={disabled}
-        className={`absolute right-[40px] top-1/2 -translate-y-1/2 text-indigo-600 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-800 ${
+        className={`absolute right-[40px] top-1/2 -translate-y-1/2 text-indigo-600 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-800 [&_svg]:size-5 ${
           disabled ? "opacity-50 cursor-not-allowed" : ""
         }`}
       >
@@ -124,7 +124,7 @@ export default function Input({
           size="icon"
           variant="ghost"
           onClick={onStop}
-          className="absolute right-2 top-1/2 -translate-y-1/2 bg-indigo-100 dark:bg-indigo-800 dark:text-indigo-200 text-indigo-600 hover:opacity-50"
+          className="absolute right-2 top-1/2 -translate-y-1/2 bg-indigo-100 dark:bg-indigo-800 dark:text-indigo-200 text-indigo-600 hover:opacity-50 [&_svg]:size-5"
         >
           <Stop size={24} />
         </Button>
@@ -134,7 +134,7 @@ export default function Input({
           size="icon"
           variant="ghost"
           disabled={disabled || !value.trim()}
-          className={`absolute right-2 top-1/2 -translate-y-1/2 text-indigo-600 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-800 ${
+          className={`absolute right-2 top-1/2 -translate-y-1/2 text-indigo-600 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-800 [&_svg]:size-5 ${
             disabled || !value.trim() ? "opacity-50 cursor-not-allowed" : ""
           }`}
         >

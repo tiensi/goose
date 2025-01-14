@@ -190,7 +190,7 @@ export default function Settings() {
                     className="flex items-center gap-2 text-gray-600 hover:text-gray-800 
                                             dark:text-gray-400 dark:hover:text-gray-200 mb-16 mt-4"
                   >
-                    <Back className="w-3 h-3" />
+                    <Back className="w-4 h-4" />
                     <span>Back</span>
                   </button>
                   <div className="space-y-2">
