@@ -10,6 +10,8 @@ use thiserror::Error;
 use tokio::sync::Mutex;
 use tower::{Service, ServiceExt}; // for Service::ready()
 
+pub type BoxError = Box<dyn std::error::Error + Sync + Send>;
+
 /// Error type for MCP client operations.
 #[derive(Debug, Error)]
 pub enum Error {
@@ -31,13 +33,16 @@ pub enum Error {
     #[error("Timeout or service not ready")]
     NotReady,
 
-    #[error("Box error: {0}")]
-    BoxError(Box<dyn std::error::Error + Send + Sync>),
+    #[error("Request timed out")]
+    Timeout(#[from] tower::timeout::error::Elapsed),
+
+    #[error("MCP Server error: {0}")]
+    McpServerError(BoxError),
 }
 
-impl From<Box<dyn std::error::Error + Send + Sync>> for Error {
-    fn from(err: Box<dyn std::error::Error + Send + Sync>) -> Self {
-        Error::BoxError(err)
+impl From<BoxError> for Error {
+    fn from(err: BoxError) -> Self {
+        Error::McpServerError(err)
     }
 }
 
