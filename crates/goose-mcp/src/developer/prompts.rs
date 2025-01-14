@@ -20,10 +20,10 @@ pub fn create_prompts() -> Vec<Prompt> {
                 description: arg.description.into(),
                 required: arg.required,
             })
-                .collect();
+            .collect();
 
-            prompts.push(Prompt::new(&template.id, &template.template, arguments));
-        }
+        prompts.push(Prompt::new(&template.id, &template.template, arguments));
+    }
 
     prompts
 }
