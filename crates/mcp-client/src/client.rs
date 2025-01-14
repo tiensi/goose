@@ -36,14 +36,24 @@ pub enum Error {
     #[error("Request timed out")]
     Timeout(#[from] tower::timeout::error::Elapsed),
 
-    #[error("Call to '{server}' failed for '{method}' with params '{params}'. Error: {source}")]
+    #[error("Error from mcp-server: {0}")]
+    ServerBoxError(BoxError),
+
+    #[error("Call to '{server}' failed for '{method}' with params '{params}'. {source}")]
     McpServerError {
         method: String,
         server: String,
         params: Value,
         #[source]
-        source: BoxError
+        source: BoxError,
     },
+}
+
+// BoxError from mcp-server gets converted to our Error type
+impl From<BoxError> for Error {
+    fn from(err: BoxError) -> Self {
+        Error::ServerBoxError(err)
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -189,10 +199,19 @@ where
         let notification = JsonRpcMessage::Notification(JsonRpcNotification {
             jsonrpc: "2.0".to_string(),
             method: method.to_string(),
-            params: Some(params),
+            params: Some(params.clone()),
         });
 
-        service.call(notification).await.map_err(Into::into)?;
+        service
+            .call(notification)
+            .await
+            .map_err(|e| Error::McpServerError {
+                server: self.server_info.as_ref().unwrap().name.clone(),
+                method: method.to_string(),
+                params: params.clone(),
+                source: Box::new(e.into()),
+            })?;
+
         Ok(())
     }
 
