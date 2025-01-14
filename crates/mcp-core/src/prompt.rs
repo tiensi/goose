@@ -33,7 +33,6 @@ impl Prompt {
 
 /// Represents a prompt argument that can be passed to customize the prompt
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct PromptArgument {
     /// The name of the argument
     pub name: String,
@@ -148,6 +147,7 @@ pub struct PromptTemplate {
     pub arguments: Vec<PromptArgumentTemplate>,
 }
 
+/// A template for a prompt argument, this should be identical to PromptArgument
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PromptArgumentTemplate {
     pub name: String,

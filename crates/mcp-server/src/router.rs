@@ -328,7 +328,12 @@ pub trait Router: Send + Sync + 'static {
                 .await
                 .map_err(|e| RouterError::Internal(e.to_string()))?;
 
-            // Validate prompt arguments for potential security issues
+            // Validate prompt arguments for potential security issues from user text input
+            // Checks:
+            // - Prompt must be less than 10000 total characters
+            // - Argument keys must be less than 1000 characters
+            // - Argument values must be less than 1000 characters
+            // - Dangerous patterns, eg "../", "//", "\\\\", "<script>", "{{", "}}"
             for (key, value) in arguments.iter() {
                 // Check for empty or overly long keys/values
                 if key.is_empty() || key.len() > 1000 {
@@ -338,9 +343,9 @@ pub trait Router: Send + Sync + 'static {
                 }
 
                 let value_str = value.as_str().unwrap_or_default();
-                if value_str.len() > 10000 {
+                if value_str.len() > 1000 {
                     return Err(RouterError::InvalidParams(
-                        "Argument values must not exceed 10000 characters".into(),
+                        "Argument values must not exceed 1000 characters".into(),
                     ));
                 }
 
