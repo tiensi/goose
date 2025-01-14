@@ -61,10 +61,7 @@ impl TruncateAgent {
                 return Err(SystemError::ContextLimit);
             }
 
-            new_messages = self.chop_front_messages(messages,
-                                                    approx_count,
-                                                    target_limit,
-                                                    model);
+            new_messages = self.chop_front_messages(messages, approx_count, target_limit, model);
             if new_messages.is_empty() {
                 return Err(SystemError::ContextLimit);
             }
@@ -88,11 +85,13 @@ impl TruncateAgent {
         default_size
     }
 
-    fn chop_front_messages(&self,
-                           messages: &[Message],
-                           approx_count: usize,
-                           target_limit: usize,
-                           model: Option<&str>) -> Vec<Message> {
+    fn chop_front_messages(
+        &self,
+        messages: &[Message],
+        approx_count: usize,
+        target_limit: usize,
+        model: Option<&str>,
+    ) -> Vec<Message> {
         println!(
             "[WARNING] Conversation history has size: {} exceeding the token budget of {}. \
             Dropping oldest messages.",
