@@ -1,7 +1,21 @@
+<<<<<<< HEAD
 import React, { useRef, useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import Stop from "./ui/Stop";
 import { Attach, Send } from "./icons";
+||||||| parent of b490ac0e (style: removed container styles)
+import React, { useRef, useState, useEffect } from 'react';
+import { Button } from './ui/button';
+import Send from './ui/Send';
+import Stop from './ui/Stop';
+import { Paperclip } from 'lucide-react';
+=======
+import React, { useRef, useState, useEffect } from "react";
+import { Button } from "./ui/button";
+import Send from "./ui/Send";
+import Stop from "./ui/Stop";
+import { Paperclip } from "lucide-react";
+>>>>>>> b490ac0e (style: removed container styles)
 
 interface InputProps {
   handleSubmit: (e: React.FormEvent) => void;
