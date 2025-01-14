@@ -419,7 +419,7 @@ export default function ChatWindow() {
 
   // Initialize system config when window loads
   useEffect(() => {
-    addSystemConfig("developer");
+    addSystemConfig("developer2");
   }, []);
 
   window.electron.logInfo('ChatWindow loaded');
