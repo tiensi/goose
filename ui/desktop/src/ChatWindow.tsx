@@ -19,9 +19,11 @@ import { WelcomeScreen } from './components/WelcomeScreen';
 import WingToWing, { Working } from './components/WingToWing';
 import { askAi } from './utils/askAI';
 import { NewWelcomeScreen } from './components/setup/NewWelcomeScreen';
+import mockKeychain from './services/mockKeychain';
 
 // update this when you want to show the welcome screen again - doesn't have to be an actual version, just anything woudln't have been seen before
 const CURRENT_VERSION = '0.0.1';
+export const PROVIDER_API_KEY = "GOOSE_PROVIDER__API_KEY"  // the key to look for to make sure user has previously set an API key
 
 // Get the last version from localStorage
 const getLastSeenVersion = () => localStorage.getItem('lastSeenVersion');
@@ -398,7 +400,34 @@ export default function ChatWindow() {
 
   // Check if API key is missing from the window arguments
   const apiCredsMissing = window.electron.getConfig().apiCredsMissing;
-  console.log('DEBUG: apiCredsMissing =', apiCredsMissing);
+
+  // Check if API key exists -- using this to trigger display of new welcome window
+  const [test_apiCredsMissing, setApiCredsMissing] = useState(true);
+
+  // see if the user has GOOSE_PROVIDER__API_KEY set -> if not, then show welcome page
+  useEffect(() => {
+    const checkApiKeys = async () => {
+      console.log('Checking for API credentials...');
+      const hasProviderApiKey = await mockKeychain.hasKey(PROVIDER_API_KEY);
+      console.log('API key check result:', {
+        hasProviderApiKey,
+        keyName: PROVIDER_API_KEY,
+        willShowCredsMissing: !hasProviderApiKey
+      });
+      
+      setApiCredsMissing(!hasProviderApiKey);
+      console.log('Updated apiCredsMissing state:', !hasProviderApiKey);
+    };
+
+    checkApiKeys().catch(error => {
+      console.error('Error checking API credentials:', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    });
+  }, []);
+
+    // TODO: see if the GOOSE_PROVIDER__API_KEY works for the previously selected provider -> if not, then show welcome page?
+
 
   // Get initial query and history from URL parameters
   const searchParams = new URLSearchParams(window.location.search);
@@ -422,14 +451,30 @@ export default function ChatWindow() {
   const [working, setWorking] = useState<Working>(Working.Idle);
   const [progressMessage, setProgressMessage] = useState<string>('');
 
-  // Welcome screen state
+  // Welcome screen state -- determine using if we are missing that api key or not
   const [showWelcome, setShowWelcome] = useState(() => {
-    //const lastVersion = getLastSeenVersion();
-    const lastVersion = '0.0.0';
-    console.log('DEBUG: lastVersion =', lastVersion);
-    console.log('DEBUG: CURRENT_VERSION =', CURRENT_VERSION);
-    return !lastVersion || lastVersion !== CURRENT_VERSION;
+    console.log('Initializing welcome screen state:', {
+      test_apiCredsMissing,
+      lastSeenVersion: getLastSeenVersion(),
+      currentVersion: CURRENT_VERSION,
+      requestDir: window.appConfig?.get?.("REQUEST_DIR")
+    });
+    // Only show welcome if we're missing API credentials
+    return test_apiCredsMissing;
   });
+
+  // Add this useEffect to track changes and update welcome state
+  useEffect(() => {
+    const shouldShowWelcome = test_apiCredsMissing;
+    console.log('Welcome screen evaluation:', {
+      test_apiCredsMissing,
+      currentShowWelcome: showWelcome,
+      shouldShowWelcome,
+      hasRequestDir: !!window.appConfig?.get?.("REQUEST_DIR")
+    });
+    
+    setShowWelcome(shouldShowWelcome);
+  }, [test_apiCredsMissing]);
 
   const handleWelcomeDismiss = () => {
     setShowWelcome(false);
@@ -449,11 +494,11 @@ export default function ChatWindow() {
 
   window.electron.logInfo('ChatWindow loaded');
 
-  console.log('DEBUG: Render conditions:', {
-    apiCredsMissing,
+  console.log('DEBUG: Render conditions:', JSON.stringify({
+    test_apiCredsMissing,
     showWelcome,
     hasRequestDir: window.appConfig.get("REQUEST_DIR")
-  });
+  }, null, 2));
 
   console.log('DEBUG: Welcome screen conditions:', {
     showWelcome,

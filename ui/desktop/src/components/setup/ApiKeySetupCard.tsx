@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Card } from '../ui/card';
 import { GOOSE_WELCOME_MESSAGE, GOOSE_WELCOME_MESSAGE_HEADER } from './constants';
 import { Bird } from '../ui/icons';
+import mockKeychain from '../../services/mockKeychain';
+import { PROVIDER_API_KEY } from '../../ChatWindow';
 
 interface ApiKeySetupCardProps {
   onSubmit: (provider: string, apiKey: string) => void;
@@ -33,25 +35,75 @@ const providers: ProviderOption[] = [
   }
 ];
 
+export const OPENAI_API_KEY = "OPENAI_API_KEY";
+export const ANTHROPIC_API_KEY = "ANTHROPIC_API_KEY";
+export const SELECTED_PROVIDER_KEY = "selected_provider"; // localStorage key for provider preference
+
 export function ApiKeySetupCard({ onSubmit, className }: ApiKeySetupCardProps) {
-  const [selectedProvider, setSelectedProvider] = useState<ProviderOption | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<ProviderOption | null>(() => {
+    // Initialize with saved provider preference
+    const savedProvider = localStorage.getItem(SELECTED_PROVIDER_KEY);
+    console.log('Loading saved provider preference:', savedProvider);
+    return providers.find(p => p.id === savedProvider) || null;
+  });
   const [apiKey, setApiKey] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedProvider || !apiKey.trim()) return;
+    console.log('Attempting API key submission:', {
+      provider: selectedProvider?.id,
+      hasKey: !!apiKey.trim(),
+      isSubmitting
+    });
+
+    if (!selectedProvider || !apiKey.trim()) {
+      console.warn('Submission blocked:', {
+        hasProvider: !!selectedProvider,
+        hasKey: !!apiKey.trim()
+      });
+      return;
+    }
 
     setIsSubmitting(true);
-    console.log('Would send to backend:', {
-      provider: selectedProvider.id,
-      apiKey: apiKey.trim()
-    });
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    onSubmit(selectedProvider.id, apiKey.trim());
-    setIsSubmitting(false);
+    try {
+      const trimmedKey = apiKey.trim();
+      
+      // Save the provider-specific API key
+      const providerKeyName = selectedProvider.id === 'openai' ? OPENAI_API_KEY : ANTHROPIC_API_KEY;
+      await mockKeychain.setKey(providerKeyName, trimmedKey);
+      
+      // Save the generic provider key
+      await mockKeychain.setKey(PROVIDER_API_KEY, trimmedKey);
+      
+      // Save the selected provider preference
+      localStorage.setItem(SELECTED_PROVIDER_KEY, selectedProvider.id);
+      
+      console.log('Successfully stored keys for provider:', {
+        provider: selectedProvider.id,
+        genericKey: PROVIDER_API_KEY,
+        providerKey: providerKeyName
+      });
+      
+      onSubmit(selectedProvider.id, trimmedKey);
+    } catch (error) {
+      console.error('Failed to store API key:', {
+        provider: selectedProvider.id,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    } finally {
+      console.log('Submission process completed:', {
+        provider: selectedProvider.id,
+        success: !isSubmitting
+      });
+      setIsSubmitting(false);
+    }
+  };
+
+  // Add handler for provider selection
+  const handleProviderChange = (provider: ProviderOption) => {
+    setSelectedProvider(provider);
+    console.log('Provider selection changed:', provider.id);
   };
 
   return (
@@ -81,7 +133,7 @@ export function ApiKeySetupCard({ onSubmit, className }: ApiKeySetupCardProps) {
               {providers.map((provider) => (
                 <button
                   key={provider.id}
-                  onClick={() => setSelectedProvider(provider)}
+                  onClick={() => handleProviderChange(provider)}
                   className="p-6 border rounded-lg hover:border-blue-500 transition-colors text-left dark:border-gray-700 dark:hover:border-blue-400"
                 >
                   <div className="text-2xl mb-2">{provider.logo}</div>
