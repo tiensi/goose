@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use futures::stream::BoxStream;
-use serde_json::json;
 use std::collections::VecDeque;
 use tokio::sync::Mutex;
 use tracing::{debug, instrument};
@@ -8,28 +7,28 @@ use tracing::{debug, instrument};
 use super::Agent;
 use crate::agents::capabilities::{Capabilities, ResourceItem};
 use crate::agents::system::{SystemConfig, SystemError, SystemResult};
-use crate::message::{Message, MessageContent, ToolRequest};
+use crate::message::{Message, ToolRequest};
 use crate::providers::base::Provider;
 use crate::providers::base::ProviderUsage;
 use crate::register_agent;
 use crate::token_counter::TokenCounter;
-use mcp_core::{Content, Tool, ToolCall};
+use mcp_core::Tool;
 use serde_json::Value;
+
 /// Agent impl. that truncates oldest messages when payload over LLM ctx-limit
 pub struct TruncateAgent {
     capabilities: Mutex<Capabilities>,
-    token_counter: TokenCounter,
+    _token_counter: TokenCounter,
 }
 
 impl TruncateAgent {
     pub fn new(provider: Box<dyn Provider>) -> Self {
         Self {
             capabilities: Mutex::new(Capabilities::new(provider)),
-            token_counter: TokenCounter::new(),
+            _token_counter: TokenCounter::new(),
         }
     }
 
-    /// Setup the next inference by budgeting the context window
     async fn prepare_inference(
         &self,
         system_prompt: &str,
@@ -45,63 +44,79 @@ impl TruncateAgent {
             .map(|item| item.content.clone())
             .collect();
 
-        let approx_count = self.token_counter.count_everything(
-            system_prompt,
-            messages,
-            tools,
-            &resources,
-            Some(model_name),
-        );
-        let mut status_content: Vec<String> = Vec::new();
-
-        // Create status messages from all resources when no trimming needed
-        for item in resource_items {
-            status_content.push(format!("{}\n```\n{}\n```\n", item.name, item.content));
-        }
-
-        // Join status content and create status message
-        let status_str = status_content.join("\n");
+        let model = Some(model_name);
+        let approx_count =
+            self._token_counter
+                .count_everything(system_prompt, messages, tools, &resources, model);
 
         let mut new_messages = messages.to_vec();
         if approx_count > target_limit {
-            println!("[WARNING] Token budget exceeded. Current count: {} \n Difference: {} tokens over budget. Removing context", approx_count, approx_count - target_limit);
-
-            let mut trimmed_items: VecDeque<Message> = VecDeque::from(messages.to_vec());
-            let mut current_tokens = approx_count;
-
-            // Remove messages until we're under target limit
-            for msg in messages.iter() {
-                if let Some(content) = msg.content.first() {
-                    if let Some(text) = content.as_text() {
-                        let count = self.token_counter.count_tokens(text, Some(model_name)) as u32;
-                        if current_tokens > target_limit && !trimmed_items.is_empty() {
-                            let _ = trimmed_items.pop_front().unwrap();
-                            // Subtract removed message’s token_count
-                            current_tokens = current_tokens.saturating_sub(count as usize);
-                        }
-                    }
-                }
+            let user_msg_size = self.text_content_size(new_messages.last(), model);
+            if user_msg_size > target_limit {
+                println!(
+                    "[WARNING] User message {} exceeds token budget {}.",
+                    user_msg_size,
+                    user_msg_size - target_limit
+                );
+                return Err(SystemError::ContextLimit);
             }
 
-            if trimmed_items.is_empty() {
-                return Err(SystemError::ContextLimit());
+            new_messages = self.chop_front_messages(messages,
+                                                    approx_count,
+                                                    target_limit,
+                                                    model);
+            if new_messages.is_empty() {
+                return Err(SystemError::ContextLimit);
             }
-
-            // use trimmed message-history
-            new_messages = Vec::from(trimmed_items);
         }
 
-        // Finally add the status messages
-        let message_use =
-            Message::assistant().with_tool_request("000", Ok(ToolCall::new("status", json!({}))));
-
-        let message_result =
-            Message::user().with_tool_response("000", Ok(vec![Content::text(status_str)]));
-
-        new_messages.push(message_use);
-        new_messages.push(message_result);
-
         Ok(new_messages)
+    }
+
+    fn text_content_size(&self, message: Option<&Message>, model: Option<&str>) -> usize {
+        let text = message
+            .and_then(|msg| msg.content.first())
+            .and_then(|c| c.as_text());
+
+        if let Some(txt) = text {
+            let count = self._token_counter.count_tokens(txt, model);
+            return count;
+        }
+
+        let default_size = 0;
+
+        default_size
+    }
+
+    fn chop_front_messages(&self,
+                           messages: &[Message],
+                           approx_count: usize,
+                           target_limit: usize,
+                           model: Option<&str>) -> Vec<Message> {
+        println!(
+            "[WARNING] Conversation history has size: {} exceeding the token budget of {}. \
+            Dropping oldest messages.",
+            approx_count,
+            approx_count - target_limit
+        );
+
+        let mut trimmed_items: VecDeque<Message> = VecDeque::from(messages.to_vec());
+        let mut current_tokens = approx_count;
+
+        // Remove messages until we're under target limit
+        for msg in messages.iter() {
+            if current_tokens < target_limit || trimmed_items.is_empty() {
+                break;
+            }
+            let count = self.text_content_size(Some(msg), model);
+            let _ = trimmed_items.pop_front().unwrap();
+            // Subtract removed message’s token_count
+            current_tokens = current_tokens.saturating_sub(count as usize);
+        }
+
+        // use trimmed message-history
+        let new_messages = Vec::from(trimmed_items);
+        new_messages
     }
 }
 
@@ -116,7 +131,7 @@ impl Agent for TruncateAgent {
         let mut capabilities = self.capabilities.lock().await;
         let tools = capabilities.get_prefixed_tools().await?;
         let system_prompt = capabilities.get_system_prompt().await;
-        let estimated_limit = capabilities
+        let _estimated_limit = capabilities
             .provider()
             .get_model_config()
             .get_estimated_limit();
@@ -136,7 +151,7 @@ impl Agent for TruncateAgent {
                 &system_prompt,
                 &tools,
                 messages,
-                estimated_limit,
+                _estimated_limit,
                 &capabilities.provider().get_model_config().model_name,
                 &mut capabilities.get_resources().await?,
             )
@@ -190,19 +205,17 @@ impl Agent for TruncateAgent {
 
                 yield message_tool_response.clone();
 
-                // Now we have to remove the previous status tooluse and toolresponse
-                // before we add pending messages, then the status msgs back again
-                if let Some(message) = messages.last() {
-                    if let MessageContent::ToolResponse(result) = &message.content[0] {
-                        if result.id == "000" {
-                            messages.pop();
-                            messages.pop();
-                        }
-                    }
-                }
+                messages = self.prepare_inference(
+                    &system_prompt,
+                    &tools,
+                    &messages,
+                    _estimated_limit,
+                    &capabilities.provider().get_model_config().model_name,
+                    &mut capabilities.get_resources().await?
+                ).await?;
 
-
-                messages = self.prepare_inference(&system_prompt, &tools, &messages, estimated_limit, &capabilities.provider().get_model_config().model_name, &mut capabilities.get_resources().await?).await?;
+                messages.push(response);
+                messages.push(message_tool_response);
             }
         }))
     }
