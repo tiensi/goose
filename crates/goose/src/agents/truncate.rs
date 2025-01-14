@@ -53,7 +53,7 @@ impl TruncateAgent {
         if approx_count > target_limit {
             let user_msg_size = self.text_content_size(new_messages.last(), model);
             if user_msg_size > target_limit {
-                println!(
+                debug!(
                     "[WARNING] User message {} exceeds token budget {}.",
                     user_msg_size,
                     user_msg_size - target_limit
@@ -92,7 +92,7 @@ impl TruncateAgent {
         target_limit: usize,
         model: Option<&str>,
     ) -> Vec<Message> {
-        println!(
+        debug!(
             "[WARNING] Conversation history has size: {} exceeding the token budget of {}. \
             Dropping oldest messages.",
             approx_count,
