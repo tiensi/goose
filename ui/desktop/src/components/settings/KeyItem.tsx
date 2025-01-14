@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Key } from "./types";
 import { showToast } from "../ui/toast";
 import { Tooltip } from "../ui/Tooltip";
-import { SensitiveHidden, SensitiveVisible } from "../icons";
+import { Copy, Edit, SensitiveHidden, SensitiveVisible } from "../icons";
 
 interface KeyItemProps {
   keyData: Key;
@@ -44,7 +44,7 @@ export function KeyItem({ keyData, onEdit, onCopy }: KeyItemProps) {
                 onClick={handleCopy}
                 className="ml-2 text-indigo-500 hover:text-indigo-600"
               >
-                📋
+                <Copy className="h-5 w-5" />
               </button>
             </Tooltip>
           </div>
@@ -53,7 +53,7 @@ export function KeyItem({ keyData, onEdit, onCopy }: KeyItemProps) {
               onClick={() => onEdit(keyData)}
               className="text-indigo-500 hover:text-indigo-600"
             >
-              ✏️
+              <Edit />
             </button>
           </Tooltip>
         </div>
