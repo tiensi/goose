@@ -8,8 +8,7 @@ use thiserror::Error;
 use tokio::sync::RwLock;
 
 use super::configs::ModelConfig;
-use crate::message::{Message, MessageContent};
-use mcp_core::role::Role;
+use crate::message::Message;
 use mcp_core::tool::Tool;
 
 #[derive(Error, Debug)]
