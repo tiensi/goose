@@ -29,6 +29,9 @@ def replace_env_macro() -> bool:
             f"        process.env.GOOSE_PROVIDER__TYPE = '{os.getenv('GOOSE_BUNDLE_TYPE')}';",
             f"        process.env.GOOSE_PROVIDER__HOST = '{os.getenv('GOOSE_BUNDLE_HOST')}';",
             f"        process.env.GOOSE_PROVIDER__MODEL = '{os.getenv('GOOSE_BUNDLE_MODEL')}';",
+            f"        process.env.GDRIVE_OAUTH_CONFIG = '{os.getenv('GDRIVE_OAUTH_CONFIG')}';",
+            f"        process.env.GDRIVE_CREDENTIALS_PATH = '{os.getenv('GDRIVE_CREDENTIALS_PATH')}';",
+            f"        process.env.GDRIVE_OAUTH_PATH= '{os.getenv('GDRIVE_OAUTH_PATH')}';",
         ]
 
         replacement_content = "\n".join(formatted_vars)
@@ -69,4 +72,3 @@ if __name__ == "__main__":
     if not success:
         print("Failed to update environment variables")
         exit(1)
-
