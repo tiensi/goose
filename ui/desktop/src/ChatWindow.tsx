@@ -18,14 +18,33 @@ import UserMessage from './components/UserMessage';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import WingToWing, { Working } from './components/WingToWing';
 import { askAi } from './utils/askAI';
+import { NewWelcomeScreen } from './components/setup/NewWelcomeScreen';
 
 // update this when you want to show the welcome screen again - doesn't have to be an actual version, just anything woudln't have been seen before
-const CURRENT_VERSION = '0.0.0';
+const CURRENT_VERSION = '0.0.1';
 
 // Get the last version from localStorage
 const getLastSeenVersion = () => localStorage.getItem('lastSeenVersion');
 const setLastSeenVersion = (version: string) => localStorage.setItem('lastSeenVersion', version);
 
+declare global {
+  interface Window {
+    electron: {
+      stopPowerSaveBlocker: () => void;
+      startPowerSaveBlocker: () => void;
+      hideWindow: () => void;
+      createChatWindow: () => void;
+      getConfig: () => { apiCredsMissing: boolean };
+      logInfo: (message: string) => void;
+      showNotification: (opts: { title: string; body: string }) => void;
+      getBinaryPath: (binary: string) => Promise<string>;
+      app: any;
+    };
+    appConfig: {
+      get: (key: string) => any;
+    };
+  }
+}
 
 export interface Chat {
   id: number;
@@ -379,6 +398,7 @@ export default function ChatWindow() {
 
   // Check if API key is missing from the window arguments
   const apiCredsMissing = window.electron.getConfig().apiCredsMissing;
+  console.log('DEBUG: apiCredsMissing =', apiCredsMissing);
 
   // Get initial query and history from URL parameters
   const searchParams = new URLSearchParams(window.location.search);
@@ -404,7 +424,10 @@ export default function ChatWindow() {
 
   // Welcome screen state
   const [showWelcome, setShowWelcome] = useState(() => {
-    const lastVersion = getLastSeenVersion();
+    //const lastVersion = getLastSeenVersion();
+    const lastVersion = '0.0.0';
+    console.log('DEBUG: lastVersion =', lastVersion);
+    console.log('DEBUG: CURRENT_VERSION =', CURRENT_VERSION);
     return !lastVersion || lastVersion !== CURRENT_VERSION;
   });
 
@@ -426,19 +449,36 @@ export default function ChatWindow() {
 
   window.electron.logInfo('ChatWindow loaded');
 
+  console.log('DEBUG: Render conditions:', {
+    apiCredsMissing,
+    showWelcome,
+    hasRequestDir: window.appConfig.get("REQUEST_DIR")
+  });
+
+  console.log('DEBUG: Welcome screen conditions:', {
+    showWelcome,
+    lastVersion: getLastSeenVersion(),
+    currentVersion: CURRENT_VERSION,
+    requestDir: window.appConfig?.get?.("REQUEST_DIR"),
+    shouldShow: showWelcome && (!window.appConfig?.get?.("REQUEST_DIR"))
+  });
+
   return (
     <div className="relative w-screen h-screen overflow-hidden dark:bg-dark-window-gradient bg-window-gradient flex flex-col">
       <div className="titlebar-drag-region" />
       {apiCredsMissing ? (
         <div className="w-full h-full">
           <ApiKeyWarning className="w-full h-full" />
+          {window.electron?.logInfo?.('DEBUG: Rendering ApiKeyWarning')}
         </div>
-      ) : showWelcome && (!window.appConfig.get("REQUEST_DIR")) ? (
+      ) : showWelcome ? (
         <div className="w-full h-full">
-          <WelcomeScreen className="w-full h-full" onDismiss={handleWelcomeDismiss} />
+          <NewWelcomeScreen className="w-full h-full" onDismiss={handleWelcomeDismiss} />
+          {window.electron?.logInfo?.('DEBUG: Rendering NewWelcomeScreen')}
         </div>
       ) : (
         <>
+          {window.electron?.logInfo?.('DEBUG: Rendering main chat interface')}
           <div style={{ display: mode === 'expanded' ? 'block' : 'none' }}>
             <Routes>
               <Route
