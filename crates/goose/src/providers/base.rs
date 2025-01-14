@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
-use tokio::select;
 use tokio::sync::RwLock;
 
 use super::configs::ModelConfig;
@@ -176,64 +175,65 @@ pub trait Provider: Send + Sync + Moderation {
         messages: &[Message],
         tools: &[Tool],
     ) -> Result<(Message, ProviderUsage)> {
-        // Get the latest user message
-        let latest_user_msg = messages
-            .iter()
-            .rev()
-            .find(|msg| {
-                msg.role == Role::User
-                    && msg
-                        .content
-                        .iter()
-                        .any(|content| matches!(content, MessageContent::Text(_)))
-            })
-            .ok_or_else(|| anyhow::anyhow!("No user message with text content found in history"))?;
+        self.complete_internal(system, messages, tools).await
 
-        // Get the content to moderate
-        let content = latest_user_msg.content.first().unwrap().as_text().unwrap();
+        // Get the latest user message
+        //let latest_user_msg = messages
+        //    .iter()
+        //    .rev()
+        //    .find(|msg| {
+        //        msg.role == Role::User
+        //            && msg
+        //                .content
+        //                .iter()
+        //                .any(|content| matches!(content, MessageContent::Text(_)))
+        //    })
+        //    .ok_or_else(|| anyhow::anyhow!("No user message with text content found in history"))?;
+        //
+        //// Get the content to moderate
+        //let content = latest_user_msg.content.first().unwrap().as_text().unwrap();
 
         // Start completion and moderation immediately
-        let completion_fut = self.complete_internal(system, messages, tools);
-        let moderation_fut = self.moderate_content(content);
-        tokio::pin!(completion_fut);
-        tokio::pin!(moderation_fut);
+        //let moderation_fut = self.moderate_content(content);
+        //tokio::pin!(completion_fut);
+        //tokio::pin!(moderation_fut);
 
         // Run moderation and completion concurrently
-        select! {
-            moderation = &mut moderation_fut => {
-                let result = moderation?;
-
-                if result.flagged {
-                    let categories = result.categories
-                        .unwrap_or_else(|| vec!["unknown".to_string()])
-                        .join(", ");
-                    return Err(ModerationError::ContentFlagged {
-                        categories,
-                        category_scores: result.category_scores,
-                    }.into());
-                }
-
-                // Moderation passed, wait for completion
-                Ok(completion_fut.await?)
-            }
-            completion = &mut completion_fut => {
-                // Completion finished first, still need to check moderation
-                let completion_result = completion?;
-                let moderation_result = moderation_fut.await?;
-
-                if moderation_result.flagged {
-                    let categories = moderation_result.categories
-                        .unwrap_or_else(|| vec!["unknown".to_string()])
-                        .join(", ");
-                    return Err(ModerationError::ContentFlagged {
-                        categories,
-                        category_scores: moderation_result.category_scores,
-                    }.into());
-                }
-
-                Ok(completion_result)
-            }
-        }
+        //select! {
+        //    moderation = &mut moderation_fut => {
+        //        let result = moderation?;
+        //
+        //        if result.flagged {
+        //            let categories = result.categories
+        //                .unwrap_or_else(|| vec!["unknown".to_string()])
+        //                .join(", ");
+        //            return Err(ModerationError::ContentFlagged {
+        //                categories,
+        //                category_scores: result.category_scores,
+        //            }.into());
+        //        }
+        //
+        //        // Moderation passed, wait for completion
+        //        Ok(completion_fut.await?)
+        //    }
+        //    completion = &mut completion_fut => {
+        //        // Completion finished first, still need to check moderation
+        //        let completion_result = completion?;
+        //        let moderation_result = moderation_fut.await?;
+        //
+        //        if moderation_result.flagged {
+        //            let categories = moderation_result.categories
+        //                .unwrap_or_else(|| vec!["unknown".to_string()])
+        //                .join(", ");
+        //            return Err(ModerationError::ContentFlagged {
+        //                categories,
+        //                category_scores: moderation_result.category_scores,
+        //            }.into());
+        //        }
+        //
+        //        Ok(completion_result)
+        //    }
+        //}
     }
 
     /// Internal completion method to be implemented by providers
