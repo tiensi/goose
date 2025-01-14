@@ -616,7 +616,7 @@ impl DeveloperRouter {
             windows.into_iter().map(|w| w.title().to_string()).collect();
 
         Ok(vec![
-            Content::text("The following windows are available.")
+            Content::text(format!("Available windows:\n{}", window_titles.join("\n")))
                 .with_audience(vec![Role::Assistant]),
             Content::text(format!("Available windows:\n{}", window_titles.join("\n")))
                 .with_audience(vec![Role::User])
