@@ -187,6 +187,7 @@ impl MemoryRouter {
     }
 
     fn get_memory_file(&self, category: &str, is_global: bool) -> PathBuf {
+        // Defaults to local memory if no is_global flag is provided
         let base_dir = if is_global {
             &self.global_memory_dir
         } else {
@@ -341,38 +342,27 @@ impl MemoryRouter {
     async fn execute_tool_call(&self, tool_call: ToolCall) -> Result<String, io::Error> {
         match tool_call.name.as_str() {
             "remember_memory" => {
-                let category = tool_call.arguments["category"].as_str().unwrap();
-                let data = tool_call.arguments["data"].as_str().unwrap();
-                let tags: Vec<&str> = tool_call.arguments["tags"]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .map(|v| v.as_str().unwrap())
-                    .collect();
-                let is_global = tool_call.arguments["is_global"].as_bool().unwrap();
-                self.remember("context", category, data, &tags, is_global)?;
-                Ok(format!("Stored memory in category: {}", category))
+                let args = MemoryArgs::from_value(&tool_call.arguments)?;
+                self.remember("context", args.category, args.data, &args.tags, args.is_global)?;
+                Ok(format!("Stored memory in category: {}", args.category))
             }
             "retrieve_memories" => {
-                let category = tool_call.arguments["category"].as_str().unwrap();
-                let is_global = tool_call.arguments["is_global"].as_bool().unwrap();
-                let memories = self.retrieve(category, is_global)?;
+                let args = MemoryArgs::from_value(&tool_call.arguments)?;
+                let memories = self.retrieve(&args.category, args.is_global)?;
                 Ok(format!("Retrieved memories: {:?}", memories))
             }
             "remove_memory_category" => {
-                let category = tool_call.arguments["category"].as_str().unwrap();
-                let is_global = tool_call.arguments["is_global"].as_bool().unwrap();
-                self.clear_memory(category, is_global)?;
-                Ok(format!("Cleared memories in category: {}", category))
+                let args = MemoryArgs::from_value(&tool_call.arguments)?;
+                self.clear_memory(&args.category, args.is_global)?;
+                Ok(format!("Cleared memories in category: {}", args.category))
             }
             "remove_specific_memory" => {
-                let category = tool_call.arguments["category"].as_str().unwrap();
+                let args = MemoryArgs::from_value(&tool_call.arguments)?;
                 let memory_content = tool_call.arguments["memory_content"].as_str().unwrap();
-                let is_global = tool_call.arguments["is_global"].as_bool().unwrap();
-                self.remove_specific_memory(category, memory_content, is_global)?;
+                self.remove_specific_memory(&args.category, memory_content, args.is_global)?;
                 Ok(format!(
                     "Removed specific memory from category: {}",
-                    category
+                    args.category
                 ))
             }
             _ => Err(io::Error::new(io::ErrorKind::InvalidInput, "Unknown tool")),
@@ -499,34 +489,49 @@ impl Router for MemoryRouter {
             }
         })
     }
+}
 
-    // async fn status(&self) -> AnyhowResult<Vec<Resource>> {
-    //     // Convert active memories to resources
-    //     let resources: Vec<Resource> = self
-    //         .active_memories
-    //         .iter()
-    //         .filter_map(|(category, memories)| {
-    //             Resource::with_uri(
-    //                 format!("str:///{}.txt", memories.join(" ")),
-    //                 format!("{}.txt", category),
-    //                 0.0,
-    //                 Some("text".to_string()),
-    //             )
-    //             .ok()
-    //         })
-    //         .collect();
-    //     Ok(resources)
-    // }
+#[derive(Debug)]
+struct MemoryArgs<'a> {
+    category: &'a str,
+    data: &'a str,
+    tags: Vec<&'a str>,
+    is_global: bool,
+}
 
-    // async fn call(&self, tool_call: ToolCall) -> AgentResult<Vec<Content>> {
-    //     match execute_tool_call(tool_call) {
-    //         Ok(result) => Ok(vec![Content::text(result)]),
-    //         Err(err) => Err(AgentError::ExecutionError(err.to_string())),
-    //     }
-    // }
+impl<'a> MemoryArgs<'a> {
+    fn from_value(args: &'a Value) -> Result<Self, io::Error> {
+        let category = args["category"]
+            .as_str()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Category must be a string"))?;
 
-    // async fn read_resource(&self, uri: &str) -> AgentResult<String> {
-    //     let memories = uri.split("/").next().unwrap();
-    //     Ok(memories.to_string())
-    // }
+        if category.is_empty() {
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, "Category must be a string"));
+        }
+
+        let data = args["data"]
+            .as_str()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Data must be a string"))?;
+
+        let tags = match &args["tags"] {
+            Value::Array(arr) => arr.iter().filter_map(|v| v.as_str()).collect(),
+            Value::String(s) => vec![s.as_str()],
+            _ => Vec::new(),
+        };
+
+        let is_global = match &args.get("is_global") {
+            // Default to false if no is_global flag is provided
+            Some(Value::Bool(b)) => *b,
+            Some(Value::String(s)) => s.to_lowercase() == "true",
+            None => false,
+            _ => return Err(io::Error::new(io::ErrorKind::InvalidInput, "is_global must be a boolean or string 'true'/'false'")),
+        };
+
+        Ok(Self {
+            category,
+            data,
+            tags,
+            is_global,
+        })
+    }
 }
