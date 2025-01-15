@@ -502,6 +502,7 @@ struct MemoryArgs<'a> {
 }
 
 impl<'a> MemoryArgs<'a> {
+    // Category is required, data is optional, tags are optional, is_global is optional
     fn from_value(args: &'a Value) -> Result<Self, io::Error> {
         let category = args["category"].as_str().ok_or_else(|| {
             io::Error::new(io::ErrorKind::InvalidInput, "Category must be a string")
