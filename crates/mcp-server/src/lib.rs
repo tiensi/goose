@@ -55,6 +55,8 @@ where
                     Ok(s) => s,
                     Err(e) => return Poll::Ready(Some(Err(TransportError::Utf8(e)))),
                 };
+                // Log incoming message here before serde conversion to
+                // track incomplete chunks which are not valid JSON
                 tracing::debug!(json = %line, "incoming message");
 
                 // Parse JSON and validate message format
