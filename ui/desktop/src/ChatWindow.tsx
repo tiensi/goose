@@ -21,8 +21,7 @@ import { askAi } from './utils/askAI';
 import { NewWelcomeScreen } from './components/setup/NewWelcomeScreen';
 import mockKeychain from './services/mockKeychain';
 
-// update this when you want to show the welcome screen again - doesn't have to be an actual version, just anything woudln't have been seen before
-const CURRENT_VERSION = '0.0.1';
+const CURRENT_VERSION = '0.0.0';
 export const PROVIDER_API_KEY = "GOOSE_PROVIDER__API_KEY"  // the key to look for to make sure user has previously set an API key
 
 // Get the last version from localStorage
