@@ -1,19 +1,20 @@
 use async_trait::async_trait;
 use futures::stream::BoxStream;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use tokio::sync::Mutex;
 use tracing::{debug, instrument};
 
 use super::Agent;
 use crate::agents::capabilities::{Capabilities, ResourceItem};
 use crate::agents::system::{SystemConfig, SystemError, SystemResult};
-use crate::message::{Message, ToolRequest};
+use crate::message::{Message, MessageContent, ToolRequest};
 use crate::providers::base::Provider;
 use crate::providers::base::ProviderUsage;
 use crate::register_agent;
 use crate::token_counter::TokenCounter;
-use mcp_core::Tool;
+use mcp_core::{TextContent, Tool};
 use serde_json::Value;
+use crate::prompt_template::load_prompt_file;
 
 /// Agent impl. that truncates oldest messages when payload over LLM ctx-limit
 pub struct TruncateAgent {
@@ -37,7 +38,7 @@ impl TruncateAgent {
         target_limit: usize,
         model_name: &str,
         resource_items: &mut [ResourceItem],
-    ) -> SystemResult<Vec<Message>> {
+    ) -> SystemResult<TruncatedConversation> {
         // Flatten all resource content into a vector of strings
         let resources: Vec<String> = resource_items
             .iter()
@@ -49,9 +50,13 @@ impl TruncateAgent {
             self._token_counter
                 .count_everything(system_prompt, messages, tools, &resources, model);
 
-        let mut new_messages = messages.to_vec();
+        let mut trunc_conv = TruncatedConversation::new(
+            messages.to_vec(),
+            None,
+        );
+
         if approx_count > target_limit {
-            let user_msg_size = self.text_content_size(new_messages.last(), model);
+            let user_msg_size = self.text_content_size(messages.last(), model);
             if user_msg_size > target_limit {
                 debug!(
                     "[WARNING] User message {} exceeds token budget {}.",
@@ -61,13 +66,13 @@ impl TruncateAgent {
                 return Err(SystemError::ContextLimit);
             }
 
-            new_messages = self.chop_front_messages(messages, approx_count, target_limit, model);
-            if new_messages.is_empty() {
+            trunc_conv = self.chop_front_messages(messages, approx_count, target_limit, model);
+            if trunc_conv.conversation.is_empty() {
                 return Err(SystemError::ContextLimit);
             }
         }
 
-        Ok(new_messages)
+        Ok(trunc_conv)
     }
 
     fn text_content_size(&self, message: Option<&Message>, model: Option<&str>) -> usize {
@@ -84,14 +89,28 @@ impl TruncateAgent {
 
         default_size
     }
+    fn clip_message(&self, message: &Message, clip_size: Option<usize>) -> String {
+        let clip_size = clip_size.unwrap_or(25);
+        let text = message.content
+            .first()
+            .and_then(|c| c.as_text())
+            .unwrap();
 
+        let words = text
+            .split_whitespace()
+            .take(clip_size)
+            .collect::<Vec<&str>>()
+            .join(" ");
+
+        words
+    }
     fn chop_front_messages(
         &self,
         messages: &[Message],
         approx_count: usize,
         target_limit: usize,
         model: Option<&str>,
-    ) -> Vec<Message> {
+    ) -> TruncatedConversation {
         debug!(
             "[WARNING] Conversation history has size: {} exceeding the token budget of {}. \
             Dropping oldest messages.",
@@ -99,23 +118,67 @@ impl TruncateAgent {
             approx_count - target_limit
         );
 
-        let mut trimmed_items: VecDeque<Message> = VecDeque::from(messages.to_vec());
+        let mut message_clippings: Vec<String> = vec![];
+        let mut truncated_conversation: VecDeque<Message> = VecDeque::from(messages.to_vec());
         let mut current_tokens = approx_count;
 
         // Remove messages until we're under target limit
         for msg in messages.iter() {
-            if current_tokens < target_limit || trimmed_items.is_empty() {
+            if current_tokens < target_limit || truncated_conversation.is_empty() {
                 break;
             }
             let count = self.text_content_size(Some(msg), model);
-            let _ = trimmed_items.pop_front().unwrap();
-            // Subtract removed message’s token_count
-            current_tokens = current_tokens.saturating_sub(count as usize);
+            current_tokens = current_tokens.saturating_sub(count);
+            let chopped_msg = truncated_conversation.pop_front().unwrap();
+
+            // gather message clippings for assistant's truncation notif to user
+            let speaker_text = self.clip_message(&chopped_msg, None);
+            let snippet = format!("{:?}: {}", chopped_msg.role, speaker_text);
+            message_clippings.push(snippet);
         }
 
+        // todo extract first and last
+        let mut context = HashMap::new();
+        context.insert("snippets", message_clippings);
+
         // use trimmed message-history
-        let new_messages = Vec::from(trimmed_items);
-        new_messages
+        let conversation = Vec::from(truncated_conversation);
+        let trunc_notif = load_prompt_file("trunc_messages_notif.md",
+                                           &context);
+
+        match trunc_notif {
+            Ok(notif) => TruncatedConversation::new(conversation, Some(notif)),
+            _ => TruncatedConversation::new(conversation, None)
+        }
+    }
+
+    fn append_message(&self, base_msg: Message, appendage: Option<String>) -> Message {
+        match appendage {
+            Some(appendage) => {
+                let mut msg = base_msg.clone();
+                let assistant_msg = msg.content
+                    .first()
+                    .and_then(|c| c.as_text())
+                    .unwrap();
+
+                let augmented_msg = format!("{}\n{}", assistant_msg, appendage);
+                let annos = msg.content
+                    .first()
+                    .and_then(|c| match c {
+                        MessageContent::Text(text) => Some(text.annotations.clone()),
+                        _ => None,
+                    })
+                    .unwrap();
+
+                msg.content = vec!(MessageContent::Text(TextContent {
+                    text: augmented_msg.into(),
+                    annotations: annos,
+                }));
+
+                msg
+            }
+            None => base_msg
+        }
     }
 }
 
@@ -145,7 +208,7 @@ impl Agent for TruncateAgent {
         }
 
         // Update conversation history for the start of the reply
-        let mut messages = self
+        let mut trunc_conv = self
             .prepare_inference(
                 &system_prompt,
                 &tools,
@@ -155,6 +218,8 @@ impl Agent for TruncateAgent {
                 &mut capabilities.get_resources().await?,
             )
             .await?;
+
+        let mut messages = trunc_conv.conversation.clone();
 
         Ok(Box::pin(async_stream::try_stream! {
             let _reply_guard = reply_span.enter();
@@ -168,7 +233,12 @@ impl Agent for TruncateAgent {
                 capabilities.record_usage(usage).await;
 
                 // Yield the assistant's response
-                yield response.clone();
+                let response_with_notif = self.append_message(
+                    response.clone(),
+                    trunc_conv.notification.clone());
+
+                yield response_with_notif.clone();
+                // yield response.clone(); todo delete
 
                 tokio::task::yield_now().await;
 
@@ -204,7 +274,7 @@ impl Agent for TruncateAgent {
 
                 yield message_tool_response.clone();
 
-                messages = self.prepare_inference(
+                trunc_conv = self.prepare_inference(
                     &system_prompt,
                     &tools,
                     &messages,
@@ -212,6 +282,7 @@ impl Agent for TruncateAgent {
                     &capabilities.provider().get_model_config().model_name,
                     &mut capabilities.get_resources().await?
                 ).await?;
+                messages = trunc_conv.conversation;
 
                 messages.push(response);
                 messages.push(message_tool_response);
@@ -248,6 +319,17 @@ impl Agent for TruncateAgent {
     async fn usage(&self) -> Vec<ProviderUsage> {
         let capabilities = self.capabilities.lock().await;
         capabilities.get_usage().await
+    }
+}
+
+struct TruncatedConversation {
+    conversation: Vec<Message>,
+    notification: Option<String>,
+}
+
+impl TruncatedConversation {
+    fn new(conversation: Vec<Message>, truncation_message: Option<String>) -> Self {
+        TruncatedConversation { conversation, notification: truncation_message }
     }
 }
 
