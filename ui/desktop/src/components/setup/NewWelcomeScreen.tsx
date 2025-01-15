@@ -29,7 +29,8 @@ export function NewWelcomeScreen({ className = '' }: NewWelcomeScreenProps) {
       setShowModal(false);
       console.log("Setting GOOSE_PROVIDER to:", selectedProvider.name);
       localStorage.setItem("GOOSE_PROVIDER", selectedProvider.name);
-      console.log("Set GOOSE_PROVIDER: ",  localStorage.getItem("GOOSE_PROVIDER"));
+      console.log("Set GOOSE_PROVIDER: ", localStorage.getItem("GOOSE_PROVIDER"));
+      window.electron.createChatWindow();  
     } catch (error) {
       console.error('Failed to store API key:', error);
     }
