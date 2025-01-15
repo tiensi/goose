@@ -75,7 +75,7 @@ mod tests {
         let result = load_prompt_file(file_path, &context).unwrap();
         assert_eq!(
             result,
-            "This prompt is only used for testing.\n\nHello, Alice! You are 30 years old.\n"
+            "This prompt is only used for testing.\n\nHello, Alice! You are 30 years old."
         );
     }
 
@@ -133,7 +133,7 @@ mod tests {
         context.insert("tools".to_string(), tools);
 
         let result = load_prompt(template, &context).unwrap();
-        let expected = "### Tool Descriptions\n";
+        let expected = "### Tool Descriptions";
         assert_eq!(result, expected);
     }
 }
