@@ -24,7 +24,7 @@ async fn add_system(
         return Err(StatusCode::UNAUTHORIZED);
     }
 
-    // TODO: fix when `goosed agent` starts a MCP server, it doesn't write logs to ~/.config/goose/logs 
+    // TODO: fix when `goosed agent` starts a MCP server, it doesn't write logs to ~/.config/goose/logs
     // Instead, the logs get written to the current directory, example: logs/mcp-server.log.2025-01-15
     // We would need the system name to write to the correct log file
     let mut agent = state.agent.lock().await;
