@@ -4,6 +4,24 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { oneLight } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { Check, Copy } from "./icons";
+import {visit} from 'unist-util-visit'
+
+function rehypeInlineCodeProperty(){
+  return function(tree) {
+    debugger;
+
+    if (!tree)
+      return;
+
+    visit(tree, 'code', function (node, index, parent) {
+      if (parent && parent.tagName === 'pre') {
+        node.properties.inline = false;
+      } else {
+        node.properties.inline = true;
+      }
+    })
+  }
+}
 
 interface MarkdownContentProps {
   content: string;
@@ -73,12 +91,14 @@ export default function MarkdownContent({
   return (
     <div className="w-full overflow-x-hidden">
       <ReactMarkdown
+        rehypePlugins={[rehypeInlineCodeProperty()]}
         className={`prose prose-xs dark:prose-invert w-full max-w-full break-words
           prose-pre:p-0 prose-pre:m-0
           prose-code:break-all prose-code:whitespace-pre-wrap
           ${className}`}
         components={{
           code({ node, inline, className, children, ...props }) {
+            console.log(inline, node.properties.inline);
             const match = /language-(\w+)/.exec(className || "");
             return !inline && match ? (
               <CodeBlock language={match[1]}>
