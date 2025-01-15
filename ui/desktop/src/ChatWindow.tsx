@@ -26,8 +26,6 @@ import {
   ANTHROPIC_DEFAULT_MODEL
 } from './utils/providerUtils';
 
-export const PROVIDER_API_KEY = "GOOSE_PROVIDER__API_KEY"  // the key to look for to make sure user has previously set an API key
-
 declare global {
   interface Window {
     electron: {
@@ -202,10 +200,6 @@ function ChatContent({
 
     const lastMessage: Message = messages[messages.length - 1];
     if (lastMessage.role === 'user' && lastMessage.toolInvocations === undefined) {
-      // TODO: Using setInput seems to change the ongoing request message and prevents stop from stopping.
-      // It would be nice to find a way to populate the input field with the last message when interrupted.
-      // setInput("stop");
-
       // Remove the last user message.
       if (messages.length > 1) {
         setMessages(messages.slice(0, -1));
@@ -412,38 +406,107 @@ export default function ChatWindow() {
     setMode(newMode);
   };
 
-  // Initialize system config when window loads
-  useEffect(() => {
-    addSystemConfig("developer2");
-  }, []);
-
   window.electron.logInfo('ChatWindow loaded');
 
   useEffect(() => {
     // Check if we already have a provider set
     const storedProvider = localStorage.getItem("GOOSE_PROVIDER");
-    const hasApiKey = window.appConfig.get(PROVIDER_API_KEY);
 
-    if (storedProvider && hasApiKey) {
+    if (storedProvider) {
       setShowWelcomeModal(false);
     } else {
       setShowWelcomeModal(true);
     }
   }, []);
 
+  const storeSecret = async (key: string, value: string) => {
+    const response = await fetch(getApiUrl('/secrets/store'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Secret-Key': getSecretKey(),
+      },
+      body: JSON.stringify({ key, value })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to store secret: ${response.statusText}`);
+    }
+
+    return response;
+  };
+
+  const addAgent = async (provider: ProviderOption) => {
+    const response = await fetch(getApiUrl('/agent'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Secret-Key': getSecretKey(),
+      },
+      body: JSON.stringify({ provider: provider.id })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to add agent: ${response.statusText}`);
+    }
+
+    return response;
+  };
+
+  const initializeSystem = async (provider: ProviderOption) => {
+    try {
+      await addAgent(provider);
+      await addSystemConfig("developer2");
+    } catch (error) {
+      console.error('Failed to initialize system:', error);
+      throw error;
+    }
+  };
+
   const handleModalSubmit = async (apiKey: string) => {
     try {
       const trimmedKey = apiKey.trim();
-      await mockKeychain.setKey(PROVIDER_API_KEY, trimmedKey);
 
-      if (selectedProvider) {
-        localStorage.setItem("GOOSE_PROVIDER", selectedProvider.name);
-        setShowWelcomeModal(false);
+      if (!selectedProvider) {
+        throw new Error('No provider selected');
       }
+
+      // Store the API key
+      const secretKey = `${selectedProvider.id.toUpperCase()}_API_KEY`;
+      await storeSecret(secretKey, trimmedKey);
+
+      // Initialize the system with the selected provider
+      await initializeSystem(selectedProvider);
+
+      // Save provider selection and close modal
+      localStorage.setItem("GOOSE_PROVIDER", selectedProvider.name);
+      setShowWelcomeModal(false);
     } catch (error) {
-      console.error('Failed to store API key:', error);
+      console.error('Failed to setup provider:', error);
+      throw error;
     }
   };
+
+  // Initialize system on load if we have a stored provider
+  useEffect(() => {
+    const setupStoredProvider = async () => {
+      const storedProvider = localStorage.getItem("GOOSE_PROVIDER");
+      if (storedProvider) {
+        const provider = providers.find(p => p.name === storedProvider);
+        if (provider) {
+          try {
+            await initializeSystem(provider);
+          } catch (error) {
+            console.error('Failed to initialize with stored provider:', error);
+          }
+        }
+      }
+    };
+
+    setupStoredProvider();
+  }, []);
+
+
 
   return (
     <div className="relative w-screen h-screen overflow-hidden dark:bg-dark-window-gradient bg-window-gradient flex flex-col">

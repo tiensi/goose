@@ -81,7 +81,7 @@ export const startGoosed = async (app, dir=null, env={}): Promise<[number, strin
     USERPROFILE: homeDir,
 
     // start with the port specified 
-    GOOSE_SERVER__PORT: String(port),
+    GOOSE_PORT: String(port),
 
     GOOSE_SERVER__SECRET_KEY: process.env.GOOSE_SERVER__SECRET_KEY,
     

@@ -39,7 +39,7 @@ export default function MoreMenu() {
     // Fetch available versions when the menu opens
     const fetchVersions = async () => {
       try {
-        const port = window.appConfig.get("GOOSE_SERVER__PORT");
+        const port = window.appConfig.get("GOOSE_PORT");
         const response = await fetch(
           `http://127.0.0.1:${port}/agent/versions`
         );

@@ -52,7 +52,7 @@ const generateSecretKey = () => {
 let appConfig = { 
   GOOSE_PROVIDER: getGooseProvider(),
   GOOSE_API_HOST: 'http://127.0.0.1',
-  GOOSE_SERVER__PORT: 0,
+  GOOSE_PORT: 0,
   GOOSE_WORKING_DIR: '',
   GOOSE_AGENT_VERSION: '',
   secretKey: generateSecretKey(),
@@ -126,7 +126,7 @@ const createChat = async (app, query?: string, dir?: string, version?: string) =
       preload: path.join(__dirname, 'preload.js'),
       additionalArguments: [JSON.stringify({ 
         ...appConfig, 
-        GOOSE_SERVER__PORT: port, 
+        GOOSE_PORT: port,
         GOOSE_WORKING_DIR: working_dir,
         GOOSE_AGENT_VERSION: agentVersion,
         REQUEST_DIR: dir 
