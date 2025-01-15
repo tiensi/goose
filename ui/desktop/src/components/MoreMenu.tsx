@@ -236,6 +236,16 @@ export default function MoreMenu() {
             >
               New Session (cmd+N)
             </button>
+            <button
+              onClick={() => {
+                localStorage.removeItem("GOOSE_PROVIDER");
+                setOpen(false);
+                window.electron.createChatWindow();
+              }}
+              className="w-full text-left px-2 py-1.5 text-sm hover:bg-gray-700 text-red-400"
+            >
+              Reset Provider
+            </button>
           </div>
         </PopoverContent>
       </PopoverPortal>
