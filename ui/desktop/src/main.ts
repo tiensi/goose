@@ -36,6 +36,9 @@ const parseArgs = () => {
 
 const getGooseProvider = () => {
   loadZshEnv(app.isPackaged);
+  //{env-macro-start}//
+  //needed when goose is bundled for a specific provider
+  //{env-macro-end}//
   return process.env.GOOSE_PROVIDER;
 };
 
