@@ -162,9 +162,8 @@ impl ProtocolFormatter {
 
     fn format_error(error: &str) -> String {
         // Error messages start with "3:" in the new protocol.
-        // Escape double quotes in the string with \"
-        let error_str = error.to_string().replace('"', "\\\"");
-        format!("3:\"{}\"\n", error_str)
+        let encoded_error = serde_json::to_string(error).unwrap_or_else(|_| String::new());
+        format!("3:{}\n", encoded_error)
     }
 
     fn format_moderation_error(error: &ModerationError) -> String {
