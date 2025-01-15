@@ -1,6 +1,4 @@
 use anyhow::{Context, Result};
-use cliclack::log;
-use core::time;
 use std::fs;
 use std::path::PathBuf;
 use tracing_appender::rolling::Rotation;
