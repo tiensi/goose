@@ -57,7 +57,7 @@ where
                 };
                 // Log incoming message here before serde conversion to
                 // track incomplete chunks which are not valid JSON
-                tracing::debug!(json = %line, "incoming message");
+                tracing::info!(json = %line, "incoming message");
 
                 // Parse JSON and validate message format
                 match serde_json::from_str::<serde_json::Value>(&line) {
@@ -77,7 +77,6 @@ where
                                 "Missing or invalid jsonrpc version".into(),
                             ))));
                         }
-
 
                         // Now try to parse as proper message
                         match serde_json::from_value::<JsonRpcMessage>(value) {
