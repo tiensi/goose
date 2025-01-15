@@ -1,5 +1,7 @@
 use anyhow::Result;
-use goose_mcp::{Developer2Router, DeveloperRouter, JetBrainsRouter, MemoryRouter, NonDeveloperRouter};
+use goose_mcp::{
+    Developer2Router, DeveloperRouter, JetBrainsRouter, MemoryRouter, NonDeveloperRouter,
+};
 use mcp_server::router::RouterService;
 use mcp_server::{BoundedService, ByteTransport, Server};
 use tokio::io::{stdin, stdout};

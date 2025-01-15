@@ -14,15 +14,14 @@ use tracing::info;
 use url::Url;
 
 use mcp_core::{
-    Content,
     handler::{ResourceError, ToolError},
     protocol::ServerCapabilities,
     resource::Resource,
     tool::{Tool, ToolCall},
+    Content,
 };
 use mcp_server::router::CapabilitiesBuilder;
 use mcp_server::Router;
-
 
 // MemoryRouter implementation
 #[derive(Clone)]
@@ -343,7 +342,13 @@ impl MemoryRouter {
         match tool_call.name.as_str() {
             "remember_memory" => {
                 let args = MemoryArgs::from_value(&tool_call.arguments)?;
-                self.remember("context", args.category, args.data, &args.tags, args.is_global)?;
+                self.remember(
+                    "context",
+                    args.category,
+                    args.data,
+                    &args.tags,
+                    args.is_global,
+                )?;
                 Ok(format!("Stored memory in category: {}", args.category))
             }
             "retrieve_memories" => {
@@ -370,10 +375,7 @@ impl MemoryRouter {
     }
 
     fn add_active_resource(&self, uri: String, resource: Resource) {
-        self.active_resources
-            .lock()
-            .unwrap()
-            .insert(uri, resource);
+        self.active_resources.lock().unwrap().insert(uri, resource);
     }
 
     async fn read_memory_resources(&self, uri: &str) -> Result<String, ResourceError> {
@@ -501,12 +503,15 @@ struct MemoryArgs<'a> {
 
 impl<'a> MemoryArgs<'a> {
     fn from_value(args: &'a Value) -> Result<Self, io::Error> {
-        let category = args["category"]
-            .as_str()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Category must be a string"))?;
+        let category = args["category"].as_str().ok_or_else(|| {
+            io::Error::new(io::ErrorKind::InvalidInput, "Category must be a string")
+        })?;
 
         if category.is_empty() {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "Category must be a string"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Category must be a string",
+            ));
         }
 
         let data = args["data"]
@@ -524,7 +529,12 @@ impl<'a> MemoryArgs<'a> {
             Some(Value::Bool(b)) => *b,
             Some(Value::String(s)) => s.to_lowercase() == "true",
             None => false,
-            _ => return Err(io::Error::new(io::ErrorKind::InvalidInput, "is_global must be a boolean or string 'true'/'false'")),
+            _ => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "is_global must be a boolean or string 'true'/'false'",
+                ))
+            }
         };
 
         Ok(Self {
