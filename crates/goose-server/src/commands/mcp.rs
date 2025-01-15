@@ -6,8 +6,10 @@ use mcp_server::{BoundedService, ByteTransport, Server};
 use tokio::io::{stdin, stdout};
 
 pub async fn run(name: &str) -> Result<()> {
-    tracing::info!("Starting MCP server");
+    // Initialize logging
+    crate::logging::setup_logging(Some(&format!("mcp-{name}")))?;
 
+    tracing::info!("Starting MCP server");
     let router: Option<Box<dyn BoundedService>> = match name {
         "developer" => Some(Box::new(RouterService(DeveloperRouter::new()))),
         "developer2" => Some(Box::new(RouterService(Developer2Router::new()))),

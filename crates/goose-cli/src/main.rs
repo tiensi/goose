@@ -203,7 +203,6 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         Some(Command::Mcp { name }) => {
-            setup_logging(None)?;
             let _ = run_server(&name).await;
         }
         Some(Command::Session {
