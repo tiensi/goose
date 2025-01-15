@@ -34,28 +34,9 @@ const parseArgs = () => {
   return { dirPath };
 };
 
-const checkApiCredentials = () => {
+const getGooseProvider = () => {
   loadZshEnv(app.isPackaged);
-
-  
-  //{env-macro-start}//
-  //needed when goose is bundled for a specific provider
-
-  const apiKeyProvidersValid =
-    ['openai', 'anthropic', 'google', 'groq', 'openrouter'].includes(process.env.GOOSE_PROVIDER__TYPE) &&
-      process.env.GOOSE_PROVIDER__HOST &&
-      process.env.GOOSE_PROVIDER__MODEL &&
-      process.env.GOOSE_PROVIDER__API_KEY;
-
-  const optionalApiKeyProvidersValid =
-    ['ollama', 'databricks'].includes(process.env.GOOSE_PROVIDER__TYPE) &&
-      process.env.GOOSE_PROVIDER__HOST &&
-      process.env.GOOSE_PROVIDER__MODEL;
-
-  return apiKeyProvidersValid || optionalApiKeyProvidersValid;
-  
-  //needed when goose is bundled for a specific provider:
-  //{env-macro-end}//
+  return process.env.GOOSE_PROVIDER;
 };
 
 const generateSecretKey = () => {
@@ -66,7 +47,7 @@ const generateSecretKey = () => {
 };
 
 let appConfig = { 
-  apiCredsMissing: !checkApiCredentials(),
+  GOOSE_PROVIDER: getGooseProvider(),
   GOOSE_API_HOST: 'http://127.0.0.1',
   GOOSE_SERVER__PORT: 0,
   GOOSE_WORKING_DIR: '',
@@ -126,7 +107,7 @@ const createChat = async (app, query?: string, dir?: string, version?: string) =
   updateEnvironmentVariables(envToggles);
 
   const maybeStartGoosed = async () => {
-    if (checkApiCredentials()) {
+    if (getGooseProvider()) {
       return startGoosed(app, dir);
     } else {
       return [0, '', ''];

@@ -13,7 +13,7 @@ interface NewWelcomeScreenProps {
   className?: string;
 }
 
-export function NewWelcomeScreen({ onDismiss, className = '' }: NewWelcomeScreenProps) {
+export function NewWelcomeScreen({ className = '' }: NewWelcomeScreenProps) {
   const [showModal, setShowModal] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<ProviderOption | null>(null);
 
@@ -22,14 +22,14 @@ export function NewWelcomeScreen({ onDismiss, className = '' }: NewWelcomeScreen
     setShowModal(true);
   };
 
-  const handleModalSubmit = async (apiKey: string) => {
-    if (!selectedProvider) return;
-
+  const handleModalSubmit = async (apiKey: string, provider: string) => {
     try {
       const trimmedKey = apiKey.trim();
       await mockKeychain.setKey(PROVIDER_API_KEY, trimmedKey);
       setShowModal(false);
-      onDismiss();
+      console.log("Setting GOOSE_PROVIDER to:", selectedProvider.name);
+      localStorage.setItem("GOOSE_PROVIDER", selectedProvider.name);
+      console.log("Set GOOSE_PROVIDER: ",  localStorage.getItem("GOOSE_PROVIDER"));
     } catch (error) {
       console.error('Failed to store API key:', error);
     }
@@ -78,4 +78,4 @@ export function NewWelcomeScreen({ onDismiss, className = '' }: NewWelcomeScreen
       )}
     </>
   );
-} 
+}

@@ -35,7 +35,7 @@ declare global {
       startPowerSaveBlocker: () => void;
       hideWindow: () => void;
       createChatWindow: () => void;
-      getConfig: () => { apiCredsMissing: boolean };
+      getConfig: () => { GOOSE_PROVIDER: string };
       logInfo: (message: string) => void;
       showNotification: (opts: { title: string; body: string }) => void;
       getBinaryPath: (binary: string) => Promise<string>;
@@ -397,37 +397,6 @@ export default function ChatWindow() {
     };
   }, []);
 
-  // Check if API key is missing from the window arguments
-  const apiCredsMissing = window.electron.getConfig().apiCredsMissing;
-
-  // Check if API key exists -- using this to trigger display of new welcome window
-  const [test_apiCredsMissing, setApiCredsMissing] = useState(true);
-
-  // see if the user has GOOSE_PROVIDER__API_KEY set -> if not, then show welcome page
-  useEffect(() => {
-    const checkApiKeys = async () => {
-      console.log('Checking for API credentials...');
-      const hasProviderApiKey = await mockKeychain.hasKey(PROVIDER_API_KEY);
-      console.log('API key check result:', {
-        hasProviderApiKey,
-        keyName: PROVIDER_API_KEY,
-        willShowCredsMissing: !hasProviderApiKey
-      });
-      
-      setApiCredsMissing(!hasProviderApiKey);
-      console.log('Updated apiCredsMissing state:', !hasProviderApiKey);
-    };
-
-    checkApiKeys().catch(error => {
-      console.error('Error checking API credentials:', {
-        error: error instanceof Error ? error.message : String(error)
-      });
-    });
-  }, []);
-
-    // TODO: see if the GOOSE_PROVIDER__API_KEY works for the previously selected provider -> if not, then show welcome page?
-
-
   // Get initial query and history from URL parameters
   const searchParams = new URLSearchParams(window.location.search);
   const initialQuery = searchParams.get('initialQuery');
@@ -450,36 +419,7 @@ export default function ChatWindow() {
   const [working, setWorking] = useState<Working>(Working.Idle);
   const [progressMessage, setProgressMessage] = useState<string>('');
 
-  // Welcome screen state -- determine using if we are missing that api key or not
-  const [showWelcome, setShowWelcome] = useState(() => {
-    console.log('Initializing welcome screen state:', {
-      test_apiCredsMissing,
-      lastSeenVersion: getLastSeenVersion(),
-      currentVersion: CURRENT_VERSION,
-      requestDir: window.appConfig?.get?.("REQUEST_DIR")
-    });
-    // Only show welcome if we're missing API credentials
-    return test_apiCredsMissing;
-  });
-
   // Add this useEffect to track changes and update welcome state
-  useEffect(() => {
-    const shouldShowWelcome = test_apiCredsMissing;
-    console.log('Welcome screen evaluation:', {
-      test_apiCredsMissing,
-      currentShowWelcome: showWelcome,
-      shouldShowWelcome,
-      hasRequestDir: !!window.appConfig?.get?.("REQUEST_DIR")
-    });
-    
-    setShowWelcome(shouldShowWelcome);
-  }, [test_apiCredsMissing]);
-
-  const handleWelcomeDismiss = () => {
-    setShowWelcome(false);
-    setLastSeenVersion(CURRENT_VERSION);
-  };
-
   const toggleMode = () => {
     const newMode = mode === 'expanded' ? 'compact' : 'expanded';
     console.log(`Toggle to ${newMode}`);
@@ -493,31 +433,20 @@ export default function ChatWindow() {
 
   window.electron.logInfo('ChatWindow loaded');
 
-  console.log('DEBUG: Render conditions:', JSON.stringify({
-    test_apiCredsMissing,
-    showWelcome,
-    hasRequestDir: window.appConfig.get("REQUEST_DIR")
-  }, null, 2));
 
-  console.log('DEBUG: Welcome screen conditions:', {
-    showWelcome,
-    lastVersion: getLastSeenVersion(),
-    currentVersion: CURRENT_VERSION,
-    requestDir: window.appConfig?.get?.("REQUEST_DIR"),
-    shouldShow: showWelcome && (!window.appConfig?.get?.("REQUEST_DIR"))
-  });
+  // env.GOOSE_PROVIDER || localstorage.getItem("GOOSE_PROVIDER") -> none
+  // if it is set we assume the keys are available somewhere (keychain or env)
+  // if it is not set, we run the login page
+  console.log("GOOSE_PROVIDER via env:", window.electron.getConfig().GOOSE_PROVIDER);
+  console.log("GOOSE_PROVIDER via storage:", localStorage.getItem("GOOSE_PROVIDER"));
+  let goose_provider = window.electron.getConfig().GOOSE_PROVIDER || localStorage.getItem("GOOSE_PROVIDER");
 
   return (
     <div className="relative w-screen h-screen overflow-hidden dark:bg-dark-window-gradient bg-window-gradient flex flex-col">
       <div className="titlebar-drag-region" />
-      {apiCredsMissing ? (
+      {goose_provider === null ? (
         <div className="w-full h-full">
-          <ApiKeyWarning className="w-full h-full" />
-          {window.electron?.logInfo?.('DEBUG: Rendering ApiKeyWarning')}
-        </div>
-      ) : showWelcome ? (
-        <div className="w-full h-full">
-          <NewWelcomeScreen className="w-full h-full" onDismiss={handleWelcomeDismiss} />
+          <NewWelcomeScreen className="w-full h-full" />
           {window.electron?.logInfo?.('DEBUG: Rendering NewWelcomeScreen')}
         </div>
       ) : (
