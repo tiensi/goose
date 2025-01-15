@@ -47,11 +47,8 @@ pub fn setup_logging(name: Option<&str>) -> Result<()> {
     };
 
     // Create non-rolling file appender for detailed logs
-    let file_appender = tracing_appender::rolling::RollingFileAppender::new(
-        Rotation::NEVER,
-        log_dir,
-        &format!("{}.log", log_filename.unwrap_or(&timestamp)),
-    );
+    let file_appender =
+        tracing_appender::rolling::RollingFileAppender::new(Rotation::NEVER, log_dir, log_filename);
 
     // Create JSON file logging layer
     let file_layer = fmt::layer()
