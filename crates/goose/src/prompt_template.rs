@@ -11,7 +11,7 @@ pub fn load_prompt<T: Serialize>(template: &str, context_data: &T) -> Result<Str
     tera.add_raw_template("inline_template", template)?;
     let context = Context::from_serialize(context_data)?;
     let rendered = tera.render("inline_template", &context)?;
-    Ok(rendered)
+    Ok(rendered.trim().to_string())
 }
 
 pub fn load_prompt_file<T: Serialize>(
