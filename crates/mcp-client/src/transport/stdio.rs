@@ -38,7 +38,7 @@ impl StdioActor {
         loop {
             match reader.read_line(&mut line).await {
                 Ok(0) => {
-                    tracing::error!("Child process ended (EOF on stdout)");
+                    eprintln!("Child process ended (EOF on stdout)");
                     break;
                 } // EOF
                 Ok(_) => {
