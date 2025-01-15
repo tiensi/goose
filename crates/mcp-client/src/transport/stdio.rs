@@ -43,7 +43,7 @@ impl StdioActor {
                 } // EOF
                 Ok(_) => {
                     if let Ok(message) = serde_json::from_str::<JsonRpcMessage>(&line) {
-                        tracing::info!(
+                        tracing::debug!(
                             message = ?message,
                             "Received incoming message"
                         );
@@ -80,7 +80,7 @@ impl StdioActor {
                 }
             };
 
-            tracing::info!(message = ?transport_msg.message, "Sending outgoing message");
+            tracing::debug!(message = ?transport_msg.message, "Sending outgoing message");
 
             if let Some(response_tx) = transport_msg.response_tx {
                 if let JsonRpcMessage::Request(request) = &transport_msg.message {

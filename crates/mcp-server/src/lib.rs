@@ -220,8 +220,6 @@ where
                         },
                     };
 
-                    tracing::error!(error = %e, "Transport error");
-
                     let error_response = JsonRpcMessage::Error(JsonRpcError {
                         jsonrpc: "2.0".to_string(),
                         id: None,

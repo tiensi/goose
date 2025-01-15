@@ -39,11 +39,10 @@ pub enum Error {
     #[error("Error from mcp-server: {0}")]
     ServerBoxError(BoxError),
 
-    #[error("Call to '{server}' failed for '{method}' with params '{params}'. {source}")]
+    #[error("Call to '{server}' failed for '{method}'. {source}")]
     McpServerError {
         method: String,
         server: String,
-        params: Value,
         #[source]
         source: BoxError,
     },
@@ -146,7 +145,7 @@ where
             .map_err(|e| Error::McpServerError {
                 server: self.server_info.as_ref().unwrap().name.clone(),
                 method: method.to_string(),
-                params: params.clone(),
+                // we don't need include params because it can be really large
                 source: Box::new(e.into()),
             })?;
 
@@ -208,7 +207,7 @@ where
             .map_err(|e| Error::McpServerError {
                 server: self.server_info.as_ref().unwrap().name.clone(),
                 method: method.to_string(),
-                params: params.clone(),
+                // we don't need include params because it can be really large
                 source: Box::new(e.into()),
             })?;
 
