@@ -3,6 +3,8 @@ import { Card } from '../ui/card';
 import { Lock } from 'lucide-react'
 import { Input } from "../ui/input"
 import { Button } from "../ui/button"
+import UnionIcon from '../../images/Union@2x.svg';
+
 
 interface AddModelModalProps {
   provider: string
@@ -26,18 +28,13 @@ export function AddModelModal({ provider, model, endpoint, onSubmit, onCancel }:
           <div className="px-8 pt-12 pb-0 space-y-8">
             {/* Header */}
             <div className="text-center space-y-4">
+              {/* Purple icon */}
               <div className="mx-auto w-12 h-12 flex items-center justify-center">
-                {/* Purple triangle icon */}
-                <div className="mx-auto w-12 h-12 flex items-center justify-center">
-                <div
-                    className="bg-purple-600 rounded-sm transform rotate-180"
-                    style={{
-                    clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
-                    width: '32px', // Explicitly set width
-                    height: '32px', // Explicitly set height
-                    }}
-                />
-                </div>
+                  <img 
+                    src={UnionIcon} 
+                    alt="Union icon" 
+                    className="w-32 h-32"
+                  />
               </div>
               <h2 className="text-2xl font-semibold text-gray-900">Add model</h2>
               <p className="text-gray-500 text-lg">

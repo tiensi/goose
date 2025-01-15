@@ -30,12 +30,13 @@ export function WelcomeModelModal({ provider, model, endpoint, onSubmit, onCance
           <div className="px-8 pt-12 pb-0 space-y-8">
             {/* Header */}
             <div className="text-center space-y-4">
+              {/* Purple icon */}
               <div className="mx-auto w-12 h-12 flex items-center justify-center">
-                <img 
-                  src={UnionIcon} 
-                  alt="Union icon" 
-                  className="w-8 h-8"
-                />
+                  <img 
+                    src={UnionIcon} 
+                    alt="Union icon" 
+                    className="w-32 h-32"
+                  />
               </div>
               <h2 className="text-2xl font-semibold text-gray-900">{headerText}</h2>
               <p className="text-gray-500 text-lg">
@@ -55,7 +56,7 @@ export function WelcomeModelModal({ provider, model, endpoint, onSubmit, onCance
                   className="w-full h-14 px-6 rounded-2xl border border-gray-200/75 bg-white text-lg placeholder:text-gray-400"
                 />
               </div>
-              <div>
+              <div className="relative group">
                 <Input
                   type="text"
                   value={model}
@@ -63,6 +64,9 @@ export function WelcomeModelModal({ provider, model, endpoint, onSubmit, onCance
                   placeholder="Model"
                   className="w-full h-14 px-6 rounded-2xl border border-gray-200/75 bg-white text-lg placeholder:text-gray-400"
                 />
+                <div className="absolute mt-2 left-0 bg-gray-800 text-white text-sm rounded-md px-2 py-1 shadow-lg hidden group-hover:block">
+                  Model is fixed for beta. Future releases will allow selection.
+                </div>
               </div>
               <div>
                 <Input
