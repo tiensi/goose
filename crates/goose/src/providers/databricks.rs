@@ -66,9 +66,7 @@ impl DatabricksProvider {
             .send()
             .await?;
 
-        handle_response(payload, response)
-            .await
-            .map_err(|e| anyhow::anyhow!(e.to_string()))
+        handle_response(payload, response).await
     }
 
     async fn handle_moderation_response(&self, response: reqwest::Response) -> Result<Value> {
