@@ -38,11 +38,16 @@ impl StdioActor {
         loop {
             match reader.read_line(&mut line).await {
                 Ok(0) => {
-                    eprintln!("Child process ended (EOF on stdout)");
+                    tracing::error!("Child process ended (EOF on stdout)");
                     break;
                 } // EOF
                 Ok(_) => {
                     if let Ok(message) = serde_json::from_str::<JsonRpcMessage>(&line) {
+                        tracing::info!(
+                            message = ?message,
+                            "Received incoming message"
+                        );
+
                         if let JsonRpcMessage::Response(response) = &message {
                             if let Some(id) = &response.id {
                                 pending_requests.respond(&id.to_string(), Ok(message)).await;
@@ -52,7 +57,7 @@ impl StdioActor {
                     line.clear();
                 }
                 Err(e) => {
-                    eprintln!("Error reading line: {}", e);
+                    tracing::error!(error = ?e, "Error reading line");
                     break;
                 }
             }
@@ -75,6 +80,8 @@ impl StdioActor {
                 }
             };
 
+            tracing::info!(message = ?transport_msg.message, "Sending outgoing message");
+
             if let Some(response_tx) = transport_msg.response_tx {
                 if let JsonRpcMessage::Request(request) = &transport_msg.message {
                     if let Some(id) = &request.id {
@@ -87,13 +94,13 @@ impl StdioActor {
                 .write_all(format!("{}\n", message_str).as_bytes())
                 .await
             {
-                eprintln!("write_all failed: {:?}", e);
+                tracing::error!(error = ?e, "Error writing message to child process");
                 pending_requests.clear().await;
                 break;
             }
 
             if let Err(e) = stdin.flush().await {
-                eprintln!("flush failed: {:?}", e);
+                tracing::error!(error = ?e, "Error flushing message to child process");
                 pending_requests.clear().await;
                 break;
             }
