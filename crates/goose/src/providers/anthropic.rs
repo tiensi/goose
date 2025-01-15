@@ -10,7 +10,7 @@ use super::base::{Moderation, ModerationResult, Provider, ProviderUsage, Usage};
 use super::configs::{AnthropicProviderConfig, ModelConfig, ProviderModelConfig};
 use super::model_pricing::cost;
 use super::model_pricing::model_pricing_for;
-use super::utils::{emit_debug_trace, get_model};
+use super::utils::{emit_debug_trace, get_model, non_ok_response_to_provider_error};
 use crate::message::{Message, MessageContent};
 use mcp_core::content::Content;
 use mcp_core::role::Role;
@@ -175,12 +175,9 @@ impl AnthropicProvider {
 
         match response.status() {
             StatusCode::OK => Ok(response.json().await?),
-            status if status == StatusCode::TOO_MANY_REQUESTS || status.as_u16() >= 500 => {
-                Err(anyhow!("Server error: {}", status))
-            }
-            status => {
-                let error_text = response.text().await?;
-                Err(anyhow!("Request failed: {} - {}", status, error_text))
+            _ => {
+                let provider_error = non_ok_response_to_provider_error(payload, response).await;
+                Err(anyhow::anyhow!(provider_error.to_string()))
             }
         }
     }

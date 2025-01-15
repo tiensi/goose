@@ -43,7 +43,8 @@ impl GroqProvider {
             .json(&payload)
             .send()
             .await?;
-        handle_response(payload, response).await?
+
+        handle_response(payload, response).await
     }
 }
 

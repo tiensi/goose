@@ -62,7 +62,7 @@ impl OpenAiProvider {
             .send()
             .await?;
 
-        handle_response(payload, response).await?
+        handle_response(payload, response).await
     }
 }
 
@@ -134,9 +134,7 @@ impl Moderation for OpenAiProvider {
             .send()
             .await?;
 
-        let response_json = handle_response(serde_json::to_value(&request)?, response)
-            .await?
-            .unwrap();
+        let response_json = handle_response(serde_json::to_value(&request)?, response).await?;
 
         let flagged = response_json["results"][0]["flagged"]
             .as_bool()

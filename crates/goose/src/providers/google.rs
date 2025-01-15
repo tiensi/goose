@@ -45,7 +45,7 @@ impl GoogleProvider {
             .send()
             .await?;
 
-        handle_response(payload, response).await?
+        handle_response(payload, response).await
     }
 
     fn messages_to_google_spec(&self, messages: &[Message]) -> Vec<Value> {

@@ -37,7 +37,7 @@ impl OllamaProvider {
 
         let response = self.client.post(&url).json(&payload).send().await?;
 
-        handle_response(payload, response).await?
+        handle_response(payload, response).await
     }
 }
 
