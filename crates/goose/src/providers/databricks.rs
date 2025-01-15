@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use reqwest::Client;
-use serde_json::{json, Value};
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use std::time::Duration;
 
 use super::base::{Moderation, ModerationResult, Provider, ProviderUsage, Usage};
@@ -49,7 +49,6 @@ impl DatabricksAuth {
     }
 }
 
-
 #[derive(Debug, serde::Serialize)]
 pub struct DatabricksProvider {
     #[serde(skip)]
@@ -72,18 +71,20 @@ impl DatabricksProvider {
             .build()?;
 
         // If we find a databricks token we prefer that
-        if let Ok(api_key) = crate::key_manager::get_keyring_secret("DATABRICKS_TOKEN", Default::default()) {
-            return Ok( Self {
+        if let Ok(api_key) =
+            crate::key_manager::get_keyring_secret("DATABRICKS_TOKEN", Default::default())
+        {
+            return Ok(Self {
                 client,
                 host: host.clone(),
                 auth: DatabricksAuth::token(api_key),
                 model: ModelConfig::new(model_name),
                 image_format: ImageFormat::Anthropic,
-            } )
+            });
         }
 
         // Otherwise use Oauth flow
-        Ok(Self { 
+        Ok(Self {
             client,
             host: host.clone(),
             auth: DatabricksAuth::oauth(host),
@@ -183,11 +184,8 @@ impl Provider for DatabricksProvider {
     ) -> Result<(Message, ProviderUsage)> {
         // Prepare messages and tools
         let concat_tool_response_contents = false;
-        let messages_spec = messages_to_openai_spec(
-            messages,
-            &self.image_format,
-            concat_tool_response_contents,
-        );
+        let messages_spec =
+            messages_to_openai_spec(messages, &self.image_format, concat_tool_response_contents);
         let tools_spec = if !tools.is_empty() {
             tools_to_openai_spec(tools)?
         } else {
@@ -316,7 +314,7 @@ mod tests {
     use crate::providers::mock_server::{
         create_mock_open_ai_response, TEST_INPUT_TOKENS, TEST_OUTPUT_TOKENS, TEST_TOTAL_TOKENS,
     };
-    use rust_decimal_macros::dec;
+    
     use serde_json::json;
     use wiremock::matchers::{body_json, header, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};

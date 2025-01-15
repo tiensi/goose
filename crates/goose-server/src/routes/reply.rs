@@ -312,12 +312,14 @@ async fn handler(
         let agent = match agent.as_ref() {
             Some(agent) => agent,
             None => {
-                let _ = tx.send(ProtocolFormatter::format_error("No agent configured")).await;
+                let _ = tx
+                    .send(ProtocolFormatter::format_error("No agent configured"))
+                    .await;
                 let _ = tx.send(ProtocolFormatter::format_finish("error")).await;
                 return;
             }
         };
-        
+
         let mut stream = match agent.reply(&messages).await {
             Ok(stream) => stream,
             Err(e) => {

@@ -64,24 +64,39 @@ pub fn has_no_profiles() -> Result<bool> {
 
 pub fn set_provider_env_vars(provider_name: &str, profile: &Profile) {
     if let Some(temp) = profile.temperature {
-        std::env::set_var(format!("{}_TEMPERATURE", provider_name.to_uppercase()), temp.to_string());
+        std::env::set_var(
+            format!("{}_TEMPERATURE", provider_name.to_uppercase()),
+            temp.to_string(),
+        );
     }
     if let Some(limit) = profile.context_limit {
-        std::env::set_var(format!("{}_CONTEXT_LIMIT", provider_name.to_uppercase()), limit.to_string());
+        std::env::set_var(
+            format!("{}_CONTEXT_LIMIT", provider_name.to_uppercase()),
+            limit.to_string(),
+        );
     }
     if let Some(tokens) = profile.max_tokens {
-        std::env::set_var(format!("{}_MAX_TOKENS", provider_name.to_uppercase()), tokens.to_string());
+        std::env::set_var(
+            format!("{}_MAX_TOKENS", provider_name.to_uppercase()),
+            tokens.to_string(),
+        );
     }
     if let Some(factor) = profile.estimate_factor {
-        std::env::set_var(format!("{}_ESTIMATE_FACTOR", provider_name.to_uppercase()), factor.to_string());
+        std::env::set_var(
+            format!("{}_ESTIMATE_FACTOR", provider_name.to_uppercase()),
+            factor.to_string(),
+        );
     }
-    std::env::set_var(format!("{}_MODEL", provider_name.to_uppercase()), &profile.model);
+    std::env::set_var(
+        format!("{}_MODEL", provider_name.to_uppercase()),
+        &profile.model,
+    );
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::test_helpers::run_profile_with_tmp_dir;
     use super::*;
+    use crate::test_helpers::run_profile_with_tmp_dir;
 
     #[test]
     fn test_partial_profile_config() -> Result<()> {

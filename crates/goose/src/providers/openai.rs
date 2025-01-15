@@ -45,11 +45,11 @@ impl OpenAiModerationRequest {
 impl OpenAiProvider {
     pub fn from_env() -> Result<Self> {
         let api_key = crate::key_manager::get_keyring_secret("OPENAI_API_KEY", Default::default())?;
-        let host = std::env::var("OPENAI_HOST")
-            .unwrap_or_else(|_| "https://api.openai.com".to_string());
-        let model_name = std::env::var("OPENAI_MODEL")
-            .unwrap_or_else(|_| OPEN_AI_DEFAULT_MODEL.to_string());
-        
+        let host =
+            std::env::var("OPENAI_HOST").unwrap_or_else(|_| "https://api.openai.com".to_string());
+        let model_name =
+            std::env::var("OPENAI_MODEL").unwrap_or_else(|_| OPEN_AI_DEFAULT_MODEL.to_string());
+
         let client = Client::builder()
             .timeout(Duration::from_secs(600))
             .build()?;
@@ -63,10 +63,7 @@ impl OpenAiProvider {
     }
 
     async fn post(&self, payload: Value) -> Result<Value> {
-        let url = format!(
-            "{}/v1/chat/completions",
-            self.host.trim_end_matches('/')
-        );
+        let url = format!("{}/v1/chat/completions", self.host.trim_end_matches('/'));
 
         let response = self
             .client

@@ -2,7 +2,7 @@ use anyhow::Result;
 use dotenv::dotenv;
 use goose::message::{Message, MessageContent};
 use goose::providers::base::Provider;
-use goose::providers::{openai, databricks, ollama};
+use goose::providers::{databricks, ollama, openai};
 use mcp_core::tool::Tool;
 
 /// Generic test harness for any Provider implementation
@@ -116,9 +116,7 @@ async fn test_databricks_provider() -> Result<()> {
     load_env();
 
     // Skip if credentials aren't available
-    if std::env::var("DATABRICKS_HOST").is_err()
-        || std::env::var("DATABRICKS_TOKEN").is_err()
-    {
+    if std::env::var("DATABRICKS_HOST").is_err() || std::env::var("DATABRICKS_TOKEN").is_err() {
         println!("Skipping Databricks tests - credentials not configured");
         return Ok(());
     }

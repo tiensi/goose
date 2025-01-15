@@ -12,9 +12,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub async fn new(
-        secret_key: String,
-    ) -> Result<Self> {
+    pub async fn new(secret_key: String) -> Result<Self> {
         Ok(Self {
             agent: Arc::new(Mutex::new(None)),
             secret_key,

@@ -25,11 +25,9 @@ pub struct OllamaProvider {
 
 impl OllamaProvider {
     pub fn from_env() -> Result<Self> {
-        let host = std::env::var("OLLAMA_HOST")
-            .unwrap_or_else(|_| OLLAMA_HOST.to_string());
-        let model_name = std::env::var("OLLAMA_MODEL")
-            .unwrap_or_else(|_| OLLAMA_MODEL.to_string());
-        
+        let host = std::env::var("OLLAMA_HOST").unwrap_or_else(|_| OLLAMA_HOST.to_string());
+        let model_name = std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| OLLAMA_MODEL.to_string());
+
         let client = Client::builder()
             .timeout(Duration::from_secs(600))
             .build()?;
@@ -42,10 +40,7 @@ impl OllamaProvider {
     }
 
     async fn post(&self, payload: Value) -> Result<Value> {
-        let url = format!(
-            "{}/v1/chat/completions",
-            self.host.trim_end_matches('/')
-        );
+        let url = format!("{}/v1/chat/completions", self.host.trim_end_matches('/'));
 
         let response = self.client.post(&url).json(&payload).send().await?;
 
@@ -116,7 +111,7 @@ mod tests {
 
     async fn _setup_mock_server(response_body: Value) -> (MockServer, OllamaProvider) {
         let mock_server = setup_mock_server("/v1/chat/completions", response_body).await;
-        
+
         let provider = OllamaProvider {
             client: Client::builder().build().unwrap(),
             host: mock_server.uri(),

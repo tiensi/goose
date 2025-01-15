@@ -50,15 +50,13 @@ async fn create_agent(
         return Err(StatusCode::UNAUTHORIZED);
     }
 
-    let provider = factory::get_provider(&payload.provider)
-        .expect("Failed to create provider");
-    
+    let provider = factory::get_provider(&payload.provider).expect("Failed to create provider");
+
     let version = payload
         .version
         .unwrap_or_else(|| AgentFactory::default_version().to_string());
 
-    let new_agent = AgentFactory::create(&version, provider)
-        .expect("Failed to create agent");
+    let new_agent = AgentFactory::create(&version, provider).expect("Failed to create agent");
 
     let mut agent = state.agent.lock().await;
     *agent = Some(new_agent);

@@ -108,7 +108,6 @@ impl ModelConfig {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

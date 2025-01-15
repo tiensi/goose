@@ -2,7 +2,7 @@ use anyhow::Result;
 use dotenv::dotenv;
 use goose::{
     message::Message,
-    providers::{databricks::DatabricksProvider, base::Provider},
+    providers::{base::Provider, databricks::DatabricksProvider},
 };
 
 #[tokio::main]
@@ -12,7 +12,7 @@ async fn main() -> Result<()> {
 
     // Clear any token to force OAuth
     std::env::remove_var("DATABRICKS_TOKEN");
-    
+
     // Create the provider
     let provider = DatabricksProvider::from_env()?;
 

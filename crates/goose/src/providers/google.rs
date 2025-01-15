@@ -27,11 +27,10 @@ pub struct GoogleProvider {
 impl GoogleProvider {
     pub fn from_env() -> Result<Self> {
         let api_key = crate::key_manager::get_keyring_secret("GOOGLE_API_KEY", Default::default())?;
-        let host = std::env::var("GOOGLE_HOST")
-            .unwrap_or_else(|_| GOOGLE_API_HOST.to_string());
-        let model_name = std::env::var("GOOGLE_MODEL")
-            .unwrap_or_else(|_| GOOGLE_DEFAULT_MODEL.to_string());
-        
+        let host = std::env::var("GOOGLE_HOST").unwrap_or_else(|_| GOOGLE_API_HOST.to_string());
+        let model_name =
+            std::env::var("GOOGLE_MODEL").unwrap_or_else(|_| GOOGLE_DEFAULT_MODEL.to_string());
+
         let client = Client::builder()
             .timeout(Duration::from_secs(600))
             .build()?;

@@ -29,17 +29,18 @@ pub struct AnthropicProvider {
 
 impl AnthropicProvider {
     pub fn from_env() -> Result<Self> {
-        let api_key = crate::key_manager::get_keyring_secret("ANTHROPIC_API_KEY", Default::default())?;
+        let api_key =
+            crate::key_manager::get_keyring_secret("ANTHROPIC_API_KEY", Default::default())?;
         let host = std::env::var("ANTHROPIC_HOST")
             .unwrap_or_else(|_| "https://api.anthropic.com".to_string());
         let model_name = std::env::var("ANTHROPIC_MODEL")
             .unwrap_or_else(|_| ANTHROPIC_DEFAULT_MODEL.to_string());
-        
+
         let client = Client::builder()
             .timeout(Duration::from_secs(600))
             .build()?;
 
-        Ok(Self { 
+        Ok(Self {
             client,
             host,
             api_key,

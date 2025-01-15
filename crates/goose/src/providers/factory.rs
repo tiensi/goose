@@ -1,12 +1,7 @@
 use super::{
-    anthropic::AnthropicProvider,
-    databricks::DatabricksProvider,
-    google::GoogleProvider,
-    groq::GroqProvider,
-    ollama::OllamaProvider,
-    openai::OpenAiProvider,
+    anthropic::AnthropicProvider, base::Provider, databricks::DatabricksProvider,
+    google::GoogleProvider, groq::GroqProvider, ollama::OllamaProvider, openai::OpenAiProvider,
     openrouter::OpenRouterProvider,
-    base::Provider,
 };
 use anyhow::Result;
 
@@ -19,6 +14,6 @@ pub fn get_provider(name: &str) -> Result<Box<dyn Provider + Send + Sync>> {
         "ollama" => Ok(Box::new(OllamaProvider::from_env()?)),
         "openrouter" => Ok(Box::new(OpenRouterProvider::from_env()?)),
         "google" => Ok(Box::new(GoogleProvider::from_env()?)),
-        _ => Err(anyhow::anyhow!("Unknown provider: {}", name))
+        _ => Err(anyhow::anyhow!("Unknown provider: {}", name)),
     }
 }

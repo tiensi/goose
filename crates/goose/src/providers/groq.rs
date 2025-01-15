@@ -28,11 +28,10 @@ pub struct GroqProvider {
 impl GroqProvider {
     pub fn from_env() -> Result<Self> {
         let api_key = crate::key_manager::get_keyring_secret("GROQ_API_KEY", Default::default())?;
-        let host = std::env::var("GROQ_HOST")
-            .unwrap_or_else(|_| GROQ_API_HOST.to_string());
-        let model_name = std::env::var("GROQ_MODEL")
-            .unwrap_or_else(|_| GROQ_DEFAULT_MODEL.to_string());
-        
+        let host = std::env::var("GROQ_HOST").unwrap_or_else(|_| GROQ_API_HOST.to_string());
+        let model_name =
+            std::env::var("GROQ_MODEL").unwrap_or_else(|_| GROQ_DEFAULT_MODEL.to_string());
+
         let client = Client::builder()
             .timeout(Duration::from_secs(600))
             .build()?;
@@ -128,7 +127,7 @@ mod tests {
 
     async fn _setup_mock_server(response_body: Value) -> (MockServer, GroqProvider) {
         let mock_server = setup_mock_server("/openai/v1/chat/completions", response_body).await;
-        
+
         let provider = GroqProvider {
             client: Client::builder().build().unwrap(),
             host: mock_server.uri(),

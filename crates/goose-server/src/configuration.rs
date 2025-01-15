@@ -11,7 +11,6 @@ pub struct Settings {
     pub port: u16,
 }
 
-
 impl Settings {
     pub fn socket_addr(&self) -> SocketAddr {
         format!("{}:{}", self.host, self.port)

@@ -29,12 +29,13 @@ pub struct OpenRouterProvider {
 
 impl OpenRouterProvider {
     pub fn from_env() -> Result<Self> {
-        let api_key = crate::key_manager::get_keyring_secret("OPENROUTER_API_KEY", Default::default())?;
+        let api_key =
+            crate::key_manager::get_keyring_secret("OPENROUTER_API_KEY", Default::default())?;
         let host = std::env::var("OPENROUTER_HOST")
             .unwrap_or_else(|_| "https://openrouter.ai".to_string());
         let model_name = std::env::var("OPENROUTER_MODEL")
             .unwrap_or_else(|_| OPENROUTER_DEFAULT_MODEL.to_string());
-        
+
         let client = Client::builder()
             .timeout(Duration::from_secs(600))
             .build()?;
