@@ -465,10 +465,8 @@ mod tests {
     use super::*;
     use goose::{
         agents::DefaultAgent as Agent,
-        providers::{
-            base::{Moderation, ModerationResult, Provider, ProviderUsage, Usage},
-            configs::{ModelConfig, OpenAiProviderConfig},
-        },
+        providers::base::{Moderation, ModerationResult, Provider, ProviderUsage, Usage},
+        providers::configs::ModelConfig,
     };
     use mcp_core::tool::Tool;
 
@@ -608,7 +606,6 @@ mod tests {
     mod integration_tests {
         use super::*;
         use axum::{body::Body, http::Request};
-        use goose::providers::configs::{ModelConfig, ProviderConfig};
         use std::sync::Arc;
         use tokio::sync::Mutex;
         use tower::ServiceExt;
@@ -623,14 +620,8 @@ mod tests {
             });
             let agent = Agent::new(mock_provider);
             let state = AppState {
-                agent: Arc::new(Mutex::new(Box::new(agent))),
-                provider_config: ProviderConfig::OpenAi(OpenAiProviderConfig {
-                    host: "https://api.openai.com".to_string(),
-                    api_key: "test-key".to_string(),
-                    model: ModelConfig::new("test-model".to_string()),
-                }),
+                agent: Arc::new(Mutex::new(Some(Box::new(agent)))),
                 secret_key: "test-secret".to_string(),
-                agent_version: "test-version".to_string(),
             };
 
             // Build router
