@@ -1,6 +1,7 @@
 use keyring::Entry;
 use std::env;
 use thiserror::Error;
+use anyhow::{Result, Context};
 
 #[derive(Error, Debug)]
 pub enum KeyManagerError {
@@ -45,23 +46,22 @@ impl Default for KeyRetrievalStrategy {
 pub fn get_keyring_secret(
     key_name: &str,
     strategy: KeyRetrievalStrategy,
-) -> Result<String, Box<dyn std::error::Error>> {
-    let kr = Entry::new("goose", key_name)?;
+) -> Result<String> {
+    let kr = Entry::new("goose", key_name).context("Failed to create keyring entry")?;
     match strategy {
-        KeyRetrievalStrategy::EnvironmentOnly => env::var(key_name)
-            .map_err(|e| Box::new(KeyManagerError::from(e)) as Box<dyn std::error::Error>),
-        KeyRetrievalStrategy::KeyringOnly => kr
-            .get_password()
-            .map_err(|e| Box::new(KeyManagerError::from(e)) as Box<dyn std::error::Error>),
+        KeyRetrievalStrategy::EnvironmentOnly => {
+            env::var(key_name).context("Failed to get environment variable")
+        }
+        KeyRetrievalStrategy::KeyringOnly => {
+            kr.get_password().context("Failed to get password from keyring")
+        }
         KeyRetrievalStrategy::Both => {
             // Try environment first, then keyring
             env::var(key_name).or_else(|_| {
-                kr.get_password().map_err(|_| {
-                    Box::new(KeyManagerError::EnvVarAccess(format!(
-                        "Could not find {} key in keyring or environment variables",
-                        key_name
-                    ))) as Box<dyn std::error::Error>
-                })
+                kr.get_password().context(format!(
+                    "Could not find {} key in keyring or environment variables",
+                    key_name
+                ))
             })
         }
     }

@@ -41,7 +41,7 @@ export default function MoreMenu() {
       try {
         const port = window.appConfig.get("GOOSE_SERVER__PORT");
         const response = await fetch(
-          `http://127.0.0.1:${port}/api/agent/versions`
+          `http://127.0.0.1:${port}/agent/versions`
         );
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);

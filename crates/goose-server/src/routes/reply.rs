@@ -309,6 +309,15 @@ async fn handler(
     // Spawn task to handle streaming
     tokio::spawn(async move {
         let agent = agent.lock().await;
+        let agent = match agent.as_ref() {
+            Some(agent) => agent,
+            None => {
+                let _ = tx.send(ProtocolFormatter::format_error("No agent configured")).await;
+                let _ = tx.send(ProtocolFormatter::format_finish("error")).await;
+                return;
+            }
+        };
+        
         let mut stream = match agent.reply(&messages).await {
             Ok(stream) => stream,
             Err(e) => {
@@ -404,6 +413,7 @@ async fn ask_handler(
 
     let agent = state.agent.clone();
     let agent = agent.lock().await;
+    let agent = agent.as_ref().ok_or(StatusCode::NOT_FOUND)?;
 
     // Create a single message for the prompt
     let messages = vec![Message::user().with_text(request.prompt)];

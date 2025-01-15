@@ -109,15 +109,7 @@ const createChat = async (app, query?: string, dir?: string, version?: string) =
   // Apply current environment settings before creating chat
   updateEnvironmentVariables(envToggles);
 
-  const maybeStartGoosed = async () => {
-    if (getGooseProvider()) {
-      return startGoosed(app, dir);
-    } else {
-      return [0, '', ''];
-    }
-  }
-
-  const [port, working_dir, agentVersion] = await maybeStartGoosed();
+  const [port, working_dir, agentVersion] = await startGoosed(app, dir);
 
   const mainWindow = new BrowserWindow({
     titleBarStyle: 'hidden',
