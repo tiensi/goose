@@ -16,7 +16,4 @@ pub enum ProviderError {
 
     #[error("Request failed: {0}")]
     RequestFailed(String),
-
-    #[error("JSON parse error: {0}")]
-    JsonParseError(String),
 }

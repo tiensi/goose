@@ -189,7 +189,7 @@ mod tests {
         assert!(result.is_some());
         assert_eq!(
             result.unwrap().to_string(),
-            "Context length exceeded. Message: Input is too long for requested model."
+            "Context length exceeded: Input is too long for requested model."
         );
 
         let error = json!({
