@@ -1,5 +1,5 @@
 use crate::profile::{
-    find_existing_profile, get_provider_config, profile_path, save_profile, Profile,
+    find_existing_profile, profile_path, save_profile, set_provider_env_vars, Profile,
 };
 use cliclack::spinner;
 use console::style;
@@ -103,31 +103,22 @@ pub async fn handle_configure(
             .interact()?
     };
 
-    // Forward any existing systems from the profile if present
-    let additional_systems =
-        existing_profile.map_or(Vec::new(), |profile| profile.additional_systems.clone());
-
-    if !additional_systems.is_empty() {
-        let _ = cliclack::log::info(
-            format!("We kept the existing systems from your {} profile. You can edit this with `goose system`", profile_name)
-        );
-    }
-
     let profile = Profile {
         provider: provider_name.to_string(),
         model: model.clone(),
-        additional_systems,
         temperature: None,
         context_limit: None,
         max_tokens: None,
         estimate_factor: None,
     };
 
+    // Set environment variables for provider configuration
+    set_provider_env_vars(&provider_name, &profile);
+
     // Confirm everything is configured correctly by calling a model!
-    let provider_config = get_provider_config(&provider_name, profile.clone());
     let spin = spinner();
     spin.start("Checking your configuration...");
-    let provider = factory::get_provider(provider_config).unwrap();
+    let provider = factory::get_provider(&provider_name).unwrap();
     let message = Message::user().with_text("Please give a nice welcome messsage (one sentence) and let them know they are all set to use this agent");
     let result = provider.complete("You are an AI agent called Goose. You use tools of connected systems to solve problems.", &[message], &[]).await;
 

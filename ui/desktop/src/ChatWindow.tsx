@@ -1,29 +1,49 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Message, useChat } from './ai-sdk-fork/useChat';
 import { Route, Routes, Navigate } from 'react-router-dom';
-import { getApiUrl } from './config';
+import { getApiUrl, getSecretKey } from './config';
+import BottomMenu from './components/BottomMenu';
+import FlappyGoose from './components/FlappyGoose';
+import GooseMessage from './components/GooseMessage';
+import Input from './components/Input';
+import LoadingGoose from './components/LoadingGoose';
+import MoreMenu from './components/MoreMenu';
+import Settings from './components/settings/Settings';
+import Splash from './components/Splash';
 import { Card } from './components/ui/card';
 import { ScrollArea } from './components/ui/scroll-area';
-import Splash from './components/Splash';
-import GooseMessage from './components/GooseMessage';
 import UserMessage from './components/UserMessage';
-import Input from './components/Input';
-import MoreMenu from './components/MoreMenu';
-import BottomMenu from './components/BottomMenu';
-import LoadingGoose from './components/LoadingGoose';
-import { ApiKeyWarning } from './components/ApiKeyWarning';
-import { askAi } from './utils/askAI';
 import WingToWing, { Working } from './components/WingToWing';
-import { WelcomeScreen } from './components/WelcomeScreen';
-import FlappyGoose from './components/FlappyGoose';
+import { askAi } from './utils/askAI';
+import mockKeychain from './services/mockKeychain';
+import { ProviderSetupModal } from './components/ProviderSetupModal';
+import {
+  providers,
+  ProviderOption,
+  OPENAI_ENDPOINT_PLACEHOLDER,
+  ANTHROPIC_ENDPOINT_PLACEHOLDER,
+  OPENAI_DEFAULT_MODEL,
+  ANTHROPIC_DEFAULT_MODEL
+} from './utils/providerUtils';
 
-// update this when you want to show the welcome screen again - doesn't have to be an actual version, just anything woudln't have been seen before
-const CURRENT_VERSION = '0.0.0';
-
-// Get the last version from localStorage
-const getLastSeenVersion = () => localStorage.getItem('lastSeenVersion');
-const setLastSeenVersion = (version: string) => localStorage.setItem('lastSeenVersion', version);
-
+declare global {
+  interface Window {
+    electron: {
+      stopPowerSaveBlocker: () => void;
+      startPowerSaveBlocker: () => void;
+      hideWindow: () => void;
+      createChatWindow: () => void;
+      getConfig: () => { GOOSE_PROVIDER: string };
+      logInfo: (message: string) => void;
+      showNotification: (opts: { title: string; body: string }) => void;
+      getBinaryPath: (binary: string) => Promise<string>;
+      app: any;
+    };
+    appConfig: {
+      get: (key: string) => any;
+    };
+  }
+}
 
 export interface Chat {
   id: number;
@@ -110,7 +130,6 @@ function ChatContent({
       const timeSinceLastInteraction = Date.now() - lastInteractionTime;
       window.electron.logInfo("last interaction:" + lastInteractionTime);
       if (timeSinceLastInteraction > 60000) { // 60000ms = 1 minute
-        
         window.electron.showNotification({title: 'Goose finished the task.', body: 'Click here to expand.'});
       }
     },
@@ -151,19 +170,12 @@ function ChatContent({
   // Single effect to handle all scrolling
   useEffect(() => {
     if (isLoading || messages.length > 0 || working === Working.Working) {
-      // Initial scroll
       scrollToBottom(isLoading || working === Working.Working ? 'instant' : 'smooth');
-      
-      // // Additional scrolls to catch dynamic content
-      // [100, 300, 500].forEach(delay => {
-      //   setTimeout(() => scrollToBottom('smooth'), delay);
-      // });
     }
   }, [messages, isLoading, working]);
 
   // Handle submit
   const handleSubmit = (e: React.FormEvent) => {
-    // Start power save blocker when sending a message
     window.electron.startPowerSaveBlocker();
     const customEvent = e as CustomEvent;
     const content = customEvent.detail?.value || '';
@@ -173,7 +185,6 @@ function ChatContent({
         role: 'user',
         content: content,
       });
-      // Immediate scroll on submit
       scrollToBottom('instant');
     }
   };
@@ -184,15 +195,11 @@ function ChatContent({
 
   const onStopGoose = () => {
     stop();
-    setLastInteractionTime(Date.now()); // Update last interaction time
+    setLastInteractionTime(Date.now());
     window.electron.stopPowerSaveBlocker();
 
     const lastMessage: Message = messages[messages.length - 1];
     if (lastMessage.role === 'user' && lastMessage.toolInvocations === undefined) {
-      // TODO: Using setInput seems to change the ongoing request message and prevents stop from stopping.
-      // It would be nice to find a way to populate the input field with the last message when interrupted.
-      // setInput("stop");
-
       // Remove the last user message.
       if (messages.length > 1) {
         setMessages(messages.slice(0, -1));
@@ -200,7 +207,7 @@ function ChatContent({
         setMessages([]);
       }
     } else if (lastMessage.role === 'assistant' && lastMessage.toolInvocations !== undefined) {
-      // Add messaging about interrupted ongoing tool invocations.
+      // Add messaging about interrupted ongoing tool invocations
       const newLastMessage: Message = {
           ...lastMessage,
           toolInvocations: lastMessage.toolInvocations.map((invocation) => {
@@ -209,16 +216,12 @@ function ChatContent({
                 ...invocation,
                 result: [
                   {
-                    "audience": [
-                      "user"
-                    ],
+                    "audience": ["user"],
                     "text": "Interrupted.\n",
                     "type": "text"
                   },
                   {
-                    "audience": [
-                      "assistant"
-                    ],
+                    "audience": ["assistant"],
                     "text": "Interrupted by the user to make a correction.\n",
                     "type": "text"
                   }
@@ -321,9 +324,6 @@ function ChatContent({
 // Function to send the system configuration to the server
 const addSystemConfig = async (system: string) => {
   console.log("calling add system")
-  // Get the app instance from electron
-  const app = window.electron.app;
-  
   const systemConfig = {
     type: "Stdio",
     cmd: await window.electron.getBinaryPath('goosed'),
@@ -335,6 +335,7 @@ const addSystemConfig = async (system: string) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-Secret-Key': getSecretKey(),
       },
       body: JSON.stringify(systemConfig)
     });
@@ -374,9 +375,6 @@ export default function ChatWindow() {
     };
   }, []);
 
-  // Check if API key is missing from the window arguments
-  const apiCredsMissing = window.electron.getConfig().apiCredsMissing;
-
   // Get initial query and history from URL parameters
   const searchParams = new URLSearchParams(window.location.search);
   const initialQuery = searchParams.get('initialQuery');
@@ -398,67 +396,175 @@ export default function ChatWindow() {
   );
   const [working, setWorking] = useState<Working>(Working.Idle);
   const [progressMessage, setProgressMessage] = useState<string>('');
+  const [selectedProvider, setSelectedProvider] = useState<ProviderOption | null>(null);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(true);
 
-  // Welcome screen state
-  const [showWelcome, setShowWelcome] = useState(() => {
-    const lastVersion = getLastSeenVersion();
-    return !lastVersion || lastVersion !== CURRENT_VERSION;
-  });
-
-  const handleWelcomeDismiss = () => {
-    setShowWelcome(false);
-    setLastSeenVersion(CURRENT_VERSION);
-  };
-
+  // Add this useEffect to track changes and update welcome state
   const toggleMode = () => {
     const newMode = mode === 'expanded' ? 'compact' : 'expanded';
     console.log(`Toggle to ${newMode}`);
     setMode(newMode);
   };
 
-  // Initialize system config when window loads
+  window.electron.logInfo('ChatWindow loaded');
+
   useEffect(() => {
-    addSystemConfig("developer");
+    // Check if we already have a provider set
+    const storedProvider = localStorage.getItem("GOOSE_PROVIDER");
+
+    if (storedProvider) {
+      setShowWelcomeModal(false);
+    } else {
+      setShowWelcomeModal(true);
+    }
   }, []);
 
-  window.electron.logInfo('ChatWindow loaded');
+  const storeSecret = async (key: string, value: string) => {
+    const response = await fetch(getApiUrl('/secrets/store'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Secret-Key': getSecretKey(),
+      },
+      body: JSON.stringify({ key, value })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to store secret: ${response.statusText}`);
+    }
+
+    return response;
+  };
+
+  const addAgent = async (provider: ProviderOption) => {
+    const response = await fetch(getApiUrl('/agent'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Secret-Key': getSecretKey(),
+      },
+      body: JSON.stringify({ provider: provider.id })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to add agent: ${response.statusText}`);
+    }
+
+    return response;
+  };
+
+  const initializeSystem = async (provider: ProviderOption) => {
+    try {
+      await addAgent(provider);
+      await addSystemConfig("developer2");
+    } catch (error) {
+      console.error('Failed to initialize system:', error);
+      throw error;
+    }
+  };
+
+  const handleModalSubmit = async (apiKey: string) => {
+    try {
+      const trimmedKey = apiKey.trim();
+
+      if (!selectedProvider) {
+        throw new Error('No provider selected');
+      }
+
+      // Store the API key
+      const secretKey = `${selectedProvider.id.toUpperCase()}_API_KEY`;
+      await storeSecret(secretKey, trimmedKey);
+
+      // Initialize the system with the selected provider
+      await initializeSystem(selectedProvider);
+
+      // Save provider selection and close modal
+      localStorage.setItem("GOOSE_PROVIDER", selectedProvider.name);
+      setShowWelcomeModal(false);
+    } catch (error) {
+      console.error('Failed to setup provider:', error);
+      throw error;
+    }
+  };
+
+  // Initialize system on load if we have a stored provider
+  useEffect(() => {
+    const setupStoredProvider = async () => {
+      const storedProvider = localStorage.getItem("GOOSE_PROVIDER");
+      if (storedProvider) {
+        const provider = providers.find(p => p.name === storedProvider);
+        if (provider) {
+          try {
+            await initializeSystem(provider);
+          } catch (error) {
+            console.error('Failed to initialize with stored provider:', error);
+          }
+        }
+      }
+    };
+
+    setupStoredProvider();
+  }, []);
+
+
 
   return (
     <div className="relative w-screen h-screen overflow-hidden dark:bg-dark-window-gradient bg-window-gradient flex flex-col">
       <div className="titlebar-drag-region" />
-      {apiCredsMissing ? (
-        <div className="w-full h-full">
-          <ApiKeyWarning className="w-full h-full" />
-        </div>
-      ) : showWelcome && (!window.appConfig.get("REQUEST_DIR")) ? (
-        <div className="w-full h-full">
-          <WelcomeScreen className="w-full h-full" onDismiss={handleWelcomeDismiss} />
-        </div>
-      ) : (
-        <>
-          <div style={{ display: mode === 'expanded' ? 'block' : 'none' }}>
-            <Routes>
-              <Route
-                path="/chat/:id"
-                element={
-                  <ChatContent
-                    key={selectedChatId}
-                    chats={chats}
-                    setChats={setChats}
-                    selectedChatId={selectedChatId}
-                    setSelectedChatId={setSelectedChatId}
-                    initialQuery={initialQuery}
-                    setProgressMessage={setProgressMessage}
-                    setWorking={setWorking}
-                  />
-                }
+      <div style={{ display: mode === 'expanded' ? 'block' : 'none' }}>
+        <Routes>
+          <Route
+            path="/chat/:id"
+            element={
+              <ChatContent
+                key={selectedChatId}
+                chats={chats}
+                setChats={setChats}
+                selectedChatId={selectedChatId}
+                setSelectedChatId={setSelectedChatId}
+                initialQuery={null}
+                setProgressMessage={setProgressMessage}
+                setWorking={setWorking}
               />
-              <Route path="*" element={<Navigate to="/chat/1" replace />} />
-            </Routes>
-          </div>
+            }
+          />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="*" element={<Navigate to="/chat/1" replace />} />
+        </Routes>
+      </div>
 
-          <WingToWing onExpand={toggleMode} progressMessage={progressMessage} working={working} />
-        </>
+      <WingToWing onExpand={toggleMode} progressMessage={progressMessage} working={working} />
+
+      {showWelcomeModal && (
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[9999]">
+          {selectedProvider ? (
+            <ProviderSetupModal
+              provider={selectedProvider.name}
+              model={selectedProvider.id === 'openai' ? OPENAI_DEFAULT_MODEL : ANTHROPIC_DEFAULT_MODEL}
+              endpoint={selectedProvider.id === 'openai' ? OPENAI_ENDPOINT_PLACEHOLDER : ANTHROPIC_ENDPOINT_PLACEHOLDER}
+              onSubmit={handleModalSubmit}
+              onCancel={() => {
+                setSelectedProvider(null);
+              }}
+            />
+          ) : (
+            <Card className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[440px] bg-white dark:bg-gray-800 rounded-[32px] shadow-xl overflow-hidden p-8">
+              <h2 className="text-2xl font-semibold text-center mb-6 dark:text-white">Select a Provider</h2>
+              <div className="grid grid-cols-1 gap-4">
+                {providers.map((provider) => (
+                  <button
+                    key={provider.id}
+                    onClick={() => setSelectedProvider(provider)}
+                    className="p-6 border rounded-lg hover:border-blue-500 transition-colors text-left dark:border-gray-700 dark:hover:border-blue-400"
+                  >
+                    <h3 className="text-lg font-medium mb-2 dark:text-gray-200">{provider.name}</h3>
+                    <p className="text-gray-600 dark:text-gray-400">{provider.description}</p>
+                  </button>
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
       )}
     </div>
   );

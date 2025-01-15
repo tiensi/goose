@@ -1,16 +1,16 @@
-use std::sync::atomic::{AtomicU64, Ordering};
-
-use crate::transport::TransportHandle;
 use mcp_core::protocol::{
-    CallToolResult, InitializeResult, JsonRpcError, JsonRpcMessage, JsonRpcNotification,
-    JsonRpcRequest, JsonRpcResponse, ListResourcesResult, ListToolsResult, ReadResourceResult,
-    ServerCapabilities, METHOD_NOT_FOUND,
+    CallToolResult, Implementation, InitializeResult, JsonRpcError, JsonRpcMessage,
+    JsonRpcNotification, JsonRpcRequest, JsonRpcResponse, ListResourcesResult, ListToolsResult,
+    ReadResourceResult, ServerCapabilities, METHOD_NOT_FOUND,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::sync::atomic::{AtomicU64, Ordering};
 use thiserror::Error;
 use tokio::sync::Mutex;
 use tower::{Service, ServiceExt}; // for Service::ready()
+
+pub type BoxError = Box<dyn std::error::Error + Sync + Send>;
 
 /// Error type for MCP client operations.
 #[derive(Debug, Error)]
@@ -24,14 +24,36 @@ pub enum Error {
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
 
-    #[error("Unexpected response from server")]
-    UnexpectedResponse,
+    #[error("Unexpected response from server: {0}")]
+    UnexpectedResponse(String),
 
     #[error("Not initialized")]
     NotInitialized,
 
     #[error("Timeout or service not ready")]
     NotReady,
+
+    #[error("Request timed out")]
+    Timeout(#[from] tower::timeout::error::Elapsed),
+
+    #[error("Error from mcp-server: {0}")]
+    ServerBoxError(BoxError),
+
+    #[error("Call to '{server}' failed for '{method}' with params '{params}'. {source}")]
+    McpServerError {
+        method: String,
+        server: String,
+        params: Value,
+        #[source]
+        source: BoxError,
+    },
+}
+
+// BoxError from mcp-server gets converted to our Error type
+impl From<BoxError> for Error {
+    fn from(err: BoxError) -> Self {
+        Error::ServerBoxError(err)
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -54,20 +76,51 @@ pub struct InitializeParams {
     pub client_info: ClientInfo,
 }
 
-/// The MCP client is the interface for MCP operations.
-pub struct McpClient {
-    service: Mutex<TransportHandle>,
-    next_id: AtomicU64,
-    server_capabilities: Option<ServerCapabilities>,
+#[async_trait::async_trait]
+pub trait McpClientTrait: Send + Sync {
+    async fn initialize(
+        &mut self,
+        info: ClientInfo,
+        capabilities: ClientCapabilities,
+    ) -> Result<InitializeResult, Error>;
+
+    async fn list_resources(
+        &self,
+        next_cursor: Option<String>,
+    ) -> Result<ListResourcesResult, Error>;
+
+    async fn read_resource(&self, uri: &str) -> Result<ReadResourceResult, Error>;
+
+    async fn list_tools(&self, next_cursor: Option<String>) -> Result<ListToolsResult, Error>;
+
+    async fn call_tool(&self, name: &str, arguments: Value) -> Result<CallToolResult, Error>;
 }
 
-impl McpClient {
-    pub fn new(transport_handle: TransportHandle) -> Self {
-        // Takes TransportHandle directly
+/// The MCP client is the interface for MCP operations.
+pub struct McpClient<S>
+where
+    S: Service<JsonRpcMessage, Response = JsonRpcMessage> + Clone + Send + Sync + 'static,
+    S::Error: Into<Error>,
+    S::Future: Send,
+{
+    service: Mutex<S>,
+    next_id: AtomicU64,
+    server_capabilities: Option<ServerCapabilities>,
+    server_info: Option<Implementation>,
+}
+
+impl<S> McpClient<S>
+where
+    S: Service<JsonRpcMessage, Response = JsonRpcMessage> + Clone + Send + Sync + 'static,
+    S::Error: Into<Error>,
+    S::Future: Send,
+{
+    pub fn new(service: S) -> Self {
         Self {
-            service: Mutex::new(transport_handle),
+            service: Mutex::new(service),
             next_id: AtomicU64::new(1),
-            server_capabilities: None, // set during initialization
+            server_capabilities: None,
+            server_info: None,
         }
     }
 
@@ -84,10 +137,18 @@ impl McpClient {
             jsonrpc: "2.0".to_string(),
             id: Some(id),
             method: method.to_string(),
-            params: Some(params),
+            params: Some(params.clone()),
         });
 
-        let response_msg = service.call(request).await?;
+        let response_msg = service
+            .call(request)
+            .await
+            .map_err(|e| Error::McpServerError {
+                server: self.server_info.as_ref().unwrap().name.clone(),
+                method: method.to_string(),
+                params: params.clone(),
+                source: Box::new(e.into()),
+            })?;
 
         match response_msg {
             JsonRpcMessage::Response(JsonRpcResponse {
@@ -95,7 +156,9 @@ impl McpClient {
             }) => {
                 // Verify id matches
                 if id != Some(self.next_id.load(Ordering::SeqCst) - 1) {
-                    return Err(Error::UnexpectedResponse);
+                    return Err(Error::UnexpectedResponse(
+                        "id mismatch for JsonRpcResponse".to_string(),
+                    ));
                 }
                 if let Some(err) = error {
                     Err(Error::RpcError {
@@ -105,12 +168,14 @@ impl McpClient {
                 } else if let Some(r) = result {
                     Ok(serde_json::from_value(r)?)
                 } else {
-                    Err(Error::UnexpectedResponse)
+                    Err(Error::UnexpectedResponse("missing result".to_string()))
                 }
             }
             JsonRpcMessage::Error(JsonRpcError { id, error, .. }) => {
                 if id != Some(self.next_id.load(Ordering::SeqCst) - 1) {
-                    return Err(Error::UnexpectedResponse);
+                    return Err(Error::UnexpectedResponse(
+                        "id mismatch for JsonRpcError".to_string(),
+                    ));
                 }
                 Err(Error::RpcError {
                     code: error.code,
@@ -119,7 +184,9 @@ impl McpClient {
             }
             _ => {
                 // Requests/notifications not expected as a response
-                Err(Error::UnexpectedResponse)
+                Err(Error::UnexpectedResponse(
+                    "unexpected message type".to_string(),
+                ))
             }
         }
     }
@@ -132,14 +199,36 @@ impl McpClient {
         let notification = JsonRpcMessage::Notification(JsonRpcNotification {
             jsonrpc: "2.0".to_string(),
             method: method.to_string(),
-            params: Some(params),
+            params: Some(params.clone()),
         });
 
-        service.call(notification).await?;
+        service
+            .call(notification)
+            .await
+            .map_err(|e| Error::McpServerError {
+                server: self.server_info.as_ref().unwrap().name.clone(),
+                method: method.to_string(),
+                params: params.clone(),
+                source: Box::new(e.into()),
+            })?;
+
         Ok(())
     }
 
-    pub async fn initialize(
+    // Check if the client has completed initialization
+    fn completed_initialization(&self) -> bool {
+        self.server_capabilities.is_some()
+    }
+}
+
+#[async_trait::async_trait]
+impl<S> McpClientTrait for McpClient<S>
+where
+    S: Service<JsonRpcMessage, Response = JsonRpcMessage> + Clone + Send + Sync + 'static,
+    S::Error: Into<Error>,
+    S::Future: Send,
+{
+    async fn initialize(
         &mut self,
         info: ClientInfo,
         capabilities: ClientCapabilities,
@@ -158,14 +247,15 @@ impl McpClient {
 
         self.server_capabilities = Some(result.capabilities.clone());
 
+        self.server_info = Some(result.server_info.clone());
+
         Ok(result)
     }
 
-    fn completed_initialization(&self) -> bool {
-        self.server_capabilities.is_some()
-    }
-
-    pub async fn list_resources(&self) -> Result<ListResourcesResult, Error> {
+    async fn list_resources(
+        &self,
+        next_cursor: Option<String>,
+    ) -> Result<ListResourcesResult, Error> {
         if !self.completed_initialization() {
             return Err(Error::NotInitialized);
         }
@@ -177,14 +267,20 @@ impl McpClient {
             .resources
             .is_none()
         {
-            return Ok(ListResourcesResult { resources: vec![] });
+            return Ok(ListResourcesResult {
+                resources: vec![],
+                next_cursor: None,
+            });
         }
 
-        self.send_request("resources/list", serde_json::json!({}))
-            .await
+        let payload = next_cursor
+            .map(|cursor| serde_json::json!({"cursor": cursor}))
+            .unwrap_or_else(|| serde_json::json!({}));
+
+        self.send_request("resources/list", payload).await
     }
 
-    pub async fn read_resource(&self, uri: &str) -> Result<ReadResourceResult, Error> {
+    async fn read_resource(&self, uri: &str) -> Result<ReadResourceResult, Error> {
         if !self.completed_initialization() {
             return Err(Error::NotInitialized);
         }
@@ -206,19 +302,26 @@ impl McpClient {
         self.send_request("resources/read", params).await
     }
 
-    pub async fn list_tools(&self) -> Result<ListToolsResult, Error> {
+    async fn list_tools(&self, next_cursor: Option<String>) -> Result<ListToolsResult, Error> {
         if !self.completed_initialization() {
             return Err(Error::NotInitialized);
         }
         // If tools is not supported, return an empty list
         if self.server_capabilities.as_ref().unwrap().tools.is_none() {
-            return Ok(ListToolsResult { tools: vec![] });
+            return Ok(ListToolsResult {
+                tools: vec![],
+                next_cursor: None,
+            });
         }
 
-        self.send_request("tools/list", serde_json::json!({})).await
+        let payload = next_cursor
+            .map(|cursor| serde_json::json!({"cursor": cursor}))
+            .unwrap_or_else(|| serde_json::json!({}));
+
+        self.send_request("tools/list", payload).await
     }
 
-    pub async fn call_tool(&self, name: &str, arguments: Value) -> Result<CallToolResult, Error> {
+    async fn call_tool(&self, name: &str, arguments: Value) -> Result<CallToolResult, Error> {
         if !self.completed_initialization() {
             return Err(Error::NotInitialized);
         }
@@ -231,6 +334,9 @@ impl McpClient {
         }
 
         let params = serde_json::json!({ "name": name, "arguments": arguments });
+
+        // TODO ERROR: check that if there is an error, we send back is_error: true with msg
+        // https://modelcontextprotocol.io/docs/concepts/tools#error-handling-2
         self.send_request("tools/call", params).await
     }
 }

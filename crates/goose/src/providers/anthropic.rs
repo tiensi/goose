@@ -6,9 +6,8 @@ use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::time::Duration;
 
-use super::base::ProviderUsage;
-use super::base::{Provider, Usage};
-use super::configs::{AnthropicProviderConfig, ModelConfig, ProviderModelConfig};
+use super::base::{Moderation, ModerationResult, Provider, ProviderUsage, Usage};
+use super::configs::ModelConfig;
 use super::model_pricing::cost;
 use super::model_pricing::model_pricing_for;
 use super::utils::{emit_debug_trace, get_model};
@@ -19,18 +18,34 @@ use mcp_core::tool::{Tool, ToolCall};
 
 pub const ANTHROPIC_DEFAULT_MODEL: &str = "claude-3-5-sonnet-latest";
 
+#[derive(serde::Serialize)]
 pub struct AnthropicProvider {
+    #[serde(skip)]
     client: Client,
-    config: AnthropicProviderConfig,
+    host: String,
+    api_key: String,
+    model: ModelConfig,
 }
 
 impl AnthropicProvider {
-    pub fn new(config: AnthropicProviderConfig) -> Result<Self> {
+    pub fn from_env() -> Result<Self> {
+        let api_key =
+            crate::key_manager::get_keyring_secret("ANTHROPIC_API_KEY", Default::default())?;
+        let host = std::env::var("ANTHROPIC_HOST")
+            .unwrap_or_else(|_| "https://api.anthropic.com".to_string());
+        let model_name = std::env::var("ANTHROPIC_MODEL")
+            .unwrap_or_else(|_| ANTHROPIC_DEFAULT_MODEL.to_string());
+
         let client = Client::builder()
-            .timeout(Duration::from_secs(600)) // 10 minutes timeout
+            .timeout(Duration::from_secs(600))
             .build()?;
 
-        Ok(Self { client, config })
+        Ok(Self {
+            client,
+            host,
+            api_key,
+            model: ModelConfig::new(model_name),
+        })
     }
 
     fn tools_to_anthropic_spec(tools: &[Tool]) -> Vec<Value> {
@@ -163,12 +178,12 @@ impl AnthropicProvider {
     }
 
     async fn post(&self, payload: Value) -> Result<Value> {
-        let url = format!("{}/v1/messages", self.config.host.trim_end_matches('/'));
+        let url = format!("{}/v1/messages", self.host.trim_end_matches('/'));
 
         let response = self
             .client
             .post(&url)
-            .header("x-api-key", &self.config.api_key)
+            .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
             .json(&payload)
             .send()
@@ -190,7 +205,7 @@ impl AnthropicProvider {
 #[async_trait]
 impl Provider for AnthropicProvider {
     fn get_model_config(&self) -> &ModelConfig {
-        self.config.model_config()
+        &self.model
     }
 
     #[tracing::instrument(
@@ -205,7 +220,7 @@ impl Provider for AnthropicProvider {
             cost
         )
     )]
-    async fn complete(
+    async fn complete_internal(
         &self,
         system: &str,
         messages: &[Message],
@@ -220,9 +235,9 @@ impl Provider for AnthropicProvider {
         }
 
         let mut payload = json!({
-            "model": self.config.model.model_name,
+            "model": self.model.model_name,
             "messages": anthropic_messages,
-            "max_tokens": self.config.model.max_tokens.unwrap_or(4096)
+            "max_tokens": self.model.max_tokens.unwrap_or(4096)
         });
 
         // Add system message if present
@@ -242,7 +257,7 @@ impl Provider for AnthropicProvider {
         }
 
         // Add temperature if specified
-        if let Some(temp) = self.config.model.temperature {
+        if let Some(temp) = self.model.temperature {
             payload
                 .as_object_mut()
                 .unwrap()
@@ -257,7 +272,7 @@ impl Provider for AnthropicProvider {
         let usage = self.get_usage(&response)?;
         let model = get_model(&response);
         let cost = cost(&usage, &model_pricing_for(&model));
-        emit_debug_trace(&self.config, &payload, &response, &usage, cost);
+        emit_debug_trace(self, &payload, &response, &usage, cost);
         Ok((message, ProviderUsage::new(model, usage, cost)))
     }
 
@@ -285,10 +300,15 @@ impl Provider for AnthropicProvider {
     }
 }
 
+#[async_trait]
+impl Moderation for AnthropicProvider {
+    async fn moderate_content(&self, _content: &str) -> Result<ModerationResult> {
+        Ok(ModerationResult::new(false, None, None))
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::providers::configs::ModelConfig;
-
     use super::*;
     use rust_decimal_macros::dec;
     use serde_json::json;
@@ -304,7 +324,8 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let config = AnthropicProviderConfig {
+        let provider = AnthropicProvider {
+            client: Client::builder().build().unwrap(),
             host: mock_server.uri(),
             api_key: "test_api_key".to_string(),
             model: ModelConfig::new("claude-3-sonnet-20241022".to_string())
@@ -312,7 +333,6 @@ mod tests {
                 .with_context_limit(Some(200_000)),
         };
 
-        let provider = AnthropicProvider::new(config).unwrap();
         (mock_server, provider)
     }
 
@@ -340,7 +360,7 @@ mod tests {
         let messages = vec![Message::user().with_text("Hello?")];
 
         let (message, usage) = provider
-            .complete("You are a helpful assistant.", &messages, &[])
+            .complete_internal("You are a helpful assistant.", &messages, &[])
             .await?;
 
         if let MessageContent::Text(text) = &message.content[0] {
@@ -399,7 +419,7 @@ mod tests {
         );
 
         let (message, usage) = provider
-            .complete("You are a helpful assistant.", &messages, &[tool])
+            .complete_internal("You are a helpful assistant.", &messages, &[tool])
             .await?;
 
         if let MessageContent::ToolRequest(tool_request) = &message.content[0] {

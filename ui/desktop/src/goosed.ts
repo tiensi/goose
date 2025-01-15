@@ -1,18 +1,13 @@
-import path from 'node:path';
-import { execSync, spawn } from 'child_process';
-import { getBinaryPath } from './utils/binaryPath';
-import { existsSync } from 'fs';
-import log from './utils/logger';
-import os from 'node:os';
+import { spawn } from 'child_process';
 import { createServer } from 'net';
-import { loadZshEnv } from './utils/loadEnv';
-
+import os from 'node:os';
+import { getBinaryPath } from './utils/binaryPath';
+import log from './utils/logger';
 
 // Find an available port to start goosed on
 export const findAvailablePort = (): Promise<number> => {
   return new Promise((resolve, reject) => {
     const server = createServer();
-
 
     server.listen(0, '127.0.0.1', () => {
       const { port } = server.address() as { port: number };
@@ -24,9 +19,24 @@ export const findAvailablePort = (): Promise<number> => {
   });
 };
 
+// Function to fetch agent version from the server
+const fetchAgentVersion = async (port: number): Promise<string> => {
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/agent/versions`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    return data.current_version;
+  } catch (error) {
+    log.error('Failed to fetch agent version:', error);
+    return 'unknown';
+  }
+};
+
 // Goose process manager. Take in the app, port, and directory to start goosed in.
 // Check if goosed server is ready by polling the status endpoint
-const checkServerStatus = async (port: number, maxAttempts: number = 30, interval: number = 100): Promise<boolean> => {
+const checkServerStatus = async (port: number, maxAttempts: number = 60, interval: number = 100): Promise<boolean> => {
   const statusUrl = `http://127.0.0.1:${port}/status`;
   log.info(`Checking server status at ${statusUrl}`);
 
@@ -48,22 +58,13 @@ const checkServerStatus = async (port: number, maxAttempts: number = 30, interva
   return false;
 };
 
-export const startGoosed = async (app, dir=null): Promise<[number, string]> => {
-  // In will use this later to determine if we should start process
-  const isDev = process.env.NODE_ENV === 'development';
-
+export const startGoosed = async (app, dir=null, env={}): Promise<[number, string, string]> => {
   // we default to running goosed in home dir - if not specified
   const homeDir = os.homedir();
   if (!dir) {
     dir = homeDir;
   }
   
-  // Skip starting goosed if configured in dev mode
-  if (isDev && !app.isPackaged && process.env.VITE_START_EMBEDDED_SERVER === 'no') {
-    log.info('Skipping starting goosed in development mode');
-    return [3000, dir];
-  }
-
   // Get the goosed binary path using the shared utility
   const goosedPath = getBinaryPath(app, 'goosed');
   const port = await findAvailablePort();
@@ -80,16 +81,19 @@ export const startGoosed = async (app, dir=null): Promise<[number, string]> => {
     USERPROFILE: homeDir,
 
     // start with the port specified 
-    GOOSE_SERVER__PORT: String(port),
+    GOOSE_PORT: String(port),
 
     GOOSE_SERVER__SECRET_KEY: process.env.GOOSE_SERVER__SECRET_KEY,
+    
+    // Add any additional environment variables passed in
+    ...env
   };
 
   // Merge parent environment with additional environment variables
-  const env = { ...process.env, ...additionalEnv };
+  const processEnv = { ...process.env, ...additionalEnv };
 
   // Spawn the goosed process with the user's home directory as cwd
-  const goosedProcess = spawn(goosedPath, ["agent"], { cwd: dir, env: env, stdio: ["ignore", "pipe", "pipe"] });
+  const goosedProcess = spawn(goosedPath, ["agent"], { cwd: dir, env: processEnv, stdio: ["ignore", "pipe", "pipe"] });
 
   goosedProcess.stdout.on('data', (data) => {
     log.info(`goosed stdout for port ${port} and dir ${dir}: ${data.toString()}`);
@@ -110,6 +114,7 @@ export const startGoosed = async (app, dir=null): Promise<[number, string]> => {
 
   // Wait for the server to be ready
   const isReady = await checkServerStatus(port);
+  log.info(`Goosed isReady ${isReady}`);
   if (!isReady) {
     log.error(`Goosed server failed to start on port ${port}`);
     goosedProcess.kill();
@@ -123,8 +128,10 @@ export const startGoosed = async (app, dir=null): Promise<[number, string]> => {
     goosedProcess.kill();
   });
 
+  // Wait for the server to start and fetch the agent version
+  await new Promise(resolve => setTimeout(resolve, 1000)); // Give the server time to start
+  const agentVersion = await fetchAgentVersion(port);
+
   log.info(`Goosed server successfully started on port ${port}`);
-  return [port, dir];
+  return [port, dir, agentVersion];
 };
-
-

@@ -9,6 +9,7 @@ use axum::{
 use bytes::Bytes;
 use futures::{stream::StreamExt, Stream};
 use goose::message::{Message, MessageContent};
+use goose::providers::base::ModerationError;
 use mcp_core::{content::Content, role::Role};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -159,6 +160,24 @@ impl ProtocolFormatter {
         format!("a:{}\n", response)
     }
 
+    fn format_error(error: &str) -> String {
+        // Error messages start with "3:" in the new protocol.
+        let encoded_error = serde_json::to_string(error).unwrap_or_else(|_| String::new());
+        format!("3:{}\n", encoded_error)
+    }
+
+    fn format_moderation_error(error: &ModerationError) -> String {
+        let error_part = match error {
+            ModerationError::ContentFlagged { categories, .. } => {
+                format!(
+                    "Content was flagged by moderation in the following categories: {}",
+                    categories
+                )
+            }
+        };
+        format!("3:\"{}\"\n", error_part)
+    }
+
     fn format_finish(reason: &str) -> String {
         // Finish messages start with "d:"
         let finish = json!({
@@ -193,8 +212,12 @@ async fn stream_message(
                             .await?;
                         }
                         Err(err) => {
+                            // Send an error message first
+                            tx.send(ProtocolFormatter::format_error(&err.to_string()))
+                                .await?;
+                            // Then send an empty tool response to maintain the protocol
                             let result =
-                                vec![Content::text(format!("Error {}", err)).with_priority(0.0)];
+                                vec![Content::text(format!("Error: {}", err)).with_priority(0.0)];
                             tx.send(ProtocolFormatter::format_tool_response(
                                 &response.id,
                                 &result,
@@ -209,22 +232,24 @@ async fn stream_message(
             for content in message.content {
                 match content {
                     MessageContent::ToolRequest(request) => {
-                        if let Ok(tool_call) = request.tool_call {
-                            tx.send(ProtocolFormatter::format_tool_call(
-                                &request.id,
-                                &tool_call.name,
-                                &tool_call.arguments,
-                            ))
-                            .await?;
-                        } else {
-                            // if the llm generates an invalid object tool call, we still have
-                            // to include it in the history. It always comes with a response indicating the error
-                            tx.send(ProtocolFormatter::format_tool_call(
-                                &request.id,
-                                "invalid name",
-                                &json!({}),
-                            ))
-                            .await?;
+                        match request.tool_call {
+                            Ok(tool_call) => {
+                                tx.send(ProtocolFormatter::format_tool_call(
+                                    &request.id,
+                                    &tool_call.name,
+                                    &tool_call.arguments,
+                                ))
+                                .await?;
+                            }
+                            Err(err) => {
+                                // Send a placeholder tool call to maintain protocol
+                                tx.send(ProtocolFormatter::format_tool_call(
+                                    &request.id,
+                                    "invalid_tool",
+                                    &json!({"error": err.to_string()}),
+                                ))
+                                .await?;
+                            }
                         }
                     }
                     MessageContent::Text(text) => {
@@ -254,6 +279,16 @@ async fn handler(
     headers: HeaderMap,
     Json(request): Json<ChatRequest>,
 ) -> Result<SseResponse, StatusCode> {
+    // Verify secret key
+    let secret_key = headers
+        .get("X-Secret-Key")
+        .and_then(|value| value.to_str().ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    if secret_key != state.secret_key {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
     // Check protocol header (optional in our case)
     if let Some(protocol) = headers.get("x-protocol") {
         if protocol.to_str().map(|p| p != "data").unwrap_or(true) {
@@ -274,10 +309,33 @@ async fn handler(
     // Spawn task to handle streaming
     tokio::spawn(async move {
         let agent = agent.lock().await;
+        let agent = match agent.as_ref() {
+            Some(agent) => agent,
+            None => {
+                let _ = tx
+                    .send(ProtocolFormatter::format_error("No agent configured"))
+                    .await;
+                let _ = tx.send(ProtocolFormatter::format_finish("error")).await;
+                return;
+            }
+        };
+
         let mut stream = match agent.reply(&messages).await {
             Ok(stream) => stream,
             Err(e) => {
                 tracing::error!("Failed to start reply stream: {}", e);
+                // Check if it's a moderation error
+                if let Some(moderation_error) = e.downcast_ref::<ModerationError>() {
+                    let _ = tx
+                        .send(ProtocolFormatter::format_moderation_error(moderation_error))
+                        .await;
+                    // Kill the stream since we encountered a moderation error
+                } else {
+                    // Send a generic error message
+                    let _ = tx
+                        .send(ProtocolFormatter::format_error(&e.to_string()))
+                        .await;
+                }
                 // Send a finish message with error as the reason
                 let _ = tx.send(ProtocolFormatter::format_finish("error")).await;
                 return;
@@ -291,11 +349,18 @@ async fn handler(
                         Ok(Some(Ok(message))) => {
                             if let Err(e) = stream_message(message, &tx).await {
                                 tracing::error!("Error sending message through channel: {}", e);
+                                let _ = tx.send(ProtocolFormatter::format_error(&e.to_string())).await;
                                 break;
                             }
                         }
                         Ok(Some(Err(e))) => {
                             tracing::error!("Error processing message: {}", e);
+                            // Check if it's a moderation error
+                            if let Some(moderation_error) = e.downcast_ref::<ModerationError>() {
+                                let _ = tx.send(ProtocolFormatter::format_moderation_error(moderation_error)).await;
+                            } else {
+                                let _ = tx.send(ProtocolFormatter::format_error(&e.to_string())).await;
+                            }
                             break;
                         }
                         Ok(None) => {
@@ -335,10 +400,22 @@ struct AskResponse {
 // simple ask an AI for a response, non streaming
 async fn ask_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(request): Json<AskRequest>,
 ) -> Result<Json<AskResponse>, StatusCode> {
+    // Verify secret key
+    let secret_key = headers
+        .get("X-Secret-Key")
+        .and_then(|value| value.to_str().ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    if secret_key != state.secret_key {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
     let agent = state.agent.clone();
     let agent = agent.lock().await;
+    let agent = agent.as_ref().ok_or(StatusCode::NOT_FOUND)?;
 
     // Create a single message for the prompt
     let messages = vec![Message::user().with_text(request.prompt)];
@@ -390,10 +467,8 @@ mod tests {
     use super::*;
     use goose::{
         agents::DefaultAgent as Agent,
-        providers::{
-            base::{Provider, ProviderUsage, Usage},
-            configs::{ModelConfig, OpenAiProviderConfig},
-        },
+        providers::base::{Moderation, ModerationResult, Provider, ProviderUsage, Usage},
+        providers::configs::ModelConfig,
     };
     use mcp_core::tool::Tool;
 
@@ -405,7 +480,7 @@ mod tests {
 
     #[async_trait::async_trait]
     impl Provider for MockProvider {
-        async fn complete(
+        async fn complete_internal(
             &self,
             _system_prompt: &str,
             _messages: &[Message],
@@ -423,6 +498,16 @@ mod tests {
 
         fn get_usage(&self, _data: &Value) -> anyhow::Result<Usage> {
             Ok(Usage::new(None, None, None))
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl Moderation for MockProvider {
+        async fn moderate_content(
+            &self,
+            _content: &str,
+        ) -> Result<ModerationResult, anyhow::Error> {
+            Ok(ModerationResult::new(false, None, None))
         }
     }
 
@@ -493,6 +578,27 @@ mod tests {
         assert!(formatted.starts_with("a:"));
         assert!(formatted.contains("\"toolCallId\":\"123\""));
 
+        // Test error formatting
+        let formatted = ProtocolFormatter::format_error("Test error");
+        println!("Formatted error: {}", formatted);
+        assert!(formatted.starts_with("3:"));
+        assert!(formatted.contains("Test error"));
+
+        // Test moderation error formatting
+        let moderation_error = ModerationError::ContentFlagged {
+            categories: "hate, violence".to_string(),
+            category_scores: Some(json!({
+                "hate": 0.9,
+                "violence": 0.8
+            })),
+        };
+        let formatted = ProtocolFormatter::format_moderation_error(&moderation_error);
+        println!("{}", formatted);
+        assert!(formatted.starts_with("3:"));
+        assert!(
+            formatted.contains("Content was flagged by moderation in the following categories:")
+        );
+
         // Test finish formatting
         let formatted = ProtocolFormatter::format_finish("stop");
         assert!(formatted.starts_with("d:"));
@@ -502,7 +608,6 @@ mod tests {
     mod integration_tests {
         use super::*;
         use axum::{body::Body, http::Request};
-        use goose::providers::configs::{ModelConfig, ProviderConfig};
         use std::sync::Arc;
         use tokio::sync::Mutex;
         use tower::ServiceExt;
@@ -517,14 +622,8 @@ mod tests {
             });
             let agent = Agent::new(mock_provider);
             let state = AppState {
-                agent: Arc::new(Mutex::new(Box::new(agent))),
-                provider_config: ProviderConfig::OpenAi(OpenAiProviderConfig {
-                    host: "https://api.openai.com".to_string(),
-                    api_key: "test-key".to_string(),
-                    model: ModelConfig::new("test-model".to_string()),
-                }),
+                agent: Arc::new(Mutex::new(Some(Box::new(agent)))),
                 secret_key: "test-secret".to_string(),
-                agent_version: "test-version".to_string(),
             };
 
             // Build router
@@ -535,6 +634,7 @@ mod tests {
                 .uri("/ask")
                 .method("POST")
                 .header("content-type", "application/json")
+                .header("x-secret-key", "test-secret")
                 .body(Body::from(
                     serde_json::to_string(&AskRequest {
                         prompt: "test prompt".to_string(),

@@ -44,7 +44,9 @@ where
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
         let mut buf = Vec::new();
-        let mut reader = BufReader::new(&mut this.reader);
+        // Default BufReader capacity is 8 * 1024, increase this to 2MB to the file size limit
+        // allows the buffer to have the capacity to read very large calls
+        let mut reader = BufReader::with_capacity(2 * 1024 * 1024, &mut this.reader);
 
         let mut read_future = Box::pin(reader.read_until(b'\n', &mut buf));
         match read_future.as_mut().poll(cx) {

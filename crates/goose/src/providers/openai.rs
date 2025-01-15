@@ -4,10 +4,9 @@ use reqwest::Client;
 use serde_json::Value;
 use std::time::Duration;
 
-use super::base::ProviderUsage;
+use super::base::{Moderation, ModerationResult, ProviderUsage};
 use super::base::{Provider, Usage};
-use super::configs::OpenAiProviderConfig;
-use super::configs::{ModelConfig, ProviderModelConfig};
+use super::configs::ModelConfig;
 use super::model_pricing::cost;
 use super::model_pricing::model_pricing_for;
 use super::utils::{emit_debug_trace, get_model, handle_response};
@@ -17,33 +16,59 @@ use crate::providers::openai_utils::{
     openai_response_to_message,
 };
 use mcp_core::tool::Tool;
+use serde::Serialize;
 
 pub const OPEN_AI_DEFAULT_MODEL: &str = "gpt-4o";
+pub const OPEN_AI_MODERATION_MODEL: &str = "omni-moderation-latest";
 
+#[derive(Debug, serde::Serialize)]
 pub struct OpenAiProvider {
+    #[serde(skip)]
     client: Client,
-    config: OpenAiProviderConfig,
+    host: String,
+    api_key: String,
+    model: ModelConfig,
+}
+
+#[derive(Serialize)]
+struct OpenAiModerationRequest {
+    input: String,
+    model: String,
+}
+
+impl OpenAiModerationRequest {
+    pub fn new(input: String, model: String) -> Self {
+        Self { input, model }
+    }
 }
 
 impl OpenAiProvider {
-    pub fn new(config: OpenAiProviderConfig) -> Result<Self> {
+    pub fn from_env() -> Result<Self> {
+        let api_key = crate::key_manager::get_keyring_secret("OPENAI_API_KEY", Default::default())?;
+        let host =
+            std::env::var("OPENAI_HOST").unwrap_or_else(|_| "https://api.openai.com".to_string());
+        let model_name =
+            std::env::var("OPENAI_MODEL").unwrap_or_else(|_| OPEN_AI_DEFAULT_MODEL.to_string());
+
         let client = Client::builder()
-            .timeout(Duration::from_secs(600)) // 10 minutes timeout
+            .timeout(Duration::from_secs(600))
             .build()?;
 
-        Ok(Self { client, config })
+        Ok(Self {
+            client,
+            host,
+            api_key,
+            model: ModelConfig::new(model_name),
+        })
     }
 
     async fn post(&self, payload: Value) -> Result<Value> {
-        let url = format!(
-            "{}/v1/chat/completions",
-            self.config.host.trim_end_matches('/')
-        );
+        let url = format!("{}/v1/chat/completions", self.host.trim_end_matches('/'));
 
         let response = self
             .client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", self.config.api_key))
+            .header("Authorization", format!("Bearer {}", self.api_key))
             .json(&payload)
             .send()
             .await?;
@@ -55,7 +80,7 @@ impl OpenAiProvider {
 #[async_trait]
 impl Provider for OpenAiProvider {
     fn get_model_config(&self) -> &ModelConfig {
-        self.config.model_config()
+        &self.model
     }
 
     #[tracing::instrument(
@@ -70,14 +95,14 @@ impl Provider for OpenAiProvider {
             cost
         )
     )]
-    async fn complete(
+    async fn complete_internal(
         &self,
         system: &str,
         messages: &[Message],
         tools: &[Tool],
     ) -> Result<(Message, ProviderUsage)> {
         // Not checking for o1 model here since system message is not supported by o1
-        let payload = create_openai_request_payload(&self.config.model, system, messages, tools)?;
+        let payload = create_openai_request_payload(&self.model, system, messages, tools)?;
 
         // Make request
         let response = self.post(payload.clone()).await?;
@@ -95,7 +120,7 @@ impl Provider for OpenAiProvider {
         let usage = self.get_usage(&response)?;
         let model = get_model(&response);
         let cost = cost(&usage, &model_pricing_for(&model));
-        emit_debug_trace(&self.config, &payload, &response, &usage, cost);
+        emit_debug_trace(self, &payload, &response, &usage, cost);
         Ok((message, ProviderUsage::new(model, usage, cost)))
     }
 
@@ -104,11 +129,55 @@ impl Provider for OpenAiProvider {
     }
 }
 
+#[async_trait]
+impl Moderation for OpenAiProvider {
+    async fn moderate_content_internal(&self, content: &str) -> Result<ModerationResult> {
+        let url = format!("{}/v1/moderations", self.host.trim_end_matches('/'));
+
+        let request =
+            OpenAiModerationRequest::new(content.to_string(), OPEN_AI_MODERATION_MODEL.to_string());
+
+        let response = self
+            .client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .json(&request)
+            .send()
+            .await?;
+
+        let response_json = handle_response(serde_json::to_value(&request)?, response)
+            .await?
+            .unwrap();
+
+        let flagged = response_json["results"][0]["flagged"]
+            .as_bool()
+            .unwrap_or(false);
+        if flagged {
+            let categories = response_json["results"][0]["categories"]
+                .as_object()
+                .unwrap();
+            let category_scores = response_json["results"][0]["category_scores"].clone();
+            return Ok(ModerationResult::new(
+                flagged,
+                Some(
+                    categories
+                        .iter()
+                        .filter(|(_, value)| value.as_bool().unwrap_or(false))
+                        .map(|(key, _)| key.to_string())
+                        .collect(),
+                ),
+                Some(category_scores),
+            ));
+        } else {
+            return Ok(ModerationResult::new(flagged, None, None));
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::message::MessageContent;
-    use crate::providers::configs::ModelConfig;
     use crate::providers::mock_server::{
         create_mock_open_ai_response, create_mock_open_ai_response_with_tools, create_test_tool,
         get_expected_function_call_arguments, setup_mock_server, TEST_INPUT_TOKENS,
@@ -121,13 +190,13 @@ mod tests {
         let mock_server = setup_mock_server("/v1/chat/completions", response_body).await;
 
         // Create the OpenAiProvider with the mock server's URL as the host
-        let config = OpenAiProviderConfig {
+        let provider = OpenAiProvider {
+            client: Client::builder().build().unwrap(),
             host: mock_server.uri(),
             api_key: "test_api_key".to_string(),
             model: ModelConfig::new("gpt-4o".to_string()).with_temperature(Some(0.7)),
         };
 
-        let provider = OpenAiProvider::new(config).unwrap();
         (mock_server, provider)
     }
 
@@ -145,7 +214,7 @@ mod tests {
 
         // Call the complete method
         let (message, usage) = provider
-            .complete("You are a helpful assistant.", &messages, &[])
+            .complete_internal("You are a helpful assistant.", &messages, &[])
             .await?;
 
         // Assert the response
@@ -176,7 +245,7 @@ mod tests {
 
         // Call the complete method
         let (message, usage) = provider
-            .complete(
+            .complete_internal(
                 "You are a helpful assistant.",
                 &messages,
                 &[create_test_tool()],

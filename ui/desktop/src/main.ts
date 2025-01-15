@@ -1,14 +1,14 @@
+import { spawn } from 'child_process';
 import 'dotenv/config';
-import { loadZshEnv } from './utils/loadEnv';
-import { getBinaryPath } from './utils/binaryPath';
-import { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, Notification, MenuItem, dialog, powerSaveBlocker } from 'electron';
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, MenuItem, Notification, powerSaveBlocker, Tray } from 'electron';
+import started from "electron-squirrel-startup";
 import path from 'node:path';
 import { startGoosed } from './goosed';
-import started from "electron-squirrel-startup";
+import { getBinaryPath } from './utils/binaryPath';
+import { loadZshEnv } from './utils/loadEnv';
 import log from './utils/logger';
-import { exec } from 'child_process';
 import { addRecentDir, loadRecentDirs } from './utils/recentDirs';
-import { EnvToggles, loadSettings, saveSettings, updateEnvironmentVariables, createEnvironmentMenu } from './utils/settings';
+import { createEnvironmentMenu, EnvToggles, loadSettings, saveSettings, updateEnvironmentVariables } from './utils/settings';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) app.quit();
@@ -34,28 +34,12 @@ const parseArgs = () => {
   return { dirPath };
 };
 
-const checkApiCredentials = () => {
+const getGooseProvider = () => {
   loadZshEnv(app.isPackaged);
-
-  
   //{env-macro-start}//
   //needed when goose is bundled for a specific provider
-
-  const apiKeyProvidersValid =
-    ['openai', 'anthropic', 'google', 'groq', 'openrouter'].includes(process.env.GOOSE_PROVIDER__TYPE) &&
-      process.env.GOOSE_PROVIDER__HOST &&
-      process.env.GOOSE_PROVIDER__MODEL &&
-      process.env.GOOSE_PROVIDER__API_KEY;
-
-  const optionalApiKeyProvidersValid =
-    ['ollama', 'databricks'].includes(process.env.GOOSE_PROVIDER__TYPE) &&
-      process.env.GOOSE_PROVIDER__HOST &&
-      process.env.GOOSE_PROVIDER__MODEL;
-
-  return apiKeyProvidersValid || optionalApiKeyProvidersValid;
-  
-  //needed when goose is bundled for a specific provider:
   //{env-macro-end}//
+  return process.env.GOOSE_PROVIDER;
 };
 
 const generateSecretKey = () => {
@@ -66,10 +50,11 @@ const generateSecretKey = () => {
 };
 
 let appConfig = { 
-  apiCredsMissing: !checkApiCredentials(),
+  GOOSE_PROVIDER: getGooseProvider(),
   GOOSE_API_HOST: 'http://127.0.0.1',
-  GOOSE_SERVER__PORT: 0,
+  GOOSE_PORT: 0,
   GOOSE_WORKING_DIR: '',
+  GOOSE_AGENT_VERSION: '',
   secretKey: generateSecretKey(),
 };
 
@@ -114,24 +99,18 @@ const createLauncher = () => {
   });
 };
 
-
 // Track windows by ID
 let windowCounter = 0;
 const windowMap = new Map<number, BrowserWindow>();
 
-const createChat = async (app, query?: string, dir?: string) => {
+const createChat = async (app, query?: string, dir?: string, version?: string) => {
+  const env = version ? { GOOSE_AGENT_VERSION: version } : {};
+
   // Apply current environment settings before creating chat
   updateEnvironmentVariables(envToggles);
 
-  const maybeStartGoosed = async () => {
-    if (checkApiCredentials()) {
-      return startGoosed(app, dir);
-    } else {
-      return [0, ''];
-    }
-  }
+  const [port, working_dir, agentVersion] = await startGoosed(app, dir);
 
-  const [port, working_dir] = await maybeStartGoosed();
   const mainWindow = new BrowserWindow({
     titleBarStyle: 'hidden',
     trafficLightPosition: { x: 16, y: 10 },
@@ -145,7 +124,13 @@ const createChat = async (app, query?: string, dir?: string) => {
     icon: path.join(__dirname, '../images/icon'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      additionalArguments: [JSON.stringify({ ...appConfig, GOOSE_SERVER__PORT: port, GOOSE_WORKING_DIR: working_dir, REQUEST_DIR: dir })],
+      additionalArguments: [JSON.stringify({ 
+        ...appConfig, 
+        GOOSE_PORT: port,
+        GOOSE_WORKING_DIR: working_dir,
+        GOOSE_AGENT_VERSION: agentVersion,
+        REQUEST_DIR: dir 
+      })],
     },
   });
 
@@ -206,7 +191,6 @@ const createTray = () => {
   tray.setToolTip('Goose');
   tray.setContextMenu(contextMenu);
 };
-
 
 const showWindow = () => {
   const windows = BrowserWindow.getAllWindows();
@@ -373,8 +357,8 @@ app.whenReady().then(async () => {
     }
   });
 
-  ipcMain.on('create-chat-window', (_, query) => {
-    createChat(app, query);
+  ipcMain.on('create-chat-window', (_, query, dir, version) => {
+    createChat(app, query, dir, version);
   });
 
   ipcMain.on('directory-chooser', (_, replace: boolean = false) => {
@@ -447,13 +431,12 @@ app.whenReady().then(async () => {
   ipcMain.on('open-in-chrome', (_, url) => {
     // On macOS, use the 'open' command with Chrome
     if (process.platform === 'darwin') {
-      exec(`open -a "Google Chrome" "${url}"`);
+      spawn('open', ['-a', 'Google Chrome', url]);
     } else if (process.platform === 'win32') {
-      // On Windows, use start command
-      exec(`start chrome "${url}"`);
-    } else {
+      // On Windows, start is built-in command of cmd.exe
+      spawn('cmd.exe', ['/c', 'start', '', 'chrome', url]);    } else {
       // On Linux, use xdg-open with chrome
-      exec(`xdg-open "${url}"`);
+      spawn('xdg-open', [url]);
     }
   });
 });
