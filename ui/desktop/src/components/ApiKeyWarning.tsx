@@ -50,7 +50,7 @@ export GOOSE_PROVIDER__API_KEY=your_api_key_here`;
 
 const DATABRICKS_CONFIG = `export GOOSE_PROVIDER__TYPE=databricks
 export GOOSE_PROVIDER__HOST=your_databricks_host
-export GOOSE_PROVIDER__MODEL=claude-3-5-sonnet-2`;
+export GOOSE_PROVIDER__MODEL=your_databricks_model`;
 
 const OPENROUTER_CONFIG = `export GOOSE_PROVIDER__TYPE=openrouter
 export GOOSE_PROVIDER__HOST=https://openrouter.ai
