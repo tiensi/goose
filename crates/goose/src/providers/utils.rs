@@ -43,7 +43,7 @@ pub async fn non_ok_response_to_provider_error(
 ) -> ProviderError {
     match response.status() {
         StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
-            ProviderError::Unauthorized(format!("Authentication failed. Please ensure your API keys are valid and have the required permissions. \
+            ProviderError::Authentication(format!("Authentication failed. Please ensure your API keys are valid and have the required permissions. \
                 Status: {}. Response: {:?}", response.status(), response.text().await.unwrap_or_default()))
         }
         StatusCode::TOO_MANY_REQUESTS => {

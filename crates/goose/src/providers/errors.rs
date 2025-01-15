@@ -3,7 +3,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum ProviderError {
     #[error("Authentication error: {0}")]
-    Unauthorized(String),
+    Authentication(String),
 
     #[error("Context length exceeded: {0}")]
     ContextLengthExceeded(String),
