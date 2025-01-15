@@ -1,6 +1,7 @@
 use crate::state::AppState;
 use axum::{
     extract::State,
+    http::{HeaderMap, StatusCode},
     routing::{get, post},
     Json, Router,
 };
@@ -36,8 +37,19 @@ async fn get_versions() -> Json<VersionsResponse> {
 
 async fn create_agent(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(payload): Json<CreateAgentRequest>,
-) -> Json<CreateAgentResponse> {
+) -> Result<Json<CreateAgentResponse>, StatusCode> {
+    // Verify secret key
+    let secret_key = headers
+        .get("X-Secret-Key")
+        .and_then(|value| value.to_str().ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    if secret_key != state.secret_key {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
     let provider = factory::get_provider(&payload.provider)
         .expect("Failed to create provider");
     
@@ -51,7 +63,7 @@ async fn create_agent(
     let mut agent = state.agent.lock().await;
     *agent = Some(new_agent);
 
-    Json(CreateAgentResponse { version })
+    Ok(Json(CreateAgentResponse { version }))
 }
 
 pub fn routes(state: AppState) -> Router {
