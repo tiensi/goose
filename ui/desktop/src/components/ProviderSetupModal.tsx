@@ -1,11 +1,11 @@
 import React from 'react';
-import { Card } from '../ui/card';
+import { Card } from './ui/card';
 import { Lock } from 'lucide-react'
-import { Input } from "../ui/input"
-import { Button } from "../ui/button"
-import UnionIcon from '../../images/Union@2x.svg';
+import { Input } from "./ui/input"
+import { Button } from "./ui/button"
+import UnionIcon from '../images/Union@2x.svg';
 
-interface WelcomeAddModelModalProps {
+interface ProviderSetupModalProps {
   provider: string
   model: string
   endpoint: string
@@ -13,12 +13,9 @@ interface WelcomeAddModelModalProps {
   onCancel: () => void
 }
 
-export function WelcomeModelModal({ provider, model, endpoint, onSubmit, onCancel }: WelcomeAddModelModalProps) {
+export function ProviderSetupModal({ provider, model, endpoint, onSubmit, onCancel }: ProviderSetupModalProps) {
     const [apiKey, setApiKey] = React.useState("")
-
     const headerText = `Add ${provider} API Key`
-    const description = "This preview of Goose currently supports select models from Anthropic (Claude) and OpenAI (GPT-4). Beta will support a wider range of providers."
-  
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault()
       onSubmit(apiKey)
@@ -39,9 +36,6 @@ export function WelcomeModelModal({ provider, model, endpoint, onSubmit, onCance
                   />
               </div>
               <h2 className="text-2xl font-semibold text-gray-900">{headerText}</h2>
-              <p className="text-gray-500 text-lg">
-                {description}
-              </p>
             </div>
   
             {/* Form */}
@@ -49,31 +43,10 @@ export function WelcomeModelModal({ provider, model, endpoint, onSubmit, onCance
             <div className="space-y-5">
               <div>
                 <Input
-                  type="text"
-                  value={endpoint}
-                  disabled
-                  placeholder="Endpoint"
-                  className="w-full h-14 px-6 rounded-2xl border border-gray-200/75 bg-white text-lg placeholder:text-gray-400"
-                />
-              </div>
-              <div className="relative group">
-                <Input
-                  type="text"
-                  value={model}
-                  disabled
-                  placeholder="Model"
-                  className="w-full h-14 px-6 rounded-2xl border border-gray-200/75 bg-white text-lg placeholder:text-gray-400"
-                />
-                <div className="absolute mt-2 left-0 bg-gray-800 text-white text-sm rounded-md px-2 py-1 shadow-lg hidden group-hover:block">
-                  Model is fixed for beta. Future releases will allow selection.
-                </div>
-              </div>
-              <div>
-                <Input
                   type="password"
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
-                  placeholder={`Paste your ${provider} API key here`}
+                  placeholder={`${provider} API key`}
                   className="w-full h-14 px-6 rounded-2xl border border-gray-200/75 bg-white text-lg placeholder:text-gray-400"
                   required
                 />
