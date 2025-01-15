@@ -24,6 +24,7 @@ async fn add_system(
         return Err(StatusCode::UNAUTHORIZED);
     }
     let mut agent = state.agent.lock().await;
+    let agent = agent.as_mut().ok_or(StatusCode::PRECONDITION_REQUIRED)?;
     let response = agent.add_system(request).await;
 
     Ok(Json(SystemResponse {
