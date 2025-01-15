@@ -67,7 +67,11 @@ pub fn setup_logging() -> Result<()> {
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
         // Set default levels for different modules
         EnvFilter::new("")
-            // Set goose module to INFO only
+            // Set mcp-server module to DEBUG
+            .add_directive("mcp_server=debug".parse().unwrap())
+            // Set mcp-client to DEBUG
+            .add_directive("mcp_client=debug".parse().unwrap())
+            // Set goose module to DEBUG
             .add_directive("goose=debug".parse().unwrap())
             // Set goose-server to INFO
             .add_directive("goose_server=info".parse().unwrap())
