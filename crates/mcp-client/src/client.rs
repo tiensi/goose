@@ -143,7 +143,11 @@ where
             .call(request)
             .await
             .map_err(|e| Error::McpServerError {
-                server: self.server_info.as_ref().unwrap().name.clone(),
+                server: self
+                    .server_info
+                    .as_ref()
+                    .map(|s| s.name.clone())
+                    .unwrap_or("".to_string()),
                 method: method.to_string(),
                 // we don't need include params because it can be really large
                 source: Box::new(e.into()),
@@ -205,7 +209,11 @@ where
             .call(notification)
             .await
             .map_err(|e| Error::McpServerError {
-                server: self.server_info.as_ref().unwrap().name.clone(),
+                server: self
+                    .server_info
+                    .as_ref()
+                    .map(|s| s.name.clone())
+                    .unwrap_or("".to_string()),
                 method: method.to_string(),
                 // we don't need include params because it can be really large
                 source: Box::new(e.into()),
