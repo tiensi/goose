@@ -23,7 +23,12 @@ default:
   provider: anthropic
   processor: claude-3-5-sonnet-20241022
   accelerator: claude-3-5-sonnet-20241022
+  moderator: synopsis
+  toolkits:
+  - name: synopsis
+    requires: {}
 ```
+> **Important** Anthropic performs the best when both the `synopsis` toolkit and moderator are enabled.
 
 ### Azure
 
