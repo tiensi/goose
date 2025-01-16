@@ -33,8 +33,6 @@ def replace_env_macro() -> bool:
         ]
 
         replacement_content = "\n".join(formatted_vars)
-        replacement_content += "\n        return true;"
-
         # Define the pattern to match content between markers
         pattern = r"//{env-macro-start}//.*?//{env-macro-end}//"
         flags = re.DOTALL  # Allow matching across multiple lines
