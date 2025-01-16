@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getApiUrl, getSecretKey } from "../../config";
-import { FaKey, FaExclamationCircle, FaPencilAlt, FaTrash, FaArrowLeft } from 'react-icons/fa';
+import { FaKey, FaExclamationCircle, FaPencilAlt, FaTrash, FaArrowLeft, FaPlus } from 'react-icons/fa';
 import { showToast } from '../ui/toast';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -38,6 +38,14 @@ interface ProviderResponse {
   secret_status?: Record<string, ProviderSecretStatus>;
 }
 
+interface ProviderStatusResponse {
+  [provider: string]: {
+    set: boolean;
+    location: string | null;
+    supported: boolean;
+  };
+}
+
 export default function Keys() {
   const navigate = useNavigate();
   const [secrets, setSecrets] = useState<SecretSource[]>([]);
@@ -46,6 +54,7 @@ export default function Keys() {
   const [showTestModal, setShowTestModal] = useState(false);
   const [testResponse, setTestResponse] = useState<ProviderStatusResponse | null>(null);
   const [keyToDelete, setKeyToDelete] = useState<{providerId: string, key: string} | null>(null);
+  const [isChangingProvider, setIsChangingProvider] = useState(false);
 
   useEffect(() => {
     const fetchSecrets = async () => {
@@ -65,7 +74,7 @@ export default function Keys() {
           throw new Error('Failed to fetch secrets');
         }
 
-        const data = await response.json();
+        const data = await response.json() as Record<string, ProviderResponse>;
         console.log(data);
 
         // Transform the backend response into Provider objects
@@ -131,8 +140,8 @@ export default function Keys() {
     return providerSecrets.some(s => !s?.is_set);
   };
 
-  const handleEdit = async (key: string) => {
-    // Find the secret to check its source
+  const handleAddOrEdit = async (key: string) => {
+    // Find the secret to check its source and status
     const secret = secrets.find(s => s.key === key);
     
     if (secret?.source === 'env') {
@@ -140,23 +149,25 @@ export default function Keys() {
       return;
     }
 
-    // Get new value from user (you might want to use a modal instead)
-    const newValue = prompt("Enter new API key:");
+    const isAdding = !secret?.is_set;
+    const newValue = prompt(isAdding ? "Enter API key:" : "Enter new API key:");
     if (!newValue) return;  // User cancelled
 
     try {
-      // Delete old key first
-      const deleteResponse = await fetch(getApiUrl("/secrets/delete"), {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Secret-Key': getSecretKey(),
-        },
-        body: JSON.stringify({ key })
-      });
+      if (!isAdding) {
+        // Delete old key first if editing
+        const deleteResponse = await fetch(getApiUrl("/secrets/delete"), {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Secret-Key': getSecretKey(),
+          },
+          body: JSON.stringify({ key })
+        });
 
-      if (!deleteResponse.ok) {
-        throw new Error('Failed to delete old key');
+        if (!deleteResponse.ok) {
+          throw new Error('Failed to delete old key');
+        }
       }
 
       // Store new key
@@ -173,7 +184,7 @@ export default function Keys() {
       });
 
       if (!storeResponse.ok) {
-        throw new Error('Failed to store new key');
+        throw new Error(isAdding ? 'Failed to add key' : 'Failed to store new key');
       }
 
       // Update local state
@@ -183,10 +194,10 @@ export default function Keys() {
           : s
       ));
 
-      showToast("Key updated successfully", "success");
+      showToast(isAdding ? "Key added successfully" : "Key updated successfully", "success");
     } catch (error) {
       console.error('Error updating key:', error);
-      showToast("Failed to update key", "error");
+      showToast(isAdding ? "Failed to add key" : "Failed to update key", "error");
     }
   };
 
@@ -270,12 +281,71 @@ export default function Keys() {
         throw new Error('Failed to fetch provider status');
       }
 
-      const data = await response.json();
+      const data = await response.json() as Record<string, ProviderResponse>;
       setTestResponse(data);
       setShowTestModal(true);
     } catch (error) {
       console.error('Error testing providers:', error);
       showToast("Failed to test providers", "error");
+    }
+  };
+
+  const handleSelectProvider = async (providerId: string) => {
+    setIsChangingProvider(true);
+    try {
+      const url = getApiUrl("/agent");
+      console.log("Attempting to fetch:", url);
+
+      // Initialize agent with new provider
+      const agentResponse = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Secret-Key": getSecretKey(),
+        },
+        body: JSON.stringify({ 
+          provider: providerId,
+        }),
+      }).catch(error => {
+        console.error("Fetch failed:", error);
+        throw error;
+      });
+
+      if (agentResponse.status === 401) {
+        throw new Error("Unauthorized - invalid secret key");
+      }
+      if (!agentResponse.ok) {
+        throw new Error(`Failed to set agent: ${agentResponse.statusText}`);
+      }
+
+      // Initialize system config
+      const systemResponse = await fetch(getApiUrl("/system"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Secret-Key": getSecretKey(),
+        },
+        body: JSON.stringify({ system: "developer2" }),
+      });
+
+      if (!systemResponse.ok) {
+        throw new Error("Failed to set system config");
+      }
+
+      // Update localStorage
+      const provider = providers.find(p => p.id === providerId);
+      if (provider) {
+        localStorage.setItem("GOOSE_PROVIDER", provider.name);
+        showToast(`Switched to ${provider.name}`, "success");
+        
+        // Spawn new chat window with the new provider
+        window.electron.createChatWindow();
+      }
+    } catch (error) {
+      console.error("Failed to change provider:", error);
+      showToast(error instanceof Error ? error.message : "Failed to change provider", "error");
+    } finally {
+      setIsChangingProvider(false);
     }
   };
 
@@ -375,11 +445,11 @@ export default function Keys() {
                             {secret?.is_set ? 'Key set' : 'Missing'}
                           </span>
                           <button
-                            onClick={() => handleEdit(key)}
+                            onClick={() => handleAddOrEdit(key)}
                             className="p-1.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
-                            title="Edit key"
+                            title={secret?.is_set ? "Edit key" : "Add key"}
                           >
-                            <FaPencilAlt size={14} />
+                            {secret?.is_set ? <FaPencilAlt size={14} /> : <FaPlus size={14} />}
                           </button>
                           <button
                             onClick={() => handleDeleteKey(provider.id, key)}
@@ -404,6 +474,17 @@ export default function Keys() {
                   })}
                 </div>
               )}
+
+              <button
+                onClick={() => handleSelectProvider(provider.id)}
+                disabled={
+                  isChangingProvider || 
+                  provider.id.toLowerCase() === localStorage.getItem("GOOSE_PROVIDER")?.toLowerCase()
+                }
+                className="text-sm px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+              >
+                Set as Active
+              </button>
             </div>
           );
         })}
