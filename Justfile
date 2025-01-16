@@ -6,6 +6,12 @@ release:
     cargo build --release
     @just copy-binary
 
+# we use hermit to run npx and uvx etc for MCPs in the goose .app
+get-hermit:
+    @echo "Getting hermit..."
+    curl -fsSL "https://github.com/cashapp/hermit/releases/download/stable/hermit-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/').gz" | gzip -dc > hermit && chmod +x hermit
+    mv hermit ./ui/desktop/src/bin/
+
 # Copy binary command
 copy-binary:
     @if [ -f ./target/release/goosed ]; then \

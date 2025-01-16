@@ -24,8 +24,10 @@ Cargo.lock
 ./ui/desktop/node_modules
 ./ui/desktop/out
 
+
 # Hermit
 /.hermit/
 /bin/
+ui/desktop/src/bin/hermit
 
 debug_*.txt
