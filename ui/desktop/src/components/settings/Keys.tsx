@@ -132,6 +132,16 @@ export default function Keys() {
           );
         
         setSecrets(transformedSecrets);
+        // Check the GOOSE_PROVIDER from localStorage
+        const gooseProvider = localStorage.getItem("GOOSE_PROVIDER").toLowerCase() || null;
+        if (gooseProvider) {
+            const matchedProvider = PROVIDERS.find(provider => provider.id.toLowerCase() === gooseProvider);
+            if (matchedProvider) {
+            setExpandedProviders(new Set([matchedProvider.id]));
+            } else {
+            console.warn(`Provider ${gooseProvider} not found in settings.`);
+            }
+        }
       } catch (error) {
         console.error('Error fetching secrets:', error);
       }
