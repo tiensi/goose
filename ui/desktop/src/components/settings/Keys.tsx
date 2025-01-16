@@ -10,6 +10,8 @@ import {
   ModalTitle 
 } from '../ui/modal';
 
+const PROVIDER_ORDER = ['openai', 'anthropic', 'databricks'];
+
 interface SecretSource {
   key: string;
   source: string;
@@ -22,6 +24,8 @@ interface Provider {
   keys: string[];
   description: string;
   canDelete?: boolean;
+  supported: boolean;
+  order: number;
 }
 
 interface ProviderSecretStatus {
@@ -34,127 +38,64 @@ interface ProviderResponse {
   secret_status?: Record<string, ProviderSecretStatus>;
 }
 
-const PROVIDERS: Provider[] = [
-  {
-    id: 'openai',
-    name: 'OpenAI',
-    keys: ['OPENAI_API_KEY'],
-    description: 'OpenAI API access for GPT models'
-  },
-  {
-    id: 'anthropic',
-    name: 'Anthropic',
-    keys: ['ANTHROPIC_API_KEY'],
-    description: 'Anthropic API access for Claude models'
-  },
-  {
-    id: 'databricks',
-    name: 'Databricks',
-    keys: ['DATABRICKS_API_KEY'],
-    description: 'Databricks API access',
-    canDelete: true
-  },
-  {
-    id: 'otherProvider',
-    name: 'OtherProvider',
-    keys: ['MY_API_KEY'],
-    description: 'OtherProvider API access',
-    canDelete: true
-  },
-
-
-];
-
-// Mock data that matches the Rust endpoint response format
-const MOCK_SECRETS_RESPONSE = {
-  'openai': {
-    supported: true,
-    secret_status: {
-      'OPENAI_API_KEY': {
-        is_set: true,
-        location: 'keyring'
-      }
-    }
-  },
-  'anthropic': {
-    supported: true,
-    secret_status: {
-      'ANTHROPIC_API_KEY': {
-        is_set: false,
-        location: null
-      }
-    }
-  },
-  'databricks': {
-    supported: true,
-    secret_status: {
-      'DATABRICKS_API_KEY': {
-        is_set: true,
-        location: 'env'
-      }
-    }
-  }, 
-  'otherProvider': {
-    supported: false,
-  }
-};
-
-interface ProviderStatusResponse {
-  [provider: string]: {
-    set: boolean;
-    location: string | null;
-    supported: boolean;
-  };
-}
-
 export default function Keys() {
   const navigate = useNavigate();
   const [secrets, setSecrets] = useState<SecretSource[]>([]);
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set());
-  const [providers, setProviders] = useState<Provider[]>(PROVIDERS);
+  const [providers, setProviders] = useState<Provider[]>([]);
   const [showTestModal, setShowTestModal] = useState(false);
   const [testResponse, setTestResponse] = useState<ProviderStatusResponse | null>(null);
+  const [keyToDelete, setKeyToDelete] = useState<{providerId: string, key: string} | null>(null);
 
   useEffect(() => {
     const fetchSecrets = async () => {
       try {
         const response = await fetch(getApiUrl("/secrets/providers"), {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Secret-Key': getSecretKey(),
-            },
-            body: JSON.stringify({
-              providers: ["OpenAI", "Anthropic", "MyProvider"]
-            })
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Secret-Key': getSecretKey(),
+          },
+          body: JSON.stringify({
+            providers: ["OpenAI", "Anthropic", "MyProvider", "Databricks"]
+          })
         });
 
         if (!response.ok) {
           throw new Error('Failed to fetch secrets');
         }
 
-        let data = await response.json();
-        console.log(data)
-        
-        // Append test data for additional providers
-        data = {
-          ...data,
-          'databricks': {
-            supported: true,
-            secret_status: {
-              'DATABRICKS_API_KEY': {
-                is_set: false,
-                location: null
-              }
-            }
-          }
-        };
+        const data = await response.json();
+        console.log(data);
 
-        // Transform only supported providers with secret_status
+        // Transform the backend response into Provider objects
+        const transformedProviders: Provider[] = Object.entries(data)
+          .map(([id, status]: [string, any]) => ({
+            id: id.toLowerCase(),
+            name: id,
+            keys: status.secret_status ? Object.keys(status.secret_status) : [],
+            description: `${id} API access`,
+            supported: status.supported,
+            canDelete: id.toLowerCase() !== 'openai' && id.toLowerCase() !== 'anthropic',
+            order: PROVIDER_ORDER.indexOf(id.toLowerCase())
+          }))
+          .sort((a, b) => {
+            if (a.order !== -1 && b.order !== -1) {
+              return a.order - b.order;
+            }
+            if (a.order === -1 && b.order === -1) {
+              return a.name.localeCompare(b.name);
+            }
+            return a.order === -1 ? 1 : -1;
+          });
+
+        setProviders(transformedProviders);
+
+        // Transform secrets data
         const transformedSecrets = Object.entries(data)
-          .filter(([_, status]) => status.supported && status.secret_status)
+          .filter(([_, status]: [string, any]) => status.supported && status.secret_status)
           .flatMap(([_, status]) => 
-            Object.entries(status.secret_status!).map(([key, secretStatus]) => ({
+            Object.entries(status.secret_status!).map(([key, secretStatus]: [string, any]) => ({
               key,
               source: secretStatus.location || 'none',
               is_set: secretStatus.is_set
@@ -163,10 +104,12 @@ export default function Keys() {
         
         setSecrets(transformedSecrets);
         
-        // Check the GOOSE_PROVIDER from localStorage
+        // Check and expand active provider
         const gooseProvider = localStorage.getItem("GOOSE_PROVIDER")?.toLowerCase() || null;
         if (gooseProvider) {
-          const matchedProvider = PROVIDERS.find(provider => provider.id.toLowerCase() === gooseProvider);
+          const matchedProvider = transformedProviders.find(provider => 
+            provider.id.toLowerCase() === gooseProvider
+          );
           if (matchedProvider) {
             setExpandedProviders(new Set([matchedProvider.id]));
           } else {
@@ -188,8 +131,63 @@ export default function Keys() {
     return providerSecrets.some(s => !s?.is_set);
   };
 
-  const handleEdit = (key: string) => {
-    showToast("Key edited and updated in the keychain", "success");
+  const handleEdit = async (key: string) => {
+    // Find the secret to check its source
+    const secret = secrets.find(s => s.key === key);
+    
+    if (secret?.source === 'env') {
+      showToast("Cannot edit key set in environment. Please modify your ~/.zshrc or equivalent file.", "error");
+      return;
+    }
+
+    // Get new value from user (you might want to use a modal instead)
+    const newValue = prompt("Enter new API key:");
+    if (!newValue) return;  // User cancelled
+
+    try {
+      // Delete old key first
+      const deleteResponse = await fetch(getApiUrl("/secrets/delete"), {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Secret-Key': getSecretKey(),
+        },
+        body: JSON.stringify({ key })
+      });
+
+      if (!deleteResponse.ok) {
+        throw new Error('Failed to delete old key');
+      }
+
+      // Store new key
+      const storeResponse = await fetch(getApiUrl("/secrets/store"), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Secret-Key': getSecretKey(),
+        },
+        body: JSON.stringify({ 
+          key,
+          value: newValue.trim()
+        })
+      });
+
+      if (!storeResponse.ok) {
+        throw new Error('Failed to store new key');
+      }
+
+      // Update local state
+      setSecrets(secrets.map(s => 
+        s.key === key 
+          ? { ...s, source: 'keyring', is_set: true }
+          : s
+      ));
+
+      showToast("Key updated successfully", "success");
+    } catch (error) {
+      console.error('Error updating key:', error);
+      showToast("Failed to update key", "error");
+    }
   };
 
   const handleDeleteKey = async (providerId: string, key: string) => {
@@ -201,6 +199,13 @@ export default function Keys() {
       return;
     }
 
+    // Show confirmation modal
+    setKeyToDelete({ providerId, key });
+  };
+
+  const confirmDelete = async () => {
+    if (!keyToDelete) return;
+
     try {
       const response = await fetch(getApiUrl("/secrets/delete"), {
         method: 'DELETE',
@@ -208,7 +213,7 @@ export default function Keys() {
           'Content-Type': 'application/json',
           'X-Secret-Key': getSecretKey(),
         },
-        body: JSON.stringify({ key })
+        body: JSON.stringify({ key: keyToDelete.key })
       });
 
       if (!response.ok) {
@@ -216,11 +221,13 @@ export default function Keys() {
       }
 
       // Update local state to reflect deletion
-      setSecrets(secrets.filter(s => s.key !== key));
-      showToast(`Key ${key} deleted from keychain`, "success");
+      setSecrets(secrets.filter(s => s.key !== keyToDelete.key));
+      showToast(`Key ${keyToDelete.key} deleted from keychain`, "success");
     } catch (error) {
       console.error('Error deleting key:', error);
       showToast("Failed to delete key", "error");
+    } finally {
+      setKeyToDelete(null);
     }
   };
 
@@ -242,7 +249,8 @@ export default function Keys() {
   };
 
   const isProviderSupported = (providerId: string) => {
-    return MOCK_SECRETS_RESPONSE[providerId]?.supported ?? false;
+    const provider = providers.find(p => p.id === providerId);
+    return provider?.supported ?? false;
   };
 
   const handleTestProviders = async () => {
@@ -375,8 +383,18 @@ export default function Keys() {
                           </button>
                           <button
                             onClick={() => handleDeleteKey(provider.id, key)}
-                            className="p-1.5 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-200 rounded-full hover:bg-red-100 dark:hover:bg-red-900"
-                            title="Delete key"
+                            className={`p-1.5 rounded-full ${
+                              secret?.is_set
+                                ? 'text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
+                                : 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                            }`}
+                            title={
+                              secret?.is_set 
+                                ? "Delete key from keychain" 
+                                : "No key to delete - Add a key first before deleting"
+                            }
+                            disabled={!secret?.is_set}
+                            aria-disabled={!secret?.is_set}
                           >
                             <FaTrash size={14} />
                           </button>
@@ -400,6 +418,33 @@ export default function Keys() {
             <pre className="bg-gray-100 dark:bg-gray-900 p-4 rounded-lg overflow-auto max-h-96 text-sm">
               {testResponse && JSON.stringify(testResponse, null, 2)}
             </pre>
+          </div>
+        </ModalContent>
+      </Modal>
+
+      <Modal open={!!keyToDelete} onOpenChange={() => setKeyToDelete(null)}>
+        <ModalContent>
+          <ModalHeader>
+            <ModalTitle>Confirm Deletion</ModalTitle>
+          </ModalHeader>
+          <div className="p-6">
+            <p className="text-gray-700 dark:text-gray-300">
+              Are you sure you want to delete this API key from the keychain?
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setKeyToDelete(null)}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </ModalContent>
       </Modal>
