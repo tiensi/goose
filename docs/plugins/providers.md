@@ -73,8 +73,12 @@ default:
   provider: google
   processor: gemini-1.5-flash
   accelerator: gemini-1.5-flash
+  moderator: truncate
+  toolkits:
+  - name: developer
+    requires: {}
 ```
-
+> **Important** Gemini performs the best when both the `developer` toolkit and `truncate` moderator are enabled.
 ### Ollama
 
 For Ollama, refer to the setup process on [Ollama's site](https://ollama.com/) for obtaining necessary credentials. Make sure your environment has all the required tokens set up.
