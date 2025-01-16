@@ -18,18 +18,6 @@ struct SecretRequest {
 }
 
 #[derive(Serialize)]
-struct ProviderStatus {
-    supported: bool,
-    secret_status: HashMap<String, SecretStatus>, // Map of API key names to their statuses
-}
-
-#[derive(Serialize)]
-struct SecretStatus {
-    is_set: bool,          // True if the key is set
-    location: Option<String>, // "env", "keychain", or None
-}
-
-#[derive(Serialize)]
 struct SecretSource {
     key: String,
     source: String,  // "env", "keyring", or "none"
@@ -147,7 +135,113 @@ async fn check_provider_secrets(
     Json(response)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::Json;
+    use std::collections::HashMap;
+    use lazy_static::lazy_static;
+
+    // Mock PROVIDER_ENV_REQUIREMENTS for testing
+    lazy_static! {
+        static ref TEST_PROVIDER_REQUIREMENTS: HashMap<String, Vec<String>> = {
+            let mut m = HashMap::new();
+            m.insert(
+                "test_provider".to_string(),
+                vec!["TEST_API_KEY".to_string(), "TEST_SECRET".to_string()]
+            );
+            m
+        };
+    }
+
+    #[tokio::test]
+    async fn test_supported_provider_with_set_keys() {
+        // Setup
+        let request = ProviderRequest {
+            providers: vec!["test_provider".to_string()]
+        };
+
+        // Set environment variables for testing
+        std::env::set_var("TEST_API_KEY", "dummy_value");
+        std::env::set_var("TEST_SECRET", "dummy_secret");
+
+        // Execute
+        let Json(response) = check_provider_secrets(Json(request)).await;
+
+        // Assert
+        let provider_status = response.get("test_provider").expect("Provider should exist");
+        assert!(provider_status.supported);
+        
+        let secret_status = &provider_status.secret_status;
+        assert!(secret_status.get("TEST_API_KEY").unwrap().is_set);
+        assert!(secret_status.get("TEST_SECRET").unwrap().is_set);
+    }
+
+    #[tokio::test]
+    async fn test_unsupported_provider() {
+        // Setup
+        let request = ProviderRequest {
+            providers: vec!["unsupported_provider".to_string()]
+        };
+
+        // Execute
+        let Json(response) = check_provider_secrets(Json(request)).await;
+
+        // Assert
+        let provider_status = response.get("unsupported_provider").expect("Provider should exist");
+        assert!(!provider_status.supported);
+        assert!(provider_status.secret_status.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_supported_provider_with_missing_keys() {
+        // Setup
+        let request = ProviderRequest {
+            providers: vec!["test_provider".to_string()]
+        };
+
+        // Remove environment variables if they exist
+        std::env::remove_var("TEST_API_KEY");
+        std::env::remove_var("TEST_SECRET");
+
+        // Execute
+        let Json(response) = check_provider_secrets(Json(request)).await;
+
+        // Assert
+        let provider_status = response.get("test_provider").expect("Provider should exist");
+        assert!(provider_status.supported);
+        
+        let secret_status = &provider_status.secret_status;
+        assert!(!secret_status.get("TEST_API_KEY").unwrap().is_set);
+        assert!(!secret_status.get("TEST_SECRET").unwrap().is_set);
+    }
+
+    #[tokio::test]
+    async fn test_multiple_providers() {
+        // Setup
+        let request = ProviderRequest {
+            providers: vec![
+                "test_provider".to_string(),
+                "unsupported_provider".to_string()
+            ]
+        };
+
+        // Execute
+        let Json(response) = check_provider_secrets(Json(request)).await;
+
+        // Assert
+        assert_eq!(response.len(), 2);
+        
+        let supported_status = response.get("test_provider").expect("Supported provider should exist");
+        assert!(supported_status.supported);
+        
+        let unsupported_status = response.get("unsupported_provider").expect("Unsupported provider should exist");
+        assert!(!unsupported_status.supported);
+    }
+}
+
 pub fn routes(state: AppState) -> Router {
     Router::new()
         .route("/secrets/store", post(store_secret))
         .route("/secrets/provider", get(list_provider_secrets))
+}
