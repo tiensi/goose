@@ -342,13 +342,17 @@ impl MemoryRouter {
         match tool_call.name.as_str() {
             "remember_memory" => {
                 let args = MemoryArgs::from_value(&tool_call.arguments)?;
-                self.remember(
-                    "context",
-                    args.category,
-                    args.data,
-                    &args.tags,
-                    args.is_global,
-                )?;
+                let data = args
+                    .data
+                    .as_deref()
+                    .filter(|d| !d.is_empty())
+                    .ok_or_else(|| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "Data must exist when remembering a memory",
+                        )
+                    })?;
+                self.remember("context", args.category, data, &args.tags, args.is_global)?;
                 Ok(format!("Stored memory in category: {}", args.category))
             }
             "retrieve_memories" => {
@@ -496,7 +500,7 @@ impl Router for MemoryRouter {
 #[derive(Debug)]
 struct MemoryArgs<'a> {
     category: &'a str,
-    data: &'a str,
+    data: Option<&'a str>,
     tags: Vec<&'a str>,
     is_global: bool,
 }
@@ -515,9 +519,7 @@ impl<'a> MemoryArgs<'a> {
             ));
         }
 
-        let data = args["data"]
-            .as_str()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Data must be a string"))?;
+        let data = args.get("data").and_then(|d| d.as_str());
 
         let tags = match &args["tags"] {
             Value::Array(arr) => arr.iter().filter_map(|v| v.as_str()).collect(),
