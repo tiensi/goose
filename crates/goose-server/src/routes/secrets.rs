@@ -1,6 +1,7 @@
 use axum::{
     extract::State,
-    routing::{get, post},
+    routing::post,
+    routing::delete,
     Json, Router,
 };
 use once_cell::sync::Lazy;  // TODO: investigate if we need
@@ -8,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use crate::state::AppState;
 use http::{HeaderMap, StatusCode};
-use goose::key_manager::{save_to_keyring, get_keyring_secret, KeyRetrievalStrategy};
+use goose::key_manager::{save_to_keyring, get_keyring_secret, delete_from_keyring, KeyRetrievalStrategy};
 
 #[derive(Serialize)]
 struct SecretResponse {
@@ -112,10 +113,38 @@ async fn check_provider_secrets(
     Ok(Json(response))
 }
 
+#[derive(Deserialize)]
+struct DeleteSecretRequest {
+    key: String,
+}
+
+async fn delete_secret(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<DeleteSecretRequest>,
+) -> Result<StatusCode, StatusCode> {
+    // Verify secret key
+    let secret_key = headers
+        .get("X-Secret-Key")
+        .and_then(|value| value.to_str().ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    if secret_key != state.secret_key {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    // Attempt to delete the key
+    match delete_from_keyring(&request.key) {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(_) => Err(StatusCode::NOT_FOUND),
+    }
+}
+
 pub fn routes(state: AppState) -> Router {
     Router::new()
-        .route("/secrets/providers", get(check_provider_secrets))
+        .route("/secrets/providers", post(check_provider_secrets))
         .route("/secrets/store", post(store_secret))
+        .route("/secrets/delete", delete(delete_secret))
         .with_state(state)
 }
 

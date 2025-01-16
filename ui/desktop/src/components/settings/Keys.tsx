@@ -1,7 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { getApiUrl, getSecretKey } from "../../config";
-import { FaKey, FaExclamationCircle, FaPencilAlt, FaTrash } from 'react-icons/fa';
+import { FaKey, FaExclamationCircle, FaPencilAlt, FaTrash, FaArrowLeft } from 'react-icons/fa';
 import { showToast } from '../ui/toast';
+import { useNavigate } from 'react-router-dom';
+import { 
+  Modal, 
+  ModalContent, 
+  ModalHeader, 
+  ModalTitle 
+} from '../ui/modal';
 
 interface SecretSource {
   key: string;
@@ -92,10 +99,21 @@ const MOCK_SECRETS_RESPONSE = {
   }
 };
 
+interface ProviderStatusResponse {
+  [provider: string]: {
+    set: boolean;
+    location: string | null;
+    supported: boolean;
+  };
+}
+
 export default function Keys() {
+  const navigate = useNavigate();
   const [secrets, setSecrets] = useState<SecretSource[]>([]);
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set());
   const [providers, setProviders] = useState<Provider[]>(PROVIDERS);
+  const [showTestModal, setShowTestModal] = useState(false);
+  const [testResponse, setTestResponse] = useState<ProviderStatusResponse | null>(null);
 
   useEffect(() => {
     const fetchSecrets = async () => {
@@ -133,8 +151,36 @@ export default function Keys() {
     showToast("Key edited and updated in the keychain", "success");
   };
 
-  const handleDeleteKey = (providerId: string, key: string) => {
-    showToast(`Key ${key} deleted`, "success");
+  const handleDeleteKey = async (providerId: string, key: string) => {
+    // Find the secret to check its source
+    const secret = secrets.find(s => s.key === key);
+    
+    if (secret?.source === 'env') {
+      showToast("This key is set in your environment. Please remove it from your ~/.zshrc or equivalent file.", "error");
+      return;
+    }
+
+    try {
+      const response = await fetch(getApiUrl("/secrets/delete"), {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Secret-Key': getSecretKey(),
+        },
+        body: JSON.stringify({ key })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete key');
+      }
+
+      // Update local state to reflect deletion
+      setSecrets(secrets.filter(s => s.key !== key));
+      showToast(`Key ${key} deleted from keychain`, "success");
+    } catch (error) {
+      console.error('Error deleting key:', error);
+      showToast("Failed to delete key", "error");
+    }
   };
 
   const handleDeleteProvider = (providerId: string) => {
@@ -158,13 +204,53 @@ export default function Keys() {
     return MOCK_SECRETS_RESPONSE[providerId]?.supported ?? false;
   };
 
+  const handleTestProviders = async () => {
+    try {
+      const response = await fetch(getApiUrl("/secrets/providers"), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          providers: ["OpenAI", "Anthropic"]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch provider status');
+      }
+
+      const data = await response.json();
+      setTestResponse(data);
+      setShowTestModal(true);
+    } catch (error) {
+      console.error('Error testing providers:', error);
+      showToast("Failed to test providers", "error");
+    }
+  };
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold dark:text-white">Providers</h1>
-        <button className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
-          Add Provider
+      <div className="flex items-center mb-6">
+        <button 
+          onClick={() => navigate(-1)}
+          className="mr-4 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+          title="Go back"
+        >
+          <FaArrowLeft className="text-gray-500 dark:text-gray-400" />
         </button>
+        <h1 className="text-2xl font-semibold dark:text-white flex-1">Providers</h1>
+        <div className="flex gap-2">
+          <button 
+            onClick={handleTestProviders}
+            className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+          >
+            Test Providers
+          </button>
+          <button className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+            Add Provider
+          </button>
+        </div>
       </div>
 
       <div className="grid gap-4">
@@ -250,6 +336,19 @@ export default function Keys() {
           );
         })}
       </div>
+
+      <Modal open={showTestModal} onOpenChange={setShowTestModal}>
+        <ModalContent>
+          <ModalHeader>
+            <ModalTitle>Provider Status Test</ModalTitle>
+          </ModalHeader>
+          <div className="mt-4">
+            <pre className="bg-gray-100 dark:bg-gray-900 p-4 rounded-lg overflow-auto max-h-96 text-sm">
+              {testResponse && JSON.stringify(testResponse, null, 2)}
+            </pre>
+          </div>
+        </ModalContent>
+      </Modal>
     </div>
   );
 } 
