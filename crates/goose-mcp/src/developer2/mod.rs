@@ -82,11 +82,12 @@ impl Developer2Router {
 
                 The `command` parameter specifies the operation to perform. Allowed options are:
                 - `view`: View the content of a file.
-                - `create`: Create a new file with the given content (it will fail if the file already exists)
+                - `write`: Create or overwrite a file with the given content
                 - `str_replace`: Replace a string in a file with a new string.
                 - `undo_edit`: Undo the last edit made to a file.
 
-                To use the create command, you must specify `file_text` which will become the content of the new file.
+                To use the write command, you must specify `file_text` which will become the new content of the file. Be careful with
+                existing files! This is a full overwrite, so you must include everything - not just sections you are modifying.
 
                 To use the str_replace command, you must specify both `old_str` and `new_str` - the `old_str` needs to exactly match one
                 unique section of the original file, including any whitespace. Make sure to include enough context that the match is not
@@ -102,8 +103,8 @@ impl Developer2Router {
                     },
                     "command": {
                         "type": "string",
-                        "enum": ["view", "create", "str_replace", "undo_edit"],
-                        "description": "Allowed options are: `view`, `create`, `str_replace`, undo_edit`."
+                        "enum": ["view", "write", "str_replace", "undo_edit"],
+                        "description": "Allowed options are: `view`, `write`, `str_replace`, undo_edit`."
                     },
                     "old_str": {"type": "string"},
                     "new_str": {"type": "string"},
@@ -261,7 +262,7 @@ impl Developer2Router {
 
         match command {
             "view" => self.text_editor_view(&path).await,
-            "create" => {
+            "write" => {
                 let file_text = params
                     .get("file_text")
                     .and_then(|v| v.as_str())
@@ -269,7 +270,7 @@ impl Developer2Router {
                         ToolError::InvalidParameters("Missing 'file_text' parameter".into())
                     })?;
 
-                self.text_editor_create(&path, file_text).await
+                self.text_editor_write(&path, file_text).await
             }
             "str_replace" => {
                 let old_str = params
@@ -360,19 +361,11 @@ impl Developer2Router {
         }
     }
 
-    async fn text_editor_create(
+    async fn text_editor_write(
         &self,
         path: &PathBuf,
         file_text: &str,
     ) -> Result<Vec<Content>, ToolError> {
-        // Check if file already exists
-        if path.exists() {
-            return Err(ToolError::InvalidParameters(format!(
-                "File '{}' already exists - you will need to edit it with the `str_replace` command",
-                path.display()
-            )));
-        }
-
         // Write to the file
         std::fs::write(path, file_text)
             .map_err(|e| ToolError::ExecutionError(format!("Failed to write file: {}", e)))?;
@@ -409,7 +402,7 @@ impl Developer2Router {
         // Check if file exists and is active
         if !path.exists() {
             return Err(ToolError::InvalidParameters(format!(
-                "File '{}' does not exist, you can write a new file with the `create` command",
+                "File '{}' does not exist, you can write a new file with the `write` command",
                 path.display()
             )));
         }

@@ -39,9 +39,9 @@ export default function MoreMenu() {
     // Fetch available versions when the menu opens
     const fetchVersions = async () => {
       try {
-        const port = window.appConfig.get("GOOSE_SERVER__PORT");
+        const port = window.appConfig.get("GOOSE_PORT");
         const response = await fetch(
-          `http://127.0.0.1:${port}/api/agent/versions`
+          `http://127.0.0.1:${port}/agent/versions`
         );
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -235,6 +235,16 @@ export default function MoreMenu() {
               className="w-full text-left px-2 py-1.5 text-sm hover:bg-gray-700"
             >
               New Session (cmd+N)
+            </button>
+            <button
+              onClick={() => {
+                localStorage.removeItem("GOOSE_PROVIDER");
+                setOpen(false);
+                window.electron.createChatWindow();
+              }}
+              className="w-full text-left px-2 py-1.5 text-sm hover:bg-gray-700 text-red-400"
+            >
+              Reset Provider
             </button>
           </div>
         </PopoverContent>

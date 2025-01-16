@@ -1,19 +1,25 @@
 use crate::state::AppState;
 use axum::{extract::State, routing::post, Json, Router};
-use goose::agents::SystemConfig;
+use goose::key_manager::save_to_keyring;
 use http::{HeaderMap, StatusCode};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
-struct SystemResponse {
+struct SecretResponse {
     error: bool,
 }
 
-async fn add_system(
+#[derive(Deserialize)]
+struct SecretRequest {
+    key: String,
+    value: String,
+}
+
+async fn store_secret(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Json(request): Json<SystemConfig>,
-) -> Result<Json<SystemResponse>, StatusCode> {
+    Json(request): Json<SecretRequest>,
+) -> Result<Json<SecretResponse>, StatusCode> {
     // Verify secret key
     let secret_key = headers
         .get("X-Secret-Key")
@@ -24,17 +30,14 @@ async fn add_system(
         return Err(StatusCode::UNAUTHORIZED);
     }
 
-    let mut agent = state.agent.lock().await;
-    let agent = agent.as_mut().ok_or(StatusCode::PRECONDITION_REQUIRED)?;
-    let response = agent.add_system(request).await;
-
-    Ok(Json(SystemResponse {
-        error: response.is_err(),
-    }))
+    match save_to_keyring(&request.key, &request.value) {
+        Ok(_) => Ok(Json(SecretResponse { error: false })),
+        Err(_) => Ok(Json(SecretResponse { error: true })),
+    }
 }
 
 pub fn routes(state: AppState) -> Router {
     Router::new()
-        .route("/systems/add", post(add_system))
+        .route("/secrets/store", post(store_secret))
         .with_state(state)
 }

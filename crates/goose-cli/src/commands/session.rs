@@ -6,7 +6,7 @@ use rand::{distributions::Alphanumeric, Rng};
 use std::path::{Path, PathBuf};
 use std::process;
 
-use crate::profile::{get_provider_config, load_profiles, Profile};
+use crate::profile::{load_profiles, set_provider_env_vars, Profile};
 use crate::prompt::rustyline::RustylinePrompt;
 use crate::prompt::Prompt;
 use crate::session::{ensure_session_dir, get_most_recent_session, Session};
@@ -43,9 +43,10 @@ pub async fn build_session<'a>(
 
     let loaded_profile = load_profile(profile);
 
-    let provider_config = get_provider_config(&loaded_profile.provider, (*loaded_profile).clone());
+    // Set environment variables for provider configuration
+    set_provider_env_vars(&loaded_profile.provider, &loaded_profile);
 
-    let provider = factory::get_provider(provider_config).unwrap();
+    let provider = factory::get_provider(&loaded_profile.provider).unwrap();
 
     let mut agent =
         AgentFactory::create(agent_version.as_deref().unwrap_or("default"), provider).unwrap();

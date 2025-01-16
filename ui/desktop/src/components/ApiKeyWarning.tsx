@@ -40,21 +40,21 @@ function Collapsible({
 
 const OPENAI_CONFIG = `export GOOSE_PROVIDER__TYPE=openai
 export GOOSE_PROVIDER__HOST=https://api.openai.com
-export GOOSE_PROVIDER__MODEL=gpt-4
+export GOOSE_PROVIDER__MODEL=gpt-4o
 export GOOSE_PROVIDER__API_KEY=your_api_key_here`;
 
 const ANTHROPIC_CONFIG = `export GOOSE_PROVIDER__TYPE=anthropic
 export GOOSE_PROVIDER__HOST=https://api.anthropic.com
-export GOOSE_PROVIDER__MODEL=claude-3-sonnet
+export GOOSE_PROVIDER__MODEL=claude-3-5-sonnet-latest
 export GOOSE_PROVIDER__API_KEY=your_api_key_here`;
 
 const DATABRICKS_CONFIG = `export GOOSE_PROVIDER__TYPE=databricks
 export GOOSE_PROVIDER__HOST=your_databricks_host
-export GOOSE_PROVIDER__MODEL=claude-3-sonnet-2`;
+export GOOSE_PROVIDER__MODEL=your_databricks_model`;
 
 const OPENROUTER_CONFIG = `export GOOSE_PROVIDER__TYPE=openrouter
 export GOOSE_PROVIDER__HOST=https://openrouter.ai
-export GOOSE_PROVIDER__MODEL=anthropic/claude-3-sonnet
+export GOOSE_PROVIDER__MODEL=anthropic/claude-3.5-sonnet
 export GOOSE_PROVIDER__API_KEY=your_api_key_here`;
 
 export function ApiKeyWarning({ className }: ApiKeyWarningProps) {

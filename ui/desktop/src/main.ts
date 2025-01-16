@@ -34,28 +34,12 @@ const parseArgs = () => {
   return { dirPath };
 };
 
-const checkApiCredentials = () => {
+const getGooseProvider = () => {
   loadZshEnv(app.isPackaged);
-
-  
   //{env-macro-start}//
   //needed when goose is bundled for a specific provider
-
-  const apiKeyProvidersValid =
-    ['openai', 'anthropic', 'google', 'groq', 'openrouter'].includes(process.env.GOOSE_PROVIDER__TYPE) &&
-      process.env.GOOSE_PROVIDER__HOST &&
-      process.env.GOOSE_PROVIDER__MODEL &&
-      process.env.GOOSE_PROVIDER__API_KEY;
-
-  const optionalApiKeyProvidersValid =
-    ['ollama', 'databricks'].includes(process.env.GOOSE_PROVIDER__TYPE) &&
-      process.env.GOOSE_PROVIDER__HOST &&
-      process.env.GOOSE_PROVIDER__MODEL;
-
-  return apiKeyProvidersValid || optionalApiKeyProvidersValid;
-  
-  //needed when goose is bundled for a specific provider:
   //{env-macro-end}//
+  return process.env.GOOSE_PROVIDER;
 };
 
 const generateSecretKey = () => {
@@ -66,9 +50,9 @@ const generateSecretKey = () => {
 };
 
 let appConfig = { 
-  apiCredsMissing: !checkApiCredentials(),
+  GOOSE_PROVIDER: getGooseProvider(),
   GOOSE_API_HOST: 'http://127.0.0.1',
-  GOOSE_SERVER__PORT: 0,
+  GOOSE_PORT: 0,
   GOOSE_WORKING_DIR: '',
   GOOSE_AGENT_VERSION: '',
   secretKey: generateSecretKey(),
@@ -125,15 +109,7 @@ const createChat = async (app, query?: string, dir?: string, version?: string) =
   // Apply current environment settings before creating chat
   updateEnvironmentVariables(envToggles);
 
-  const maybeStartGoosed = async () => {
-    if (checkApiCredentials()) {
-      return startGoosed(app, dir);
-    } else {
-      return [0, '', ''];
-    }
-  }
-
-  const [port, working_dir, agentVersion] = await maybeStartGoosed();
+  const [port, working_dir, agentVersion] = await startGoosed(app, dir);
 
   const mainWindow = new BrowserWindow({
     titleBarStyle: 'hidden',
@@ -150,7 +126,7 @@ const createChat = async (app, query?: string, dir?: string, version?: string) =
       preload: path.join(__dirname, 'preload.js'),
       additionalArguments: [JSON.stringify({ 
         ...appConfig, 
-        GOOSE_SERVER__PORT: port, 
+        GOOSE_PORT: port,
         GOOSE_WORKING_DIR: working_dir,
         GOOSE_AGENT_VERSION: agentVersion,
         REQUEST_DIR: dir 
@@ -183,14 +159,31 @@ const createChat = async (app, query?: string, dir?: string, version?: string) =
     );
   }
 
-  // DevTools
-  globalShortcut.register('Alt+Command+I', () => {
-    mainWindow.webContents.openDevTools();
+  // DevTools shortcut management
+  const registerDevToolsShortcut = (window: BrowserWindow) => {
+    globalShortcut.register('Alt+Command+I', () => {
+      window.webContents.openDevTools();
+    });
+  };
+
+  const unregisterDevToolsShortcut = () => {
+    globalShortcut.unregister('Alt+Command+I');
+  };
+
+  // Register shortcut when window is focused
+  mainWindow.on('focus', () => {
+    registerDevToolsShortcut(mainWindow);
+  });
+
+  // Unregister shortcut when window loses focus
+  mainWindow.on('blur', () => {
+    unregisterDevToolsShortcut();
   });
 
   windowMap.set(windowId, mainWindow);
   mainWindow.on('closed', () => {
     windowMap.delete(windowId);
+    unregisterDevToolsShortcut();
   });
 };
 
