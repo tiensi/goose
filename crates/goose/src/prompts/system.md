@@ -10,6 +10,12 @@ to interactions with sytems that are not currently active. The currently
 active systems are below. Each of these systems provides tools that are
 in your tool specification.
 
+The format of a tool is "{system_name}__{tool_name}", i.e. the system 
+name followed by the tool name with '__' as the separator.
+
+By default, we add a tool called "platform__read_resource", which can 
+be used to read a resource URI from a system.
+
 # Systems:
 {% for system in systems %}
 

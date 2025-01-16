@@ -399,7 +399,7 @@ impl Capabilities {
 
         let client_guard = client.lock().await;
 
-        let result = if tool_name == "read_resource" {
+        let result = if tool_name == "platform__read_resource" {
             // Check if the tool is read_resource and handle it separately
             self.read_resource(tool_call.arguments.clone()).await
         } else {

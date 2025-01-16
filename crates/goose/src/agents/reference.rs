@@ -72,7 +72,7 @@ impl Agent for ReferenceAgent {
         // we add in the read_resource tool by default
         // TODO: make sure there is no collision with another system's tool name
         let read_resource_tool = Tool::new(
-            "read_resource".to_string(),
+            "platform__read_resource".to_string(),
             indoc! {r#"
                 Read a resource from a system.
         
