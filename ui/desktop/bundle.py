@@ -27,9 +27,9 @@ def replace_env_macro() -> bool:
         
         # Format the environment variables
         formatted_vars = [
-            f"        process.env.GOOSE_PROVIDER__TYPE = '{os.getenv("GOOSE_BUNDLE_TYPE")}';",
-            f"        process.env.GOOSE_PROVIDER__HOST = '{os.getenv("GOOSE_BUNDLE_HOST")}';",
-            f"        process.env.GOOSE_PROVIDER__MODEL = '{os.getenv("GOOSE_BUNDLE_MODEL")}';"
+            f"        process.env.GOOSE_PROVIDER = '{os.getenv("GOOSE_BUNDLE_TYPE")}';",
+            f"        process.env.{os.getenv("GOOSE_BUNDLE_TYPE")}_HOST = '{os.getenv("GOOSE_BUNDLE_HOST")}';",
+            f"        process.env.{os.getenv("GOOSE_BUNDLE_TYPE")}_MODEL = '{os.getenv("GOOSE_BUNDLE_MODEL")}';"
         ]
         
         replacement_content = "\n".join(formatted_vars)
