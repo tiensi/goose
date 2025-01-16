@@ -1,0 +1,6 @@
+{
+    "OpenAI": ["OPENAI_API_KEY"],
+    "Anthropic": ["ANTHROPIC_API_KEY"],
+    "Databricks": ["DATABRICKS_API_KEY"],
+    "OtherProvider": ["OTHER_PROVIDER_KEY_1", "OTHER_PROVIDER_KEY_2"]
+}
