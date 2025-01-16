@@ -6,7 +6,7 @@ We welcome Pull Requests for general contributions! If you have a larger new fea
 
 Goose includes rust binaries alongside an electron app for the GUI. To work
 on the rust backend, you will need to [install rust and cargo][rustup]. To work
-on the App, you will also need to [install node and npm][nvm] - we recommend through nvm. 
+on the App, you will also need to [install node and npm][nvm] - we recommend through nvm.
 
 We provide a shortcut to standard commands using [just][just] in our `justfile`.
 
@@ -43,7 +43,7 @@ As you make changes to the rust code, you can try it out on the CLI, or also run
 
 ```
 cargo check  # do your changes compile
-cargo test  # do the tests pass with your changes. 
+cargo test  # do the tests pass with your changes.
 ```
 
 ### Node
@@ -51,39 +51,37 @@ cargo test  # do the tests pass with your changes.
 Now let's make sure you can run the app.
 
 ```
-cd ui/desktop
-npm install
-npm run start-gui
+just run-ui
 ```
 
 The start gui will both build a release build of rust (as if you had done `cargo build -r`) and start the electron process.
 You should see the app open a window, and drop you into first time setup. When you've gone through the setup,
 you can talk to goose!
 
-You can now make changes in the code in ui/desktop to iterate on the GUI half of goose. 
+You can now make changes in the code in ui/desktop to iterate on the GUI half of goose.
 
 ## Env Vars
 
 You may want to make more frequent changes to your provider setup or similar to test things out
-as a developer. You can use environment variables to change things on the fly without redoing 
-your configuration. 
+as a developer. You can use environment variables to change things on the fly without redoing
+your configuration.
 
 > [!TIP]
 > At the moment, we are still updating some of the CLI configuration to make sure this is
-> respected. 
+> respected.
 
 You can change the provider goose points to via the `GOOSE_PROVIDER` env var. If you already
-have a credential for that provider in your keychain from previously setting up, it should 
+have a credential for that provider in your keychain from previously setting up, it should
 reuse it. For things like automations or to test without doing official setup, you can also
 set the relevant env vars for that provider. For example `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
 or `DATABRICKS_HOST`. Refer to the provider details for more info on required keys.
-
 
 ## Enable traces in Goose with [locally hosted Langfuse](https://langfuse.com/docs/deployment/self-host)
 
 - Run `just langfuse-server` to start your local Langfuse server. It requires Docker.
 - Go to http://localhost:3000 and log in with the default email/password output by the shell script (values can also be found in the `.env.langfuse.local` file).
-- Set the environment variables so that rust can connect to the langfuse server 
+- Set the environment variables so that rust can connect to the langfuse server
+
 ```
 export LANGFUSE_INIT_PROJECT_PUBLIC_KEY=publickey-local
 export LANGFUSE_INIT_PROJECT_SECRET_KEY=secretkey-local
