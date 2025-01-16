@@ -1,7 +1,7 @@
 export const SELECTED_PROVIDER_KEY = "GOOSE_PROVIDER__API_KEY"
 
 export interface ProviderOption {
-  id: 'openai' | 'anthropic';
+  id: string;
   name: string;
   description: string;
   modelExample: string;
@@ -12,6 +12,7 @@ export const ANTHROPIC_ENDPOINT_PLACEHOLDER = "https://api.anthropic.com";
 export const OPENAI_DEFAULT_MODEL = "gpt-4"
 export const ANTHROPIC_DEFAULT_MODEL = "claude-3-sonnet"
 
+// TODO we will provide these from a rust endpoint
 export const providers: ProviderOption[] = [
   {
     id: 'openai',
@@ -33,6 +34,3 @@ export const getCurrentProvider = (): string => {
   return provider || 'openai'; // default to OpenAI if none selected
 };
 
-export const getProviderKeyName = (providerId: string): string => {
-  return providerId === 'openai' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY';
-}; 

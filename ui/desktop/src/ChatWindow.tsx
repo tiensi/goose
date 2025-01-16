@@ -19,10 +19,6 @@ import { ProviderSetupModal } from "./components/ProviderSetupModal";
 import {
   providers,
   ProviderOption,
-  OPENAI_ENDPOINT_PLACEHOLDER,
-  ANTHROPIC_ENDPOINT_PLACEHOLDER,
-  OPENAI_DEFAULT_MODEL,
-  ANTHROPIC_DEFAULT_MODEL,
 } from "./utils/providerUtils";
 
 declare global {
@@ -402,7 +398,8 @@ export default function ChatWindow() {
 
   useEffect(() => {
     // Check if we already have a provider set
-    const storedProvider = localStorage.getItem("GOOSE_PROVIDER");
+    const config = window.electron.getConfig();
+    const storedProvider = config.GOOSE_PROVIDER || localStorage.getItem("GOOSE_PROVIDER");
 
     if (storedProvider) {
       setShowWelcomeModal(false);
@@ -428,14 +425,14 @@ export default function ChatWindow() {
     return response;
   };
 
-  const addAgent = async (provider: ProviderOption) => {
+  const addAgent = async (provider: string) => {
     const response = await fetch(getApiUrl("/agent"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-Secret-Key": getSecretKey(),
       },
-      body: JSON.stringify({ provider: provider.id }),
+      body: JSON.stringify({ provider: provider }),
     });
 
     if (!response.ok) {
@@ -449,7 +446,7 @@ export default function ChatWindow() {
     await addMCP("goosed", ["mcp", system]);
   }
 
-  const initializeSystem = async (provider: ProviderOption) => {
+  const initializeSystem = async (provider: string) => {
     try {
       await addAgent(provider);
       await addSystemConfig("developer2");
@@ -476,7 +473,7 @@ export default function ChatWindow() {
       await storeSecret(secretKey, trimmedKey);
 
       // Initialize the system with the selected provider
-      await initializeSystem(selectedProvider);
+      await initializeSystem(selectedProvider.id);
 
       // Save provider selection and close modal
       localStorage.setItem("GOOSE_PROVIDER", selectedProvider.name);
@@ -490,15 +487,13 @@ export default function ChatWindow() {
   // Initialize system on load if we have a stored provider
   useEffect(() => {
     const setupStoredProvider = async () => {
-      const storedProvider = localStorage.getItem("GOOSE_PROVIDER");
+      const config = window.electron.getConfig();
+      const storedProvider = config.GOOSE_PROVIDER || localStorage.getItem("GOOSE_PROVIDER");
       if (storedProvider) {
-        const provider = providers.find((p) => p.name === storedProvider);
-        if (provider) {
-          try {
-            await initializeSystem(provider);
-          } catch (error) {
-            console.error("Failed to initialize with stored provider:", error);
-          }
+        try {
+          await initializeSystem(storedProvider);
+        } catch (error) {
+          console.error("Failed to initialize with stored provider:", error);
         }
       }
     };
@@ -542,16 +537,6 @@ export default function ChatWindow() {
           {selectedProvider ? (
             <ProviderSetupModal
               provider={selectedProvider.name}
-              model={
-                selectedProvider.id === "openai"
-                  ? OPENAI_DEFAULT_MODEL
-                  : ANTHROPIC_DEFAULT_MODEL
-              }
-              endpoint={
-                selectedProvider.id === "openai"
-                  ? OPENAI_ENDPOINT_PLACEHOLDER
-                  : ANTHROPIC_ENDPOINT_PLACEHOLDER
-              }
               onSubmit={handleModalSubmit}
               onCancel={() => {
                 setSelectedProvider(null);
