@@ -472,19 +472,18 @@ export default function Keys() {
                       </div>
                     );
                   })}
+
+                  {provider.id.toLowerCase() !== localStorage.getItem("GOOSE_PROVIDER")?.toLowerCase() && (
+                    <button
+                      onClick={() => handleSelectProvider(provider.id)}
+                      disabled={isChangingProvider}
+                      className="mt-4 text-sm px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+                    >
+                      Set as Active
+                    </button>
+                  )}
                 </div>
               )}
-
-              <button
-                onClick={() => handleSelectProvider(provider.id)}
-                disabled={
-                  isChangingProvider || 
-                  provider.id.toLowerCase() === localStorage.getItem("GOOSE_PROVIDER")?.toLowerCase()
-                }
-                className="text-sm px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
-              >
-                Set as Active
-              </button>
             </div>
           );
         })}
