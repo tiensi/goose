@@ -118,10 +118,40 @@ export default function Keys() {
   useEffect(() => {
     const fetchSecrets = async () => {
       try {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        const response = await fetch(getApiUrl("/secrets/providers"), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Secret-Key': getSecretKey(),
+            },
+            body: JSON.stringify({
+              providers: ["OpenAI", "Anthropic", "MyProvider"]
+            })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch secrets');
+        }
+
+        let data = await response.json();
+        console.log(data)
         
+        // Append test data for additional providers
+        data = {
+          ...data,
+          'databricks': {
+            supported: true,
+            secret_status: {
+              'DATABRICKS_API_KEY': {
+                is_set: false,
+                location: null
+              }
+            }
+          }
+        };
+
         // Transform only supported providers with secret_status
-        const transformedSecrets = Object.entries(MOCK_SECRETS_RESPONSE)
+        const transformedSecrets = Object.entries(data)
           .filter(([_, status]) => status.supported && status.secret_status)
           .flatMap(([_, status]) => 
             Object.entries(status.secret_status!).map(([key, secretStatus]) => ({
@@ -132,15 +162,16 @@ export default function Keys() {
           );
         
         setSecrets(transformedSecrets);
+        
         // Check the GOOSE_PROVIDER from localStorage
-        const gooseProvider = localStorage.getItem("GOOSE_PROVIDER").toLowerCase() || null;
+        const gooseProvider = localStorage.getItem("GOOSE_PROVIDER")?.toLowerCase() || null;
         if (gooseProvider) {
-            const matchedProvider = PROVIDERS.find(provider => provider.id.toLowerCase() === gooseProvider);
-            if (matchedProvider) {
+          const matchedProvider = PROVIDERS.find(provider => provider.id.toLowerCase() === gooseProvider);
+          if (matchedProvider) {
             setExpandedProviders(new Set([matchedProvider.id]));
-            } else {
+          } else {
             console.warn(`Provider ${gooseProvider} not found in settings.`);
-            }
+          }
         }
       } catch (error) {
         console.error('Error fetching secrets:', error);
@@ -220,9 +251,10 @@ export default function Keys() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Secret-Key': getSecretKey(),
         },
         body: JSON.stringify({
-          providers: ["OpenAI", "Anthropic"]
+          providers: ["OpenAI", "Anthropic", "MyProvider"]
         })
       });
 
@@ -281,7 +313,19 @@ export default function Keys() {
                       <FaKey className={`${isSupported ? 'text-gray-500' : 'text-red-500'}`} />
                     </div>
                     <div className="text-left">
-                      <h3 className="font-medium dark:text-white">{provider.name}</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium dark:text-white">{provider.name}</h3>
+                        {provider.id.toLowerCase() === (localStorage.getItem("GOOSE_PROVIDER")?.toLowerCase() || '') && (
+                          <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full">
+                            Selected Provider
+                          </span>
+                        )}
+                        {!isSupported && (
+                          <span className="text-xs px-2 py-0.5 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded-full">
+                            Not Supported
+                          </span>
+                        )}
+                      </div>
                       <p className="text-sm text-gray-500">
                         {isSupported ? provider.description : 'Provider not supported'}
                       </p>
@@ -320,7 +364,7 @@ export default function Keys() {
                               ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
                               : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                           }`}>
-                            {secret?.is_set ? 'Set' : 'Not Set'}
+                            {secret?.is_set ? 'Key set' : 'Missing'}
                           </span>
                           <button
                             onClick={() => handleEdit(key)}
