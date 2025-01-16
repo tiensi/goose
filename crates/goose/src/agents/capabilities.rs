@@ -1,4 +1,6 @@
 use chrono::{DateTime, TimeZone, Utc};
+use futures::stream;
+use futures::stream::StreamExt;
 use mcp_client::McpService;
 use rust_decimal_macros::dec;
 use std::collections::HashMap;
@@ -384,12 +386,74 @@ impl Capabilities {
         return Ok(result);
     }
 
+    async fn list_resources(&self, params: Value) -> Result<Vec<Content>, ToolError> {
+        let system = params.get("system").and_then(|v| v.as_str());
+
+        if system.is_some() {
+            // grab the system
+            let client = self.clients.get(system.unwrap()).ok_or_else(|| {
+                ToolError::InvalidParameters(format!("System {} is not valid", system.unwrap()))
+            })?;
+
+            let client_guard = client.lock().await;
+            let result = client_guard
+                .list_resources(None)
+                .await
+                .map_err(|e| {
+                    ToolError::ExecutionError(format!(
+                        "Unable to list resources for {}, {:?}",
+                        system.unwrap(),
+                        e
+                    ))
+                })
+                .map(|lr| {
+                    let resource_list = lr
+                        .resources
+                        .into_iter()
+                        .map(|r| format!("{}, uri: ({})", r.name, r.uri))
+                        .collect::<Vec<String>>()
+                        .join("\n");
+
+                    vec![Content::text(resource_list)]
+                });
+
+            return result;
+        }
+
+        // if no system name, loop through all systems
+        let results: Vec<_> = stream::iter(self.clients.clone().into_iter())
+            .then(|(_system_name, client)| async move {
+                let guard = client.lock().await;
+                guard.list_resources(None).await
+            })
+            .collect()
+            .await;
+
+        let (resources, errs): (Vec<_>, Vec<_>) = results.into_iter().partition(Result::is_ok);
+
+        let errs: Vec<_> = errs.into_iter().map(Result::unwrap_err).collect();
+        tracing::error!(errors = ?errs, "errors from listing rsources");
+
+        // take all resources and convert to Content as Tool response
+        let all_resources_str: String = resources
+            .into_iter()
+            .map(Result::unwrap)
+            .flat_map(|lr| lr.resources)
+            .map(|resource| format!("{}, uri: ({})", resource.name, resource.uri))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        Ok(vec![Content::text(all_resources_str)])
+    }
+
     /// Dispatch a single tool call to the appropriate client
     #[instrument(skip(self, tool_call), fields(input, output))]
     pub async fn dispatch_tool_call(&self, tool_call: ToolCall) -> ToolResult<Vec<Content>> {
         let result = if tool_call.name == "platform__read_resource" {
             // Check if the tool is read_resource and handle it separately
             self.read_resource(tool_call.arguments.clone()).await
+        } else if tool_call.name == "platform__list_resources" {
+            self.list_resources(tool_call.arguments.clone()).await
         } else {
             // Else, dispatch tool call based on the prefix naming convention
             let client = self
