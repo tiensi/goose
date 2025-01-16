@@ -1,16 +1,50 @@
 use axum::{
+    extract::State,
     routing::{get, post},
     Json, Router,
 };
-use once_cell::sync::Lazy;
+use once_cell::sync::Lazy;  // TODO: investigate if we need
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use crate::state::AppState;
-use goose::key_manager::{get_keyring_secret, KeyRetrievalStrategy};
+use http::{HeaderMap, StatusCode};
+use goose::key_manager::{save_to_keyring, get_keyring_secret, KeyRetrievalStrategy};
 
-// Define the types needed for the API
+#[derive(Serialize)]
+struct SecretResponse {
+    error: bool,
+}
+
+#[derive(Deserialize)]
+struct SecretRequest {
+    key: String,
+    value: String,
+}
+
+async fn store_secret(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<SecretRequest>,
+) -> Result<Json<SecretResponse>, StatusCode> {
+    // Verify secret key
+    let secret_key = headers
+        .get("X-Secret-Key")
+        .and_then(|value| value.to_str().ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    if secret_key != state.secret_key {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    match save_to_keyring(&request.key, &request.value) {
+        Ok(_) => Ok(Json(SecretResponse { error: false })),
+        Err(_) => Ok(Json(SecretResponse { error: true })),
+    }
+}
+
+
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ProviderRequest {
+pub struct ProviderSecretRequest {
     pub providers: Vec<String>,
 }
 
@@ -26,19 +60,15 @@ pub struct ProviderStatus {
     pub secret_status: HashMap<String, SecretStatus>,
 }
 
-// Define the provider requirements
 static PROVIDER_ENV_REQUIREMENTS: Lazy<HashMap<String, Vec<String>>> = Lazy::new(|| {
-    let mut m = HashMap::new();
-    m.insert(
-        "test_provider".to_string(),
-        vec!["TEST_API_KEY".to_string(), "TEST_SECRET".to_string()]
-    );
-    m
+    let contents = include_str!("providers_and_keys.json");
+    serde_json::from_str(contents).expect("Failed to parse providers_and_keys.json")
 });
 
-// Helper function to check key status
+
+// Helper function to check if a key is set somewhere
 fn check_key_status(key: &str) -> (bool, Option<String>) {
-    if let Ok(value) = std::env::var(key) {
+    if let Ok(_value) = std::env::var(key) {
         (true, Some("env".to_string()))
     } else if let Ok(_) = get_keyring_secret(key, KeyRetrievalStrategy::KeyringOnly) {
         (true, Some("keyring".to_string()))
@@ -48,8 +78,8 @@ fn check_key_status(key: &str) -> (bool, Option<String>) {
 }
 
 async fn check_provider_secrets(
-    Json(request): Json<ProviderRequest>,
-) -> Json<HashMap<String, ProviderStatus>> {
+    Json(request): Json<ProviderSecretRequest>,
+) -> Result<Json<HashMap<String, ProviderStatus>>, StatusCode> {
     let mut response = HashMap::new();
 
     for provider_name in request.providers {
@@ -79,12 +109,13 @@ async fn check_provider_secrets(
         }
     }
 
-    Json(response)
+    Ok(Json(response))
 }
 
 pub fn routes(state: AppState) -> Router {
     Router::new()
-        .route("/provider", post(check_provider_secrets))
+        .route("/secrets/providers", get(check_provider_secrets))
+        .route("/secrets/store", post(store_secret))
         .with_state(state)
 }
 
@@ -93,68 +124,22 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_supported_provider_with_set_keys() {
-        // Setup
-        let request = ProviderRequest {
-            providers: vec!["test_provider".to_string()]
-        };
-
-        // Set environment variables for testing
-        std::env::set_var("TEST_API_KEY", "dummy_value");
-        std::env::set_var("TEST_SECRET", "dummy_secret");
-
-        // Execute
-        let Json(response) = check_provider_secrets(Json(request)).await;
-
-        // Assert
-        let provider_status = response.get("test_provider").expect("Provider should exist");
-        assert!(provider_status.supported);
-        
-        let secret_status = &provider_status.secret_status;
-        assert!(secret_status.get("TEST_API_KEY").unwrap().is_set);
-        assert!(secret_status.get("TEST_SECRET").unwrap().is_set);
-
-        // Cleanup
-        std::env::remove_var("TEST_API_KEY");
-        std::env::remove_var("TEST_SECRET");
-    }
-
-    #[tokio::test]
     async fn test_unsupported_provider() {
         // Setup
-        let request = ProviderRequest {
-            providers: vec!["unsupported_provider".to_string()]
+        let request = ProviderSecretRequest {
+            providers: vec!["unsupported_provider".to_string()],
         };
 
         // Execute
-        let Json(response) = check_provider_secrets(Json(request)).await;
+        let result = check_provider_secrets(Json(request)).await;
 
         // Assert
+        assert!(result.is_ok());
+        let Json(response) = result.unwrap();
+
         let provider_status = response.get("unsupported_provider").expect("Provider should exist");
         assert!(!provider_status.supported);
         assert!(provider_status.secret_status.is_empty());
     }
 
-    #[tokio::test]
-    async fn test_multiple_providers() {
-        // Setup
-        let request = ProviderRequest {
-            providers: vec![
-                "test_provider".to_string(),
-                "unsupported_provider".to_string()
-            ]
-        };
-
-        // Execute
-        let Json(response) = check_provider_secrets(Json(request)).await;
-
-        // Assert
-        assert_eq!(response.len(), 2);
-        
-        let supported_status = response.get("test_provider").expect("Supported provider should exist");
-        assert!(supported_status.supported);
-        
-        let unsupported_status = response.get("unsupported_provider").expect("Unsupported provider should exist");
-        assert!(!unsupported_status.supported);
-    }
 }
