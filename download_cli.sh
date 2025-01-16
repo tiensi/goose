@@ -2,7 +2,6 @@
 set -euo pipefail
 
 REPO="block/goose"
-FILE="goose"
 OUT_FILE="goose"
 GITHUB_API_ENDPOINT="api.github.com"
 
@@ -10,17 +9,37 @@ function gh_curl() {
   curl -sL -H "Accept: application/vnd.github.v3.raw" $@
 }
 
-# Find the goose binary asset id without using jq
+# Determine the operating system and architecture
+OS=$(uname | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
+
+case "$ARCH" in
+  x86_64)
+    ARCH="x86_64"
+    ;;
+  arm64)
+    ARCH="aarch64"
+    ;;
+  *)
+    echo "ERROR: Unsupported architecture: $ARCH"
+    exit 1
+    ;;
+esac
+
+FILE="goose-$ARCH-unknown-linux-gnu.tar.bz2"
+if [ "$OS" = "darwin" ]; then
+  FILE="goose-$ARCH-apple-darwin.tar.bz2"
+fi
+
+# Find the goose binary asset id
 echo "Looking up the most recent goose binary release..."
 echo ""
 RELEASES=$(gh_curl https://$GITHUB_API_ENDPOINT/repos/$REPO/releases)
 
-# Use awk to find the asset ID
-# This script looks for the first prerelease and within it finds the asset with matching name
+# Parse JSON to find the asset ID
 ASSET_ID=$(echo "$RELEASES" | awk -v file="$FILE" '
-  BEGIN { found_prerelease = 0; found_asset = 0; }
-  /"prerelease"/ && /true/ { found_prerelease = 1; next }
-  found_prerelease && /"assets"/ { in_assets = 1; next }
+  BEGIN { found_asset = 0; }
+  /"assets"/ { in_assets = 1; next }
   in_assets && /"id":/ {
     match($0, /[0-9]+/);
     current_id = substr($0, RSTART, RLENGTH);
@@ -38,10 +57,13 @@ if [ -z "$ASSET_ID" ]; then
 fi
 
 # Download the goose binary
-echo "Downloading goose..."
+echo "Downloading $FILE..."
 echo ""
-curl -sL --header 'Accept: application/octet-stream' https://$GITHUB_API_ENDPOINT/repos/$REPO/releases/assets/$ASSET_ID > $OUT_FILE
-chmod +x $OUT_FILE
+curl -sL --header 'Accept: application/octet-stream' https://$GITHUB_API_ENDPOINT/repos/$REPO/releases/assets/$ASSET_ID > $FILE
+tar -xjf $FILE
+echo "Cleaning up $FILE..."
+rm $FILE
+chmod +x goose goosed
 
 LOCAL_BIN="$HOME/.local/bin"
 if [ ! -d "$LOCAL_BIN" ]; then
@@ -53,8 +75,8 @@ fi
 
 echo "Sending goose to $LOCAL_BIN/$OUT_FILE"
 echo ""
-chmod +x $OUT_FILE
-mv $OUT_FILE $LOCAL_BIN/$OUT_FILE
+mv goose $LOCAL_BIN/$OUT_FILE
+mv goosed $LOCAL_BIN
 
 # Check if the directory is in the PATH
 if [[ ":$PATH:" != *":$LOCAL_BIN:"* ]]; then
