@@ -387,23 +387,23 @@ impl Capabilities {
     /// Dispatch a single tool call to the appropriate client
     #[instrument(skip(self, tool_call), fields(input, output))]
     pub async fn dispatch_tool_call(&self, tool_call: ToolCall) -> ToolResult<Vec<Content>> {
-        let client = self
-            .get_client_for_tool(&tool_call.name)
-            .ok_or_else(|| ToolError::NotFound(tool_call.name.clone()))?;
-
-        let tool_name = tool_call
-            .name
-            .split("__")
-            .nth(1)
-            .ok_or_else(|| ToolError::NotFound(tool_call.name.clone()))?;
-
-        let client_guard = client.lock().await;
-
-        let result = if tool_name == "platform__read_resource" {
+        let result = if tool_call.name == "platform__read_resource" {
             // Check if the tool is read_resource and handle it separately
             self.read_resource(tool_call.arguments.clone()).await
         } else {
             // Else, dispatch tool call based on the prefix naming convention
+            let client = self
+                .get_client_for_tool(&tool_call.name)
+                .ok_or_else(|| ToolError::NotFound(tool_call.name.clone()))?;
+
+            let tool_name = tool_call
+                .name
+                .split("__")
+                .nth(1)
+                .ok_or_else(|| ToolError::NotFound(tool_call.name.clone()))?;
+
+            let client_guard = client.lock().await;
+
             client_guard
                 .call_tool(tool_name, tool_call.clone().arguments)
                 .await
