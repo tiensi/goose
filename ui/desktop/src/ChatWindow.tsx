@@ -21,6 +21,7 @@ import {
   ProviderOption,
 } from "./utils/providerUtils";
 import Keys from "./components/settings/Keys";
+import { initializeSystem } from './utils/systemInitializer';
 
 declare global {
   interface Window {
@@ -426,14 +427,14 @@ export default function ChatWindow() {
     return response;
   };
 
-  const addAgent = async (provider: string) => {
+  const addAgent = async (provider: ProviderOption) => {
     const response = await fetch(getApiUrl("/agent"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-Secret-Key": getSecretKey(),
       },
-      body: JSON.stringify({ provider: provider }),
+      body: JSON.stringify({ provider: provider.id }),
     });
 
     if (!response.ok) {
@@ -447,13 +448,14 @@ export default function ChatWindow() {
     await addMCP("goosed", ["mcp", system]);
   };
 
-  const initializeSystem = async (provider: string) => {
+  const initializeSystem = async (provider: ProviderOption) => {
     try {
       await addAgent(provider);
       await addSystemConfig("developer2");
-      // add system from deep link up front
-      if (window.appConfig.get("DEEP_LINK")) {
-        await addMCPSystem(window.appConfig.get("DEEP_LINK"));
+      // Handle deep link if present
+      const deepLink = window.appConfig.get('DEEP_LINK');
+      if (deepLink) {
+        await addMCPSystem(deepLink);
       }
     } catch (error) {
       console.error("Failed to initialize system:", error);

@@ -9,6 +9,7 @@ import {
   ModalHeader, 
   ModalTitle 
 } from '../ui/modal';
+import { initializeSystem } from '../../utils/systemInitializer';
 
 const PROVIDER_ORDER = ['openai', 'anthropic', 'databricks'];
 
@@ -293,46 +294,7 @@ export default function Keys() {
   const handleSelectProvider = async (providerId: string) => {
     setIsChangingProvider(true);
     try {
-      const url = getApiUrl("/agent");
-      console.log("Attempting to fetch:", url);
-
-      // Initialize agent with new provider
-      const agentResponse = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Secret-Key": getSecretKey(),
-        },
-        body: JSON.stringify({ 
-          provider: providerId,
-        }),
-      }).catch(error => {
-        console.error("Fetch failed:", error);
-        throw error;
-      });
-
-      if (agentResponse.status === 401) {
-        throw new Error("Unauthorized - invalid secret key");
-      }
-      if (!agentResponse.ok) {
-        throw new Error(`Failed to set agent: ${agentResponse.statusText}`);
-      }
-
-      // Initialize system config
-      const systemResponse = await fetch(getApiUrl("/system"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Secret-Key": getSecretKey(),
-        },
-        body: JSON.stringify({ system: "developer2" }),
-      });
-
-      if (!systemResponse.ok) {
-        throw new Error("Failed to set system config");
-      }
-
-      // Update localStorage
+      // Update localStorage 
       const provider = providers.find(p => p.id === providerId);
       if (provider) {
         localStorage.setItem("GOOSE_PROVIDER", provider.name);
