@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path;
 use std::sync::Arc;
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 
@@ -139,11 +140,41 @@ impl StdioTransport {
         }
     }
 
+
+    fn prepare_hermit_install() -> String {
+        let hermit_install = r#"HERMIT_BIN=/Users/micn/Documents/code/goose-ui/ui/desktop/src/bin/hermit
+            mkdir -p ~/.goose/mcp-hermit/bin
+            cd ~/.goose/mcp-hermit/
+            cp $HERMIT_BIN ~/.goose/mcp-hermit/bin
+            PATH=~/.goose/mcp-hermit/bin:$PATH
+            which hermit
+            hermit init
+            hermit install node
+            which hermit
+            which node
+            which npx
+            env > /tmp/hermit-env.txt"#;
+        hermit_install.to_string()
+    }
+
+
     async fn spawn_process(&self) -> Result<(Child, ChildStdin, ChildStdout), Error> {
         let mut final_env = self.env.clone();
 
         if self.command == "npx" {
-            println!("npx command detected, adjusting environment with hermit.");
+            println!("npx command detected, preparing hermit environment.");
+            // Run the hermit installation commands
+            let output = std::process::Command::new("sh")
+                .arg("-c")
+                .arg(Self::prepare_hermit_install())
+                .output()
+                .map_err(|e| Error::StdioProcessError(format!("Failed to run hermit install: {}", e)))?;
+
+            if !output.status.success() {
+                return Err(Error::StdioProcessError("Hermit installation failed".into()));
+            }
+
+            // Now read the environment from the file we created
             if let Ok(hermit_env) = std::fs::read_to_string("/tmp/hermit-env.txt") {
                 for line in hermit_env.lines() {
                     if let Some((key, value)) = line.split_once('=') {
