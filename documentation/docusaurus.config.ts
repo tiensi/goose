@@ -70,8 +70,8 @@ const config: Config = {
     navbar: {
       title: 'Goose Documentation',
       logo: {
-        alt: 'My Site Logo',
-        src: 'img/logo.svg',
+        alt: 'Block Logo',
+        src: 'img/logo.png',
       },
       items: [
         {
