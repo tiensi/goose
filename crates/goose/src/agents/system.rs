@@ -49,17 +49,24 @@ impl Envs {
 #[serde(tag = "type")]
 pub enum SystemConfig {
     /// Server-sent events client with a URI endpoint
+    #[serde(rename = "sse")]
     Sse {
         uri: String,
         #[serde(default)]
         envs: Envs,
     },
     /// Standard I/O client with command and arguments
+    #[serde(rename = "stdio")]
     Stdio {
         cmd: String,
         args: Vec<String>,
         #[serde(default)]
         envs: Envs,
+    },
+    /// Built-in system that is part of the goose binary
+    #[serde(rename = "builtin")]
+    Builtin {
+        name: String,
     },
 }
 
@@ -100,6 +107,7 @@ impl std::fmt::Display for SystemConfig {
         match self {
             SystemConfig::Sse { uri, .. } => write!(f, "SSE({})", uri),
             SystemConfig::Stdio { cmd, args, .. } => write!(f, "Stdio({} {})", cmd, args.join(" ")),
+            SystemConfig::Builtin { name } => write!(f, "Builtin({})", name),
         }
     }
 }
