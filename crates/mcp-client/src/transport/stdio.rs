@@ -141,8 +141,9 @@ impl StdioTransport {
 
     async fn spawn_process(&self) -> Result<(Child, ChildStdin, ChildStdout), Error> {
         let mut final_env = self.env.clone();
-        
+
         if self.command == "npx" {
+            println!("npx command detected, adjusting environment with hermit.");
             if let Ok(hermit_env) = std::fs::read_to_string("/tmp/hermit-env.txt") {
                 for line in hermit_env.lines() {
                     if let Some((key, value)) = line.split_once('=') {
