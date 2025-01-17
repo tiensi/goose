@@ -1,4 +1,4 @@
-import React, { useEffect, useState, SVGProps } from 'react';
+import React, { useEffect, useState } from 'react';
 import { getApiUrl, getSecretKey } from '../../config';
 
 interface SecretSource {
@@ -11,9 +11,15 @@ interface SecretsListResponse {
   secrets: SecretSource[];
 }
 
-type SVGComponentProps = React.SVGProps<SVGSVGElement> & {
+type SVGComponentProps = {
   className?: string;
-};
+  width?: number | string;
+  height?: number | string;
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number | string;
+  // Add any other specific SVG props you need
+} & React.HTMLAttributes<SVGElement>;
 
 export const SecretsList = () => {
   const [secrets, setSecrets] = useState<SecretSource[]>([]);

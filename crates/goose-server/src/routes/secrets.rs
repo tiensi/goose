@@ -40,7 +40,6 @@ async fn store_secret(
     }
 }
 
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProviderSecretRequest {
     pub providers: Vec<String>,
@@ -74,8 +73,6 @@ static PROVIDER_ENV_REQUIREMENTS: Lazy<HashMap<String, ProviderConfig>> = Lazy::
     serde_json::from_str(contents).expect("Failed to parse providers_and_keys.json")
 });
 
-
-// Helper function to check if a key is set somewhere
 fn check_key_status(key: &str) -> (bool, Option<String>) {
     if let Ok(_value) = std::env::var(key) {
         (true, Some("env".to_string()))
@@ -192,5 +189,4 @@ mod tests {
         assert!(!provider_status.supported);
         assert!(provider_status.secret_status.is_empty());
     }
-
 }
