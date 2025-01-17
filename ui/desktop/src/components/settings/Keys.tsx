@@ -298,6 +298,7 @@ export default function Keys() {
       const provider = providers.find(p => p.id === providerId);
       if (provider) {
         localStorage.setItem("GOOSE_PROVIDER", provider.name);
+        initializeSystem(provider)
         showToast(`Switched to ${provider.name}`, "success");
         
         // Spawn new chat window with the new provider
