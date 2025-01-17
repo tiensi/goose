@@ -61,8 +61,16 @@ pub async fn build_session<'a>(
         );
     }
 
-    let config = Config::load().unwrap_or_else(|_| {
+    let config_path = Config::config_path().expect("should identify default config path");
+
+    if !config_path.exists() {
         println!("No configuration found. Please run 'goose configure' first.");
+        process::exit(1);
+    }
+
+    let config = Config::load().unwrap_or_else(|_| {
+        println!("The loaded configuration from {} was invalid", config_path.display());
+        println!(" please edit the file to make it valid or consider deleting and recreating it via `goose configure`");
         process::exit(1);
     });
 

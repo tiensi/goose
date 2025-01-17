@@ -249,6 +249,7 @@ pub fn toggle_systems_dialog() -> Result<(), Box<dyn Error>> {
     // Let user toggle systems
     let selected =
         cliclack::multiselect("enable systems: (use \"space\" to toggle and \"enter\" to submit)")
+            .required(false)
             .items(
                 &system_status
                     .iter()
