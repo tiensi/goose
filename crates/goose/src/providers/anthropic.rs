@@ -367,7 +367,7 @@ mod tests {
             client: Client::builder().build().unwrap(),
             host: mock_server.uri(),
             api_key: "test_api_key".to_string(),
-            model: ModelConfig::new("claude-3-5-sonnet-latest".to_string())
+            model: ModelConfig::new("claude-3-sonnet-20241022".to_string())
                 .with_temperature(Some(0.7))
                 .with_context_limit(Some(200_000)),
         };
@@ -390,17 +390,20 @@ mod tests {
             "stop_sequence": null,
             "usage": {
                 "input_tokens": 12,
-                "output_tokens": 15
+                "output_tokens": 15,
+                "cache_creation_input_tokens": 12,
+                "cache_read_input_tokens": 0
             }
         });
 
         let (_, provider) = setup_mock_server(response_body).await;
+
         let messages = vec![Message::user().with_text("Hello?")];
+
         let (message, usage) = provider
             .complete_internal("You are a helpful assistant.", &messages, &[])
             .await?;
 
-        assert!(matches!(message.content[0], MessageContent::Text(_)));
         if let MessageContent::Text(text) = &message.content[0] {
             assert_eq!(text.text, "Hello! How can I assist you today?");
         } else {
@@ -430,12 +433,14 @@ mod tests {
                     "expression": "2 + 2"
                 }
             }],
-            "model": "claude-3-5-sonnet-latest",
+            "model": "claude-3-sonnet-20240229",
             "stop_reason": "end_turn",
             "stop_sequence": null,
             "usage": {
                 "input_tokens": 15,
-                "output_tokens": 20
+                "output_tokens": 20,
+                "cache_creation_input_tokens": 15,
+                "cache_read_input_tokens": 0,
             }
         });
 
@@ -485,7 +490,7 @@ mod tests {
                 "type": "text",
                 "text": "Hello!"
             }],
-            "model": "claude-3-5-sonnet-latest",
+            "model": "claude-3-sonnet-20240229",
             "stop_reason": "end_turn",
             "stop_sequence": null,
             "usage": {
