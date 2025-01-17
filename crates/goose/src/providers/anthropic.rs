@@ -396,7 +396,6 @@ mod tests {
 
         let (_, provider) = setup_mock_server(response_body).await;
         let messages = vec![Message::user().with_text("Hello?")];
-        
         let (message, usage) = provider
             .complete_internal("You are a helpful assistant.", &messages, &[])
             .await?;
