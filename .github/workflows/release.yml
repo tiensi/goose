@@ -3,7 +3,6 @@ on:
   push:
     tags:
       - "v1.*"
-      - 'test.*'  # TODO: remove after testing
 
 name: Release
 
@@ -73,8 +72,6 @@ jobs:
           allowUpdates: true
           omitBody: true
           omitPrereleaseDuringUpdate: true
-          prerelease: true # TODO: remove after testing
-          draft: true # TODO: remove after testing
 
       # Create/update the stable release
       - name: Release stable
@@ -90,5 +87,3 @@ jobs:
           allowUpdates: true
           omitBody: true
           omitPrereleaseDuringUpdate: true
-          prerelease: true # TODO: remove after testing
-          draft: true # TODO: remove after testing
