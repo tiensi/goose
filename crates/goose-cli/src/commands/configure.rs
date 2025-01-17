@@ -60,7 +60,6 @@ pub async fn handle_configure(
     };
 
     // Depending on the provider, we now want to look for any required keys and check or set them in the keychain
-    // TODO: Remove this noop comment
     for key in get_required_keys(&provider_name).iter() {
         // If the key is in the keyring, ask if we want to overwrite
         if get_keyring_secret(key, KeyRetrievalStrategy::KeyringOnly).is_ok() {

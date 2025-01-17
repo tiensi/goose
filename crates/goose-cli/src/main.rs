@@ -199,7 +199,6 @@ async fn main() -> Result<()> {
             provider,
             model,
         }) => {
-            println!("Configuring profile...");
             let _ = handle_configure(profile_name, provider, model).await;
             return Ok(());
         }
