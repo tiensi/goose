@@ -140,8 +140,20 @@ impl StdioTransport {
     }
 
     async fn spawn_process(&self) -> Result<(Child, ChildStdin, ChildStdout), Error> {
+        let mut final_env = self.env.clone();
+        
+        if self.command == "npx" {
+            if let Ok(hermit_env) = std::fs::read_to_string("/tmp/hermit-env.txt") {
+                for line in hermit_env.lines() {
+                    if let Some((key, value)) = line.split_once('=') {
+                        final_env.insert(key.to_string(), value.to_string());
+                    }
+                }
+            }
+        }
+
         let mut process = Command::new(&self.command)
-            .envs(&self.env)
+            .envs(&final_env)
             .args(&self.args)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
