@@ -9,129 +9,48 @@ import {
   ModalHeader, 
   ModalTitle 
 } from '../ui/modal';
-import { initializeSystem } from '../../utils/systemInitializer';
-import { getProvidersList } from '../../utils/providerUtils'
-
-const PROVIDER_ORDER = ['openai', 'anthropic', 'databricks'];
-
-interface SecretSource {
-  key: string;
-  source: string;
-  is_set: boolean;
-}
-
-interface Provider {
-  id: string;
-  name: string;
-  keys: string[];
-  description: string;
-  canDelete?: boolean;
-  supported: boolean;
-  order: number;
-}
-
-interface ProviderSecretStatus {
-  is_set: boolean;
-  location: string | null;
-}
-
-interface SecretStatus {
-    is_set: boolean;
-    location?: string;
-}
-
-interface ProviderResponse {
-    supported: boolean;
-    name?: string;
-    description?: string;
-    models?: string[];
-    secret_status: Record<string, SecretStatus>;
-}
-
-interface ProviderStatusResponse {
-  [provider: string]: {
-    set: boolean;
-    location: string | null;
-    supported: boolean;
-  };
-}
+import { initializeSystem } from '../../utils/providerUtils';
+import {getSecretsSettings, transformProviderSecretsResponse, transformSecrets} from './providers/utils'
+import { SecretDetails, Provider, ProviderResponse } from './providers/types'
+import { getStoredProvider } from "../../utils/providerUtils"
+import { ProviderSetupModal } from "../welcome_screen/ProviderSetupModal"
 
 export default function Keys() {
   const navigate = useNavigate();
-  const [secrets, setSecrets] = useState<SecretSource[]>([]);
+  const [secrets, setSecrets] = useState<SecretDetails[]>([]);
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set());
-  const [providers, setProviders] = useState<Provider[]>([]);
+  const [providers, setProviders] = useState<ProviderWithSecrets[]>([]);
   const [showTestModal, setShowTestModal] = useState(false);
-  const [testResponse, setTestResponse] = useState<ProviderStatusResponse | null>(null);
+  const [currentKey, setCurrentKey] = useState<string | null>(null); // Tracks key being edited/added
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [showSetProviderKeyModal, setShowSetProviderKeyModal] = useState(false)
   const [keyToDelete, setKeyToDelete] = useState<{providerId: string, key: string} | null>(null);
   const [isChangingProvider, setIsChangingProvider] = useState(false);
 
   useEffect(() => {
+    console.log("Modal visibility:", showSetProviderKeyModal);
+  }, [showSetProviderKeyModal]);
+
+  useEffect(() => {
     const fetchSecrets = async () => {
       try {
-        // Fetch providers dynamically from getProvidersList
-        const providerList = await getProvidersList();
-        // Extract the list of IDs
-        const providerIds = providerList.map((provider) => provider.id);
-        console.log("Provider IDs:", providerIds);
-
-        // Fetch secrets state (set/unset) using the provider IDs
-        const response = await fetch(getApiUrl("/secrets/providers"), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Secret-Key': getSecretKey(),
-          },
-          body: JSON.stringify({
-            providers: providerIds
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch secrets');
-        }
-
-        const data = await response.json() as Record<string, ProviderResponse>;
-        console.log(data);
-
-        // Transform the backend response into Provider objects
-        const transformedProviders: Provider[] = Object.entries(data)
-          .map(([id, status]: [string, any]) => ({
-            id: id.toLowerCase(),
-            name: status.name ? status.name : id,
-            keys: status.secret_status ? Object.keys(status.secret_status) : [],
-            description: status.description ? status.description : "Unsupported provider",
-            supported: status.supported,
-            canDelete: id.toLowerCase() !== 'openai' && id.toLowerCase() !== 'anthropic',
-            order: PROVIDER_ORDER.indexOf(id.toLowerCase())
-          }))
-          .sort((a, b) => {
-            if (a.order !== -1 && b.order !== -1) {
-              return a.order - b.order;
-            }
-            if (a.order === -1 && b.order === -1) {
-              return a.name.localeCompare(b.name);
-            }
-            return a.order === -1 ? 1 : -1;
-          });
-
+        // Fetch secrets state (set/unset)
+        let data = await getSecretsSettings()
+        let transformedProviders: Provider[] = transformProviderSecretsResponse(data)
         setProviders(transformedProviders);
 
-        // Transform secrets data
-        const transformedSecrets = Object.entries(data)
-          .filter(([_, status]: [string, any]) => status.supported && status.secret_status)
-          .flatMap(([_, status]) => 
-            Object.entries(status.secret_status!).map(([key, secretStatus]: [string, any]) => ({
-              key,
-              source: secretStatus.location || 'none',
-              is_set: secretStatus.is_set
-            }))
-          );
+        // Transform secrets data into an array -- [
+        //   { key: "OPENAI_API_KEY", location: "keyring", is_set: true },
+        //   { key: "OPENAI_OTHER_KEY", location: "none", is_set: false }
+        // ]
+        const transformedSecrets = transformSecrets(data)
+        console.log("transformedSecrets", transformedSecrets)
         
         setSecrets(transformedSecrets);
         
         // Check and expand active provider
-        const gooseProvider = localStorage.getItem("GOOSE_PROVIDER")?.toLowerCase() || null;
+        const config = window.electron.getConfig();
+        const gooseProvider = getStoredProvider(config);
         if (gooseProvider) {
           const matchedProvider = transformedProviders.find(provider => 
             provider.id.toLowerCase() === gooseProvider
@@ -157,29 +76,35 @@ export default function Keys() {
     return providerSecrets.some(s => !s?.is_set);
   };
 
-  const handleAddOrEdit = async (key: string) => {
-    // Find the secret to check its source and status
-    const secret = secrets.find(s => s.key === key);
-    
-    if (secret?.source === 'env') {
+  const handleAddOrEditKey = (key: string, providerName: string) => {
+    const secret = secrets.find((s) => s.key === key);
+
+    if (secret?.location === 'env') {
       showToast("Cannot edit key set in environment. Please modify your ~/.zshrc or equivalent file.", "error");
       return;
     }
+    console.log("Key passed to handleAddOrEditKey:", key); // Debug log
+    setCurrentKey(key);
+    setSelectedProvider(providerName); // Set the selected provider name
+    setShowSetProviderKeyModal(true); // Show the modal
+  };
 
+  const handleSubmit = async (apiKey: string) => {
+    setShowSetProviderKeyModal(false); // Hide the modal
+
+    const secret = secrets.find((s) => s.key === currentKey);
     const isAdding = !secret?.is_set;
-    const newValue = prompt(isAdding ? "Enter API key:" : "Enter new API key:");
-    if (!newValue) return;  // User cancelled
 
     try {
       if (!isAdding) {
-        // Delete old key first if editing
+        // Delete old key logic
         const deleteResponse = await fetch(getApiUrl("/secrets/delete"), {
           method: 'DELETE',
           headers: {
             'Content-Type': 'application/json',
             'X-Secret-Key': getSecretKey(),
           },
-          body: JSON.stringify({ key })
+          body: JSON.stringify({ key: currentKey }),
         });
 
         if (!deleteResponse.ok) {
@@ -187,17 +112,17 @@ export default function Keys() {
         }
       }
 
-      // Store new key
+      // Store new key logic
       const storeResponse = await fetch(getApiUrl("/secrets/store"), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Secret-Key': getSecretKey(),
         },
-        body: JSON.stringify({ 
-          key,
-          value: newValue.trim()
-        })
+        body: JSON.stringify({
+          key: currentKey,
+          value: apiKey.trim(),
+        }),
       });
 
       if (!storeResponse.ok) {
@@ -205,24 +130,33 @@ export default function Keys() {
       }
 
       // Update local state
-      setSecrets(secrets.map(s => 
-        s.key === key 
-          ? { ...s, source: 'keyring', is_set: true }
-          : s
-      ));
+      setSecrets(
+          secrets.map((s) =>
+              s.key === currentKey
+                  ? { ...s, location: 'keyring', is_set: true }
+                  : s
+          )
+      );
 
       showToast(isAdding ? "Key added successfully" : "Key updated successfully", "success");
     } catch (error) {
       console.error('Error updating key:', error);
       showToast(isAdding ? "Failed to add key" : "Failed to update key", "error");
+    } finally {
+      setCurrentKey(null);
     }
+  };
+
+  const handleCancel = () => {
+    setShowSetProviderKeyModal(false); // Close the modal without making changes
+    setCurrentKey(null);
   };
 
   const handleDeleteKey = async (providerId: string, key: string) => {
     // Find the secret to check its source
     const secret = secrets.find(s => s.key === key);
     
-    if (secret?.source === 'env') {
+    if (secret?.location === 'env') {
       showToast("This key is set in your environment. Please remove it from your ~/.zshrc or equivalent file.", "error");
       return;
     }
@@ -249,7 +183,11 @@ export default function Keys() {
       }
 
       // Update local state to reflect deletion
-      setSecrets(secrets.filter(s => s.key !== keyToDelete.key));
+      setSecrets(secrets.map((s) =>
+          s.key === keyToDelete.key
+              ? { ...s, location: 'none', is_set: false } // Mark as not set
+              : s
+      ));
       showToast(`Key ${keyToDelete.key} deleted from keychain`, "success");
     } catch (error) {
       console.error('Error deleting key:', error);
@@ -299,7 +237,6 @@ export default function Keys() {
       }
 
       const data = await response.json() as Record<string, ProviderResponse>;
-      setTestResponse(data);
       setShowTestModal(true);
     } catch (error) {
       console.error('Error testing providers:', error);
@@ -314,11 +251,8 @@ export default function Keys() {
       const provider = providers.find(p => p.id === providerId);
       if (provider) {
         localStorage.setItem("GOOSE_PROVIDER", provider.name);
-        initializeSystem(provider)
+        initializeSystem(provider.id)
         showToast(`Switched to ${provider.name}`, "success");
-        
-        // Spawn new chat window with the new provider
-        window.electron.createChatWindow();
       }
     } catch (error) {
       console.error("Failed to change provider:", error);
@@ -392,15 +326,6 @@ export default function Keys() {
                     <FaExclamationCircle className="text-yellow-500" />
                   )}
                 </button>
-                {provider.canDelete && (
-                  <button
-                    onClick={() => handleDeleteProvider(provider.id)}
-                    className="ml-4 p-1.5 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-200 rounded-full hover:bg-red-100 dark:hover:bg-red-900"
-                    title="Delete provider"
-                  >
-                    <FaTrash size={14} />
-                  </button>
-                )}
               </div>
 
               {isSupported && isExpanded && (
@@ -412,7 +337,7 @@ export default function Keys() {
                         <div>
                           <p className="text-sm font-mono dark:text-gray-300">{key}</p>
                           <p className="text-xs text-gray-500">
-                            Source: {secret?.source || 'none'}
+                            Source: {secret?.location || 'none'}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -424,7 +349,7 @@ export default function Keys() {
                             {secret?.is_set ? 'Key set' : 'Missing'}
                           </span>
                           <button
-                            onClick={() => handleAddOrEdit(key)}
+                            onClick={() => handleAddOrEditKey(key, provider.name)}
                             className="p-1.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
                             title={secret?.is_set ? "Edit key" : "Add key"}
                           >
@@ -468,18 +393,16 @@ export default function Keys() {
         })}
       </div>
 
-      <Modal open={showTestModal} onOpenChange={setShowTestModal}>
-        <ModalContent>
-          <ModalHeader>
-            <ModalTitle>Provider Status Test</ModalTitle>
-          </ModalHeader>
-          <div className="mt-4">
-            <pre className="bg-gray-100 dark:bg-gray-900 p-4 rounded-lg overflow-auto max-h-96 text-sm">
-              {testResponse && JSON.stringify(testResponse, null, 2)}
-            </pre>
-          </div>
-        </ModalContent>
-      </Modal>
+      {showSetProviderKeyModal && currentKey && selectedProvider && (
+          <ProviderSetupModal
+              provider={selectedProvider}// Pass the provider name dynamically if available
+              model="" // Replace with dynamic model name if applicable
+              endpoint="" // Replace with dynamic endpoint if needed
+              onSubmit={(apiKey) => handleSubmit(apiKey)} // Call handleSubmit when submitting
+              onCancel={() => setShowSetProviderKeyModal(false)} // Close modal on cancel
+          />
+      )}
+
 
       <Modal open={!!keyToDelete} onOpenChange={() => setKeyToDelete(null)}>
         <ModalContent>

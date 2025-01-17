@@ -20,7 +20,7 @@ import {
 import { ChatLayout } from "./components/chat_window/ChatLayout"
 import { ChatRoutes } from "./components/chat_window/ChatRoutes"
 import { WelcomeModal } from "./components/welcome_screen/WelcomeModal"
-import { getStoredProvider } from './utils/providerUtils'
+import { getStoredProvider, initializeSystem } from './utils/providerUtils'
 
 declare global {
   interface Window {
@@ -425,44 +425,7 @@ export default function ChatWindow() {
 
     return response;
   };
-
-  const addAgent = async (provider: String) => {
-    const response = await fetch(getApiUrl("/agent"), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Secret-Key": getSecretKey(),
-      },
-      body: JSON.stringify({ provider: provider }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to add agent: ${response.statusText}`);
-    }
-
-    return response;
-  };
-
-  const addSystemConfig = async (system: string) => {
-    await addMCP("goosed", ["mcp", system]);
-  };
-
-  const initializeSystem = async (provider: String) => {
-    try {
-      console.log("initializing with provider", provider)
-      await addAgent(provider);
-      await addSystemConfig("developer2");
-      // Handle deep link if present
-      const deepLink = window.appConfig.get('DEEP_LINK');
-      if (deepLink) {
-        await addMCPSystem(deepLink);
-      }
-    } catch (error) {
-      console.error("Failed to initialize system:", error);
-      throw error;
-    }
-  };
-
+  
   const handleModalSubmit = async (apiKey: string) => {
     try {
       const trimmedKey = apiKey.trim();
@@ -528,4 +491,4 @@ export default function ChatWindow() {
         )}
       </ChatLayout>
   );
-}
+};
