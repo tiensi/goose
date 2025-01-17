@@ -34,7 +34,6 @@ struct ProviderFile {
     required_keys: Vec<String>,
 }
 
-
 #[derive(Serialize)]
 struct ProviderDetails {
     name: String,

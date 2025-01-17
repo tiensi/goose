@@ -4,7 +4,7 @@ use goose::key_manager::{
     delete_from_keyring, get_keyring_secret, save_to_keyring, KeyRetrievalStrategy,
 };
 use http::{HeaderMap, StatusCode};
-use once_cell::sync::Lazy;  // TODO: investigate if we need
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
