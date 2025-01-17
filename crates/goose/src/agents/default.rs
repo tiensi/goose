@@ -47,13 +47,8 @@ impl DefaultAgent {
             .collect();
 
         let mut counter = self.token_counter.lock().await;
-        let approx_count = counter.count_everything(
-            system_prompt,
-            messages,
-            tools,
-            &resources,
-            Some(model_name),
-        );
+        let approx_count =
+            counter.count_everything(system_prompt, messages, tools, &resources, Some(model_name));
         let mut status_content: Vec<String> = Vec::new();
 
         if approx_count > target_limit {
@@ -61,9 +56,7 @@ impl DefaultAgent {
 
             for item in resource_items.iter_mut() {
                 if item.token_count.is_none() {
-                    let count = counter
-                        .count_tokens(&item.content, Some(model_name))
-                        as u32;
+                    let count = counter.count_tokens(&item.content, Some(model_name)) as u32;
                     item.token_count = Some(count);
                 }
             }

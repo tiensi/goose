@@ -45,8 +45,13 @@ impl TruncateAgent {
             .collect();
 
         let model = Some(model_name);
-        let approx_count = self._token_counter.lock().await
-            .count_everything(system_prompt, messages, tools, &resources, model);
+        let approx_count = self._token_counter.lock().await.count_everything(
+            system_prompt,
+            messages,
+            tools,
+            &resources,
+            model,
+        );
 
         let mut new_messages = messages.to_vec();
         if approx_count > target_limit {
