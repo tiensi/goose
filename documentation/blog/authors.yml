@@ -1,23 +1,59 @@
-yangshun:
-  name: Yangshun Tay
-  title: Front End Engineer @ Facebook
-  url: https://github.com/yangshun
-  image_url: https://github.com/yangshun.png
+ebony:
+  name: Ebony Louis
+  title: Developer Advocate
+  image_url: https://avatars.githubusercontent.com/u/55366651?v=4
+  url:
   page: true
   socials:
-    x: yangshunz
-    github: yangshun
+    x: ebonylouis
+    github: ebonylouis
 
-slorber:
-  name: Sébastien Lorber
-  title: Docusaurus maintainer
-  url: https://sebastienlorber.com
-  image_url: https://github.com/slorber.png
-  page:
-    # customize the url of the author page at /blog/authors/<permalink>
-    permalink: '/all-sebastien-lorber-articles'
+rizel:
+  name: Rizel Scarlett
+  title: Staff Developer Advocate
+  image_url: https://avatars.githubusercontent.com/u/22990146?v=4
+  url:
+  page: true
   socials:
-    x: sebastienlorber
-    linkedin: sebastienlorber
-    github: slorber
-    newsletter: https://thisweekinreact.com
+    x: blackgirlbytes
+    github: blackgirlbytes
+
+adewale:
+  name: Adewale Abati
+  title: Staff Developer Advocate
+  image_url: https://avatars.githubusercontent.com/u/4003538?v=4
+  url: https://adewaleabati.com
+  page: true
+  socials:
+    x: ace_kyd
+    github: acekyd
+
+dalton:
+  name: Dalton Turner
+  title: Software Engineer
+  image_url: https://avatars.githubusercontent.com/u/78099245?v=4
+  url:
+  page: true
+  socials:
+    x: 
+    github: dalton-turner
+
+tania:
+  name: Tania Chakraborty
+  title: Senior Technical Community Manager
+  image_url: https://avatars.githubusercontent.com/u/126204004?v=4
+  url:
+  page: true
+  socials:
+    x: taniashiba
+    github: taniashiba
+
+angie:
+  name: Angie Jones
+  title: Head of Developer Relations
+  image_url: https://avatars.githubusercontent.com/u/15972783?v=4
+  url: https://angiejones.tech
+  page: true
+  socials:
+    x: techgirl1908
+    github: techgirl1908
