@@ -18,14 +18,14 @@ use serde_json::Value;
 /// Default implementation of an Agent
 pub struct DefaultAgent {
     capabilities: Mutex<Capabilities>,
-    token_counter: TokenCounter,
+    token_counter: Mutex<TokenCounter>,
 }
 
 impl DefaultAgent {
     pub fn new(provider: Box<dyn Provider>) -> Self {
         Self {
             capabilities: Mutex::new(Capabilities::new(provider)),
-            token_counter: TokenCounter::new(),
+            token_counter: Mutex::new(TokenCounter::new()),
         }
     }
 
@@ -46,7 +46,8 @@ impl DefaultAgent {
             .map(|item| item.content.clone())
             .collect();
 
-        let approx_count = self.token_counter.count_everything(
+        let mut counter = self.token_counter.lock().await;
+        let approx_count = counter.count_everything(
             system_prompt,
             messages,
             tools,
@@ -60,8 +61,7 @@ impl DefaultAgent {
 
             for item in resource_items.iter_mut() {
                 if item.token_count.is_none() {
-                    let count = self
-                        .token_counter
+                    let count = counter
                         .count_tokens(&item.content, Some(model_name))
                         as u32;
                     item.token_count = Some(count);

@@ -18,14 +18,14 @@ use serde_json::Value;
 /// Agent impl. that truncates oldest messages when payload over LLM ctx-limit
 pub struct TruncateAgent {
     capabilities: Mutex<Capabilities>,
-    _token_counter: TokenCounter,
+    _token_counter: Mutex<TokenCounter>,
 }
 
 impl TruncateAgent {
     pub fn new(provider: Box<dyn Provider>) -> Self {
         Self {
             capabilities: Mutex::new(Capabilities::new(provider)),
-            _token_counter: TokenCounter::new(),
+            _token_counter: Mutex::new(TokenCounter::new()),
         }
     }
 
@@ -45,9 +45,8 @@ impl TruncateAgent {
             .collect();
 
         let model = Some(model_name);
-        let approx_count =
-            self._token_counter
-                .count_everything(system_prompt, messages, tools, &resources, model);
+        let approx_count = self._token_counter.lock().await
+            .count_everything(system_prompt, messages, tools, &resources, model);
 
         let mut new_messages = messages.to_vec();
         if approx_count > target_limit {
@@ -76,13 +75,12 @@ impl TruncateAgent {
             .and_then(|c| c.as_text());
 
         if let Some(txt) = text {
-            let count = self._token_counter.count_tokens(txt, model);
+            let mut counter = self._token_counter.blocking_lock();
+            let count = counter.count_tokens(txt, model);
             return count;
         }
 
-        let default_size = 0;
-
-        default_size
+        0
     }
 
     fn chop_front_messages(

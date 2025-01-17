@@ -9,6 +9,7 @@ use tokenizers::tokenizer::Tokenizer;
 // Embed the tokenizer files directory
 static TOKENIZER_FILES: Dir = include_dir!("$CARGO_MANIFEST_DIR/../../tokenizer_files");
 
+#[derive(Clone)]
 pub struct TokenCounter {
     tokenizers: HashMap<String, Tokenizer>,
 }
@@ -27,6 +28,12 @@ impl Default for TokenCounter {
 
 impl TokenCounter {
     fn load_tokenizer(&mut self, tokenizer_key: &str) {
+        // Skip if tokenizer already loaded
+        if self.tokenizers.contains_key(tokenizer_key) {
+            println!("Tokenizer {} already loaded", tokenizer_key);
+            return;
+        }
+
         // Create a spinner that will show during both loading and parsing
         let pb = ProgressBar::new_spinner();
         pb.set_style(
@@ -65,24 +72,10 @@ impl TokenCounter {
     }
 
     pub fn new() -> Self {
-        let mut counter = TokenCounter {
+        let counter = TokenCounter {
             tokenizers: HashMap::new(),
         };
-        // Add default tokenizers
-        for tokenizer_key in [
-            GPT_4O_TOKENIZER_KEY,
-            CLAUDE_TOKENIZER_KEY,
-            GOOGLE_TOKENIZER_KEY,
-            QWEN_TOKENIZER_KEY,
-            LLAMA_TOKENIZER_KEY,
-        ] {
-            counter.load_tokenizer(tokenizer_key);
-        }
         counter
-    }
-
-    pub fn add_tokenizer(&mut self, tokenizer_key: &str) {
-        self.load_tokenizer(tokenizer_key);
     }
 
     fn model_to_tokenizer_key(model_name: Option<&str>) -> &str {
@@ -101,20 +94,21 @@ impl TokenCounter {
         }
     }
 
-    fn get_tokenizer(&self, model_name: Option<&str>) -> &Tokenizer {
+    fn get_tokenizer(&mut self, model_name: Option<&str>) -> &Tokenizer {
         let tokenizer_key = Self::model_to_tokenizer_key(model_name);
+        self.load_tokenizer(tokenizer_key);
         self.tokenizers
             .get(tokenizer_key)
             .expect("Tokenizer not found")
     }
 
-    pub fn count_tokens(&self, text: &str, model_name: Option<&str>) -> usize {
+    pub fn count_tokens(&mut self, text: &str, model_name: Option<&str>) -> usize {
         let tokenizer = self.get_tokenizer(model_name);
         let encoding = tokenizer.encode(text, false).unwrap();
         encoding.len()
     }
 
-    fn count_tokens_for_tools(&self, tools: &[Tool], model_name: Option<&str>) -> usize {
+    fn count_tokens_for_tools(&mut self, tools: &[Tool], model_name: Option<&str>) -> usize {
         // Token counts for different function components
         let func_init = 7; // Tokens for function initialization
         let prop_init = 3; // Tokens for properties initialization
@@ -166,7 +160,7 @@ impl TokenCounter {
     }
 
     pub fn count_chat_tokens(
-        &self,
+        &mut self,
         system_prompt: &str,
         messages: &[Message],
         tools: &[Tool],
@@ -217,7 +211,7 @@ impl TokenCounter {
     }
 
     pub fn count_everything(
-        &self,
+        &mut self,
         system_prompt: &str,
         messages: &[Message],
         tools: &[Tool],
@@ -243,9 +237,9 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn test_add_tokenizer_and_count_tokens() {
+    fn test_load_tokenizer_and_count_tokens() {
         let mut counter = TokenCounter::new();
-        counter.add_tokenizer(QWEN_TOKENIZER_KEY);
+        counter.load_tokenizer(QWEN_TOKENIZER_KEY);
         let text = "Hey there!";
         let count = counter.count_tokens(text, Some("qwen2.5-ollama"));
         println!("Token count for '{}': {:?}", text, count);
@@ -255,7 +249,7 @@ mod tests {
     // Update the default tokenizer test similarly
     #[test]
     fn test_specific_claude_tokenizer() {
-        let counter = TokenCounter::new();
+        let mut counter = TokenCounter::new();
         let text = "Hello, how are you?";
         let count = counter.count_tokens(text, Some("claude-3-5-sonnet-2"));
         println!("Token count for '{}': {:?}", text, count);
@@ -264,14 +258,14 @@ mod tests {
 
     #[test]
     fn test_default_gpt_4o_tokenizer() {
-        let counter = TokenCounter::new();
+        let mut counter = TokenCounter::new();
         let count = counter.count_tokens("Hey there!", None);
         assert_eq!(count, 3);
     }
 
     #[test]
     fn test_count_chat_tokens() {
-        let token_counter = TokenCounter::new();
+        let mut token_counter = TokenCounter::new();
 
         let system_prompt =
             "You are a helpful assistant that can answer questions about the weather.";

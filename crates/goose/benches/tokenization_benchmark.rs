@@ -2,7 +2,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use goose::token_counter::TokenCounter;
 
 fn benchmark_tokenization(c: &mut Criterion) {
-    let counter = TokenCounter::new();
+    let mut counter = TokenCounter::new();
     let lengths = [1_000, 5_000, 10_000, 50_000, 100_000, 124_000, 200_000];
     let models = ["gpt-4o", "claude-3.5-sonnet"];
 
