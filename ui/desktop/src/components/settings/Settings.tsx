@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { ScrollArea } from "../ui/scroll-area";
-import { Card } from "../ui/card";
 import { useNavigate } from "react-router-dom";
 import { Settings as SettingsType, Model, Extension, Key } from "./types";
 import { ToggleableItem } from "./ToggleableItem";
