@@ -324,7 +324,7 @@ impl Capabilities {
 
         // If system name is not provided, we need to search for the resource across all systems
         // Loop through each system and try to read the resource, don't raise an error if the resource is not found
-        for (system_name, _) in &self.clients {
+        for system_name in self.clients.keys() {
             let result = self.read_resource_from_system(uri, system_name).await;
             match result {
                 Ok(result) => return Ok(result),
@@ -343,6 +343,7 @@ impl Capabilities {
             "Resource with uri '{}' not found. Here are the available systems: {}",
             uri, available_systems
         );
+
         Err(ToolError::InvalidParameters(error_msg))
     }
 
@@ -365,7 +366,7 @@ impl Capabilities {
         let client = self
             .clients
             .get(system_name)
-            .ok_or_else(|| ToolError::InvalidParameters(error_msg))?;
+            .ok_or(ToolError::InvalidParameters(error_msg))?;
 
         let client_guard = client.lock().await;
         let read_result = client_guard.read_resource(uri).await.map_err(|_| {
@@ -382,7 +383,7 @@ impl Capabilities {
             }
         }
 
-        return Ok(result);
+        Ok(result)
     }
 
     async fn list_resources_from_system(
