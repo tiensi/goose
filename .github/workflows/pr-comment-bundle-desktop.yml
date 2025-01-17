@@ -1,9 +1,12 @@
 # This workflow is triggered by a comment on an issue or PR with the text ".bundle"
 # It bundles the Desktop App, then creates a PR comment with a link to download the app.
+
+# IMPORTANT: issue_comment workflows only use files found on "main" branch to run.
+# Do NOT allow on: pull_request since that allows a user to alter a file in a PR and exfil secrets for example.
+# Only using issue_comment is the suggested workflow type. Comments on pull requests, and issues will trigger the issue_comment workflow event.
 on:
   issue_comment:
     types: [created]
-  workflow_dispatch:
 
 # permissions needed for reacting to IssueOps commands on issues and PRs
 permissions:
