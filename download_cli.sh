@@ -11,7 +11,7 @@ set -euo pipefail
 # Supported Architectures: x86_64, arm64
 #
 # Usage:
-#   curl -sSL https://raw.githubusercontent.com/block/goose/main/install.sh | bash
+#   curl -H 'Accept: application/vnd.github.v3.raw' "https://api.github.com/repos/block/goose/contents/download_cli.sh?ref=v1.0" | bash
 #
 # Environment variables:
 #   GOOSE_BIN_DIR  - Directory to which Goose will be installed (default: $HOME/.local/bin)
