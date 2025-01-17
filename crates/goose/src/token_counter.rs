@@ -30,7 +30,6 @@ impl TokenCounter {
     fn load_tokenizer(&mut self, tokenizer_key: &str) {
         // Skip if tokenizer already loaded
         if self.tokenizers.contains_key(tokenizer_key) {
-            println!("Tokenizer {} already loaded", tokenizer_key);
             return;
         }
 
