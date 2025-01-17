@@ -1,47 +1,22 @@
-import React, { useEffect, useState } from 'react';
-import { getApiUrl, getSecretKey } from "../../../config";
-import { FaKey, FaExclamationCircle, FaPencilAlt, FaTrash, FaArrowLeft, FaPlus } from 'react-icons/fa';
+import { FaKey, FaExclamationCircle, FaPencilAlt, FaTrash, FaPlus } from 'react-icons/fa';
+import React from "react";
 
-import {
-    Modal,
-    ModalContent,
-    ModalHeader,
-    ModalTitle
-} from '../../ui/modal';
-import { initializeSystem } from '../../../utils/providerUtils';
-import {getSecretsSettings, transformProviderSecretsResponse, transformSecrets} from './utils'
-import { SecretDetails, Provider, ProviderResponse } from './types'
-
-function ProviderCard({
+export const ProviderCard = ({
                           provider,
                           secrets,
-                          expandedProviders,
+                          isExpanded,
+                          isSupported,
+                          isChangingProvider,
                           toggleProvider,
                           handleAddOrEditKey,
                           handleDeleteKey,
                           handleSelectProvider,
-                          isChangingProvider,
                           getProviderStatus,
-                          isProviderSupported,
-                      }: {
-    provider: Provider;
-    secrets: SecretDetails[];
-    expandedProviders: Set<string>;
-    toggleProvider: (id: string) => void;
-    handleAddOrEditKey: (key: string, providerName: string) => void;
-    handleDeleteKey: (providerId: string, key: string) => void;
-    handleSelectProvider: (providerId: string) => void;
-    isChangingProvider: boolean;
-    getProviderStatus: (provider: Provider) => boolean;
-    isProviderSupported: (providerId: string) => boolean;
-}) {
+                      }) => {
     const hasUnsetKeys = getProviderStatus(provider);
-    const isExpanded = expandedProviders.has(provider.id);
-    const isSupported = isProviderSupported(provider.id);
 
     return (
         <div key={provider.id} className="border dark:border-gray-700 rounded-lg p-4">
-            {/* Provider Header */}
             <div className="flex items-center justify-between">
                 <button
                     className="flex-1 flex items-center justify-between"
@@ -52,23 +27,34 @@ function ProviderCard({
                             <FaKey className={`${isSupported ? 'text-gray-500' : 'text-red-500'}`} />
                         </div>
                         <div className="text-left">
-                            <h3 className="font-medium dark:text-white">{provider.name}</h3>
-                            {!isSupported && (
-                                <span className="text-xs px-2 py-0.5 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded-full">
-                  Not Supported
-                </span>
-                            )}
+                            <div className="flex items-center gap-2">
+                                <h3 className="font-medium dark:text-white">{provider.name}</h3>
+                                {provider.id.toLowerCase() === localStorage.getItem("GOOSE_PROVIDER")?.toLowerCase() && (
+                                    <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full">
+                    Selected Provider
+                  </span>
+                                )}
+                                {!isSupported && (
+                                    <span className="text-xs px-2 py-0.5 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded-full">
+                    Not Supported
+                  </span>
+                                )}
+                            </div>
+                            <p className="text-sm text-gray-500">
+                                {isSupported ? provider.description : 'Provider not supported'}
+                            </p>
                         </div>
                     </div>
-                    {isSupported && hasUnsetKeys && <FaExclamationCircle className="text-yellow-500" />}
+                    {isSupported && hasUnsetKeys && (
+                        <FaExclamationCircle className="text-yellow-500" />
+                    )}
                 </button>
             </div>
 
-            {/* Provider Keys */}
             {isSupported && isExpanded && (
                 <div className="mt-4 pl-11">
-                    {provider.keys.map((key) => {
-                        const secret = secrets.find((s) => s.key === key);
+                    {provider.keys.map(key => {
+                        const secret = secrets.find(s => s.key === key);
                         return (
                             <div key={key} className="py-2 flex items-center justify-between">
                                 <div>
@@ -76,18 +62,17 @@ function ProviderCard({
                                     <p className="text-xs text-gray-500">Source: {secret?.location || 'none'}</p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                  <span
-                      className={`px-2 py-1 rounded text-xs ${
-                          secret?.is_set
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                              : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                      }`}
-                  >
+                  <span className={`px-2 py-1 rounded text-xs ${
+                      secret?.is_set
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                  }`}>
                     {secret?.is_set ? 'Key set' : 'Missing'}
                   </span>
                                     <button
                                         onClick={() => handleAddOrEditKey(key, provider.name)}
                                         className="p-1.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                                        title={secret?.is_set ? "Edit key" : "Add key"}
                                     >
                                         {secret?.is_set ? <FaPencilAlt size={14} /> : <FaPlus size={14} />}
                                     </button>
@@ -98,7 +83,13 @@ function ProviderCard({
                                                 ? 'text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
                                                 : 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
                                         }`}
+                                        title={
+                                            secret?.is_set
+                                                ? "Delete key from keychain"
+                                                : "No key to delete - Add a key first before deleting"
+                                        }
                                         disabled={!secret?.is_set}
+                                        aria-disabled={!secret?.is_set}
                                     >
                                         <FaTrash size={14} />
                                     </button>
@@ -106,6 +97,7 @@ function ProviderCard({
                             </div>
                         );
                     })}
+
                     {provider.id.toLowerCase() !== localStorage.getItem("GOOSE_PROVIDER")?.toLowerCase() && (
                         <button
                             onClick={() => handleSelectProvider(provider.id)}
@@ -119,4 +111,4 @@ function ProviderCard({
             )}
         </div>
     );
-}
+};
