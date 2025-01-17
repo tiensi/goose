@@ -18,8 +18,10 @@ type SVGComponentProps = {
   fill?: string;
   stroke?: string;
   strokeWidth?: number | string;
-  // Add any other specific SVG props you need
-} & React.HTMLAttributes<SVGElement>;
+  viewBox?: string;
+  xmlns?: string;
+  // Add any other specific props you need
+};
 
 export const SecretsList = () => {
   const [secrets, setSecrets] = useState<SecretSource[]>([]);
