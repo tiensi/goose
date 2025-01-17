@@ -16,7 +16,11 @@ import UserMessage from "./components/UserMessage";
 import WingToWing, { Working } from "./components/WingToWing";
 import { askAi } from "./utils/askAI";
 import { ProviderSetupModal } from "./components/ProviderSetupModal";
-import { providers, ProviderOption } from "./utils/providerUtils";
+import {
+  Provider,
+  ProviderOption,
+} from "./utils/providerUtils";
+import Keys from "./components/settings/Keys";
 
 declare global {
   interface Window {
@@ -520,6 +524,7 @@ export default function ChatWindow() {
             }
           />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/keys" element={<Keys />} />
           <Route path="*" element={<Navigate to="/chat/1" replace />} />
         </Routes>
       </div>

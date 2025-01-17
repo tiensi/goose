@@ -246,6 +246,15 @@ export default function MoreMenu() {
             >
               Reset Provider
             </button>
+            <button
+              onClick={() => {
+                setOpen(false);
+                navigate("/keys");
+              }}
+              className="w-full text-left px-2 py-1.5 text-sm hover:bg-gray-700"
+            >
+              API Keys
+            </button>
           </div>
         </PopoverContent>
       </PopoverPortal>
