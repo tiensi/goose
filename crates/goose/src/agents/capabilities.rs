@@ -1,6 +1,5 @@
 use chrono::{DateTime, TimeZone, Utc};
-use futures::stream;
-use futures::stream::StreamExt;
+use futures::stream::{FuturesUnordered, StreamExt};
 use mcp_client::McpService;
 use rust_decimal_macros::dec;
 use std::collections::HashMap;
@@ -386,64 +385,96 @@ impl Capabilities {
         return Ok(result);
     }
 
+    async fn list_resources_from_system(
+        &self,
+        system_name: &str,
+    ) -> Result<Vec<Content>, ToolError> {
+        let client = self.clients.get(system_name).ok_or_else(|| {
+            ToolError::InvalidParameters(format!("System {} is not valid", system_name))
+        })?;
+
+        let client_guard = client.lock().await;
+        client_guard
+            .list_resources(None)
+            .await
+            .map_err(|e| {
+                ToolError::ExecutionError(format!(
+                    "Unable to list resources for {}, {:?}",
+                    system_name, e
+                ))
+            })
+            .map(|lr| {
+                let resource_list = lr
+                    .resources
+                    .into_iter()
+                    .map(|r| format!("{}, uri: ({})", r.name, r.uri))
+                    .collect::<Vec<String>>()
+                    .join("\n");
+
+                vec![Content::text(resource_list)]
+            })
+    }
+
     async fn list_resources(&self, params: Value) -> Result<Vec<Content>, ToolError> {
         let system = params.get("system").and_then(|v| v.as_str());
 
-        if system.is_some() {
-            // grab the system
-            let client = self.clients.get(system.unwrap()).ok_or_else(|| {
-                ToolError::InvalidParameters(format!("System {} is not valid", system.unwrap()))
-            })?;
+        match system {
+            Some(system_name) => {
+                // Handle single system case
+                self.list_resources_from_system(system_name).await
+            }
+            None => {
+                // Handle all systems case using FuturesUnordered
+                let mut futures = FuturesUnordered::new();
 
-            let client_guard = client.lock().await;
-            let result = client_guard
-                .list_resources(None)
-                .await
-                .map_err(|e| {
-                    ToolError::ExecutionError(format!(
-                        "Unable to list resources for {}, {:?}",
-                        system.unwrap(),
-                        e
-                    ))
-                })
-                .map(|lr| {
-                    let resource_list = lr
-                        .resources
-                        .into_iter()
-                        .map(|r| format!("{}, uri: ({})", r.name, r.uri))
-                        .collect::<Vec<String>>()
-                        .join("\n");
+                // Create futures for each system
+                for (system_name, client) in &self.clients {
+                    let client = Arc::clone(client);
 
-                    vec![Content::text(resource_list)]
-                });
+                    futures.push(async move {
+                        let guard = client.lock().await;
+                        guard
+                            .list_resources(None)
+                            .await
+                            .map(|r| (system_name.clone(), r))
+                            .map_err(|e| (system_name.clone(), e))
+                    });
+                }
 
-            return result;
+                let mut all_resources = Vec::new();
+                let mut errors = Vec::new();
+
+                // Process results as they complete
+                while let Some(result) = futures.next().await {
+                    match result {
+                        Ok((system_name, resource_list)) => {
+                            all_resources.extend(resource_list.resources.into_iter().map(|r| {
+                                format!("{} - {}, uri: ({})", system_name, r.name, r.uri)
+                            }));
+                        }
+                        Err((system_name, e)) => {
+                            errors.push((system_name, e));
+                        }
+                    }
+                }
+
+                // Log any errors that occurred
+                if !errors.is_empty() {
+                    tracing::error!(
+                        errors = ?errors
+                            .into_iter()
+                            .map(|(sys, e)| format!("{}: {:?}", sys, e))
+                            .collect::<Vec<_>>(),
+                        "errors from listing resources"
+                    );
+                }
+
+                // Sort resources for consistent output
+                all_resources.sort();
+
+                Ok(vec![Content::text(all_resources.join("\n"))])
+            }
         }
-
-        // if no system name, loop through all systems
-        let results: Vec<_> = stream::iter(self.clients.clone().into_iter())
-            .then(|(_system_name, client)| async move {
-                let guard = client.lock().await;
-                guard.list_resources(None).await
-            })
-            .collect()
-            .await;
-
-        let (resources, errs): (Vec<_>, Vec<_>) = results.into_iter().partition(Result::is_ok);
-
-        let errs: Vec<_> = errs.into_iter().map(Result::unwrap_err).collect();
-        tracing::error!(errors = ?errs, "errors from listing rsources");
-
-        // take all resources and convert to Content as Tool response
-        let all_resources_str: String = resources
-            .into_iter()
-            .map(Result::unwrap)
-            .flat_map(|lr| lr.resources)
-            .map(|resource| format!("{}, uri: ({})", resource.name, resource.uri))
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        Ok(vec![Content::text(all_resources_str)])
     }
 
     /// Dispatch a single tool call to the appropriate client
