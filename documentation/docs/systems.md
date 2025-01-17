@@ -26,7 +26,7 @@ Tools are the primary way Systems expose functionality to agents. Each tool has:
 - A set of parameters
 - An implementation that executes the tool's functionality
 
-A tool must take a Value and return an AgentResult<Value> (it must also be async). This
+A tool must take a Value and return an `AgentResult<Value>` (it must also be async). This
 is what makes it compatible with the tool calling framework from the agent. 
 
 ```rust
