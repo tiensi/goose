@@ -5,6 +5,7 @@ release:
     @echo "Building release version..."
     cargo build --release
     @just copy-binary
+    @just get-hermit
 
 # we use hermit to run npx and uvx etc for MCPs in the goose .app
 get-hermit:

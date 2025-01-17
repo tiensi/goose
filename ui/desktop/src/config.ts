@@ -61,6 +61,14 @@ export const addMCP = async (system: string, args: string[], envs?: Record<strin
     system = await window.electron.getBinaryPath('goosed');
   }
 
+  if (system === 'npx') {
+    // add HERMIT_BIN to env to ensure it runs with hermit
+    envs = {
+      ...envs,
+      HERMIT_BIN: await window.electron.getBinaryPath('hermit'),
+    };
+  }
+
   const systemConfig = {
     type: "Stdio",
     cmd: system,

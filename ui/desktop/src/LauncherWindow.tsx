@@ -3,6 +3,7 @@ import React, { useRef, useState } from 'react';
 declare global {
   interface Window {
     electron: {
+      getBinaryPath(arg0: string): string | PromiseLike<string>;
       logInfo(msg: string): unknown;
       on(channel: string, arg1: (event: any, message: any) => void): unknown;
       stopPowerSaveBlocker(): unknown;

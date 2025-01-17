@@ -160,30 +160,35 @@ impl StdioTransport {
     async fn spawn_process(&self) -> Result<(Child, ChildStdin, ChildStdout), Error> {
         let mut final_env = self.env.clone();
 
-        if self.command == "npx" {
-            if let Ok(hermit_bin) = std::env::var("HERMIT_BIN") {
-                println!("npx command detected with HERMIT_BIN set, preparing hermit environment.");
-                // Run the hermit installation commands
-                let output = std::process::Command::new("sh")
-                    .arg("-c")
-                    .arg(Self::prepare_hermit_install(&hermit_bin))
-                    .output()
-                    .map_err(|e| {
-                        Error::StdioProcessError(format!("Failed to run hermit install: {}", e))
-                    })?;
+        println!("SPAWNING PROCESS: {:?} ", self.command);
+        println!(
+            "HERMIT BIN IN SPAWN: {:?}",
+            self.env.contains_key("HERMIT_BIN")
+        );
 
-                if !output.status.success() {
-                    return Err(Error::StdioProcessError(
-                        "Hermit installation failed".into(),
-                    ));
-                }
+        if self.command == "npx" && self.env.contains_key("HERMIT_BIN") {
+            println!("npx command detected with HERMIT_BIN set, preparing hermit environment.");
+            // Run the hermit installation commands
+            let hermit_bin = self.env.get("HERMIT_BIN").unwrap();
+            let output = std::process::Command::new("sh")
+                .arg("-c")
+                .arg(Self::prepare_hermit_install(&hermit_bin))
+                .output()
+                .map_err(|e| {
+                    Error::StdioProcessError(format!("Failed to run hermit install: {}", e))
+                })?;
 
-                // Now read the environment from the file we created
-                if let Ok(hermit_env) = std::fs::read_to_string("/tmp/hermit-env.txt") {
-                    for line in hermit_env.lines() {
-                        if let Some((key, value)) = line.split_once('=') {
-                            final_env.insert(key.to_string(), value.to_string());
-                        }
+            if !output.status.success() {
+                return Err(Error::StdioProcessError(
+                    "Hermit installation failed".into(),
+                ));
+            }
+
+            // Now read the environment from the file we created
+            if let Ok(hermit_env) = std::fs::read_to_string("/tmp/hermit-env.txt") {
+                for line in hermit_env.lines() {
+                    if let Some((key, value)) = line.split_once('=') {
+                        final_env.insert(key.to_string(), value.to_string());
                     }
                 }
             }
