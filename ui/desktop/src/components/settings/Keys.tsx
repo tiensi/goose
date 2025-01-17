@@ -10,6 +10,7 @@ import {
   ModalTitle 
 } from '../ui/modal';
 import { initializeSystem } from '../../utils/systemInitializer';
+import { getProvidersList } from '../../utils/providerUtils'
 
 const PROVIDER_ORDER = ['openai', 'anthropic', 'databricks'];
 
@@ -68,6 +69,13 @@ export default function Keys() {
   useEffect(() => {
     const fetchSecrets = async () => {
       try {
+        // Fetch providers dynamically from getProvidersList
+        const providerList = await getProvidersList();
+        // Extract the list of IDs
+        const providerIds = providerList.map((provider) => provider.id);
+        console.log("Provider IDs:", providerIds);
+
+        // Fetch secrets state (set/unset) using the provider IDs
         const response = await fetch(getApiUrl("/secrets/providers"), {
           method: 'POST',
           headers: {
@@ -75,7 +83,7 @@ export default function Keys() {
             'X-Secret-Key': getSecretKey(),
           },
           body: JSON.stringify({
-            providers: ["openai", "anthropic", "myprovider", "databricks"]
+            providers: providerIds
           })
         });
 
