@@ -2,7 +2,6 @@ ebony:
   name: Ebony Louis
   title: Developer Advocate
   image_url: https://avatars.githubusercontent.com/u/55366651?v=4
-  url:
   page: true
   socials:
     x: ebonylouis
@@ -12,7 +11,6 @@ rizel:
   name: Rizel Scarlett
   title: Staff Developer Advocate
   image_url: https://avatars.githubusercontent.com/u/22990146?v=4
-  url:
   page: true
   socials:
     x: blackgirlbytes
@@ -32,17 +30,14 @@ dalton:
   name: Dalton Turner
   title: Software Engineer
   image_url: https://avatars.githubusercontent.com/u/78099245?v=4
-  url:
   page: true
   socials:
-    x: 
     github: dalton-turner
 
 tania:
   name: Tania Chakraborty
   title: Senior Technical Community Manager
   image_url: https://avatars.githubusercontent.com/u/126204004?v=4
-  url:
   page: true
   socials:
     x: taniashiba
