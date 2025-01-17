@@ -11,6 +11,10 @@ interface SecretsListResponse {
   secrets: SecretSource[];
 }
 
+type SVGComponentProps = React.SVGProps<SVGSVGElement> & {
+  className?: string;
+};
+
 export const SecretsList = () => {
   const [secrets, setSecrets] = useState<SecretSource[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,21 +118,20 @@ export const SecretsList = () => {
   );
 };
 
-// Simple icon components
-const EyeIcon = (props: React.SVGProps<SVGSVGElement>) => (
+const EyeIcon: React.FC<SVGComponentProps> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
   </svg>
 );
 
-const ClipboardIcon = (props: React.SVGProps<SVGSVGElement>) => (
+const ClipboardIcon: React.FC<SVGComponentProps> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
   </svg>
 );
 
-const PencilIcon = (props: React.SVGProps<SVGSVGElement>) => (
+const PencilIcon: React.FC<SVGComponentProps> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
   </svg>
