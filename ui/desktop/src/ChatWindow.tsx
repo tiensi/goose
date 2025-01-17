@@ -425,7 +425,7 @@ export default function ChatWindow() {
 
     return response;
   };
-  
+
   const handleModalSubmit = async (apiKey: string) => {
     try {
       const trimmedKey = apiKey.trim();
