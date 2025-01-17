@@ -178,11 +178,18 @@ impl StdioTransport {
                     Error::StdioProcessError(format!("Failed to run hermit install: {}", e))
                 })?;
 
+            println!(
+                "HERMIT INSTALLATION OUTPUT: {:?}",
+                String::from_utf8_lossy(&output.stdout)
+            );
+
             if !output.status.success() {
                 return Err(Error::StdioProcessError(
                     "Hermit installation failed".into(),
                 ));
             }
+
+            println!("HERMIT INSTALLATION SUCCESS");
 
             // Now read the environment from the file we created
             if let Ok(hermit_env) = std::fs::read_to_string("/tmp/hermit-env.txt") {
