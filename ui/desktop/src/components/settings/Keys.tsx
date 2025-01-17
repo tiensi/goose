@@ -34,9 +34,17 @@ interface ProviderSecretStatus {
   location: string | null;
 }
 
+interface SecretStatus {
+    is_set: boolean;
+    location?: string;
+}
+
 interface ProviderResponse {
-  supported: boolean;
-  secret_status?: Record<string, ProviderSecretStatus>;
+    supported: boolean;
+    name?: string;
+    description?: string;
+    models?: string[];
+    secret_status: Record<string, SecretStatus>;
 }
 
 interface ProviderStatusResponse {
@@ -82,9 +90,9 @@ export default function Keys() {
         const transformedProviders: Provider[] = Object.entries(data)
           .map(([id, status]: [string, any]) => ({
             id: id.toLowerCase(),
-            name: id,
+            name: status.name ? status.name : id,
             keys: status.secret_status ? Object.keys(status.secret_status) : [],
-            description: `${id} API access`,
+            description: status.description ? status.description : "Unsupported provider",
             supported: status.supported,
             canDelete: id.toLowerCase() !== 'openai' && id.toLowerCase() !== 'anthropic',
             order: PROVIDER_ORDER.indexOf(id.toLowerCase())

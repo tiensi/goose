@@ -8,20 +8,19 @@ import GooseMessage from "./components/GooseMessage";
 import Input from "./components/Input";
 import LoadingGoose from "./components/LoadingGoose";
 import MoreMenu from "./components/MoreMenu";
-import Settings from "./components/settings/Settings";
 import Splash from "./components/Splash";
 import { Card } from "./components/ui/card";
 import { ScrollArea } from "./components/ui/scroll-area";
 import UserMessage from "./components/UserMessage";
 import WingToWing, { Working } from "./components/WingToWing";
 import { askAi } from "./utils/askAI";
-import { ProviderSetupModal } from "./components/ProviderSetupModal";
 import {
   Provider,
-  ProviderOption,
 } from "./utils/providerUtils";
-import Keys from "./components/settings/Keys";
-import { initializeSystem } from './utils/systemInitializer';
+import { ChatLayout } from "./components/chat_window/ChatLayout"
+import { ChatRoutes } from "./components/chat_window/ChatRoutes"
+import { WelcomeModal } from "./components/welcome_screen/WelcomeModal"
+import { getStoredProvider } from './utils/providerUtils'
 
 declare global {
   interface Window {
@@ -54,7 +53,7 @@ export interface Chat {
 
 type ScrollBehavior = "auto" | "smooth" | "instant";
 
-function ChatContent({
+export function ChatContent({
   chats,
   setChats,
   selectedChatId,
@@ -385,7 +384,7 @@ export default function ChatWindow() {
   const [working, setWorking] = useState<Working>(Working.Idle);
   const [progressMessage, setProgressMessage] = useState<string>("");
   const [selectedProvider, setSelectedProvider] =
-    useState<ProviderOption | null>(null);
+      useState<string | Provider | null>(null)
   const [showWelcomeModal, setShowWelcomeModal] = useState(true);
 
   // Add this useEffect to track changes and update welcome state
@@ -427,14 +426,14 @@ export default function ChatWindow() {
     return response;
   };
 
-  const addAgent = async (provider: ProviderOption) => {
+  const addAgent = async (provider: String) => {
     const response = await fetch(getApiUrl("/agent"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-Secret-Key": getSecretKey(),
       },
-      body: JSON.stringify({ provider: provider.id }),
+      body: JSON.stringify({ provider: provider }),
     });
 
     if (!response.ok) {
@@ -448,8 +447,9 @@ export default function ChatWindow() {
     await addMCP("goosed", ["mcp", system]);
   };
 
-  const initializeSystem = async (provider: ProviderOption) => {
+  const initializeSystem = async (provider: String) => {
     try {
+      console.log("initializing with provider", provider)
       await addAgent(provider);
       await addSystemConfig("developer2");
       // Handle deep link if present
@@ -479,7 +479,7 @@ export default function ChatWindow() {
       await initializeSystem(selectedProvider.id);
 
       // Save provider selection and close modal
-      localStorage.setItem("GOOSE_PROVIDER", selectedProvider.name);
+      localStorage.setItem("GOOSE_PROVIDER", selectedProvider.id);
       setShowWelcomeModal(false);
     } catch (error) {
       console.error("Failed to setup provider:", error);
@@ -491,8 +491,7 @@ export default function ChatWindow() {
   useEffect(() => {
     const setupStoredProvider = async () => {
       const config = window.electron.getConfig();
-      const storedProvider =
-        config.GOOSE_PROVIDER || localStorage.getItem("GOOSE_PROVIDER");
+      const storedProvider = getStoredProvider(config);
       if (storedProvider) {
         try {
           await initializeSystem(storedProvider);
@@ -506,72 +505,27 @@ export default function ChatWindow() {
   }, []);
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden dark:bg-dark-window-gradient bg-window-gradient flex flex-col">
-      <div className="titlebar-drag-region" />
-      <div style={{ display: mode === "expanded" ? "block" : "none" }}>
-        <Routes>
-          <Route
-            path="/chat/:id"
-            element={
-              <ChatContent
-                key={selectedChatId}
-                chats={chats}
-                setChats={setChats}
-                selectedChatId={selectedChatId}
-                setSelectedChatId={setSelectedChatId}
-                initialQuery={null}
-                setProgressMessage={setProgressMessage}
-                setWorking={setWorking}
-              />
-            }
-          />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/keys" element={<Keys />} />
-          <Route path="*" element={<Navigate to="/chat/1" replace />} />
-        </Routes>
-      </div>
-
-      <WingToWing
-        onExpand={toggleMode}
-        progressMessage={progressMessage}
-        working={working}
-      />
-
-      {showWelcomeModal && (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[9999]">
-          {selectedProvider ? (
-            <ProviderSetupModal
-              provider={selectedProvider.name}
-              onSubmit={handleModalSubmit}
-              onCancel={() => {
-                setSelectedProvider(null);
-              }}
+      <ChatLayout mode={mode}>
+        <ChatRoutes
+            chats={chats}
+            setChats={setChats}
+            selectedChatId={selectedChatId}
+            setSelectedChatId={setSelectedChatId}
+            setProgressMessage={setProgressMessage}
+            setWorking={setWorking}
+        />
+        <WingToWing
+            onExpand={toggleMode}
+            progressMessage={progressMessage}
+            working={working}
+        />
+        {showWelcomeModal && (
+            <WelcomeModal
+                selectedProvider={selectedProvider}
+                setSelectedProvider={setSelectedProvider}
+                onSubmit={handleModalSubmit}
             />
-          ) : (
-            <Card className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[440px] bg-white dark:bg-gray-800 rounded-xl shadow-xl overflow-hidden p-[16px] pt-[24px]">
-              <h2 className="text-2xl font-medium mb-6 dark:text-white">
-                Select a Provider
-              </h2>
-              <div className="grid grid-cols-1 gap-4">
-                {providers.map((provider) => (
-                  <button
-                    key={provider.id}
-                    onClick={() => setSelectedProvider(provider)}
-                    className="p-4 pt-3 border rounded-lg hover:border-blue-500 transition-colors text-left dark:border-gray-700 dark:hover:border-blue-400"
-                  >
-                    <h3 className="text-lg font-regular mb-1 dark:text-gray-200">
-                      {provider.name}
-                    </h3>
-                    <p className="font-light text-gray-600 dark:text-gray-400">
-                      {provider.description}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            </Card>
-          )}
-        </div>
-      )}
-    </div>
+        )}
+      </ChatLayout>
   );
 }

@@ -56,8 +56,11 @@ pub struct SecretStatus {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ProviderStatus {
+pub struct ProviderResponse {
     pub supported: bool,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub models: Option<Vec<String>>,
     pub secret_status: HashMap<String, SecretStatus>,
 }
 
@@ -88,7 +91,7 @@ fn check_key_status(key: &str) -> (bool, Option<String>) {
 
 async fn check_provider_secrets(
     Json(request): Json<ProviderSecretRequest>,
-) -> Result<Json<HashMap<String, ProviderStatus>>, StatusCode> {
+) -> Result<Json<HashMap<String, ProviderResponse>>, StatusCode> {
     let mut response = HashMap::new();
 
     for provider_name in request.providers {
@@ -106,13 +109,19 @@ async fn check_provider_secrets(
                 );
             }
 
-            response.insert(provider_name, ProviderStatus {
+            response.insert(provider_name, ProviderResponse {
                 supported: true,
+                name: Some(provider_config.name.clone()),
+                description: Some(provider_config.description.clone()),
+                models: Some(provider_config.models.clone()),
                 secret_status,
             });
         } else {
-            response.insert(provider_name, ProviderStatus {
+            response.insert(provider_name, ProviderResponse {
                 supported: false,
+                name: None,
+                description: None,
+                models: None,
                 secret_status: HashMap::new(),
             });
         }
