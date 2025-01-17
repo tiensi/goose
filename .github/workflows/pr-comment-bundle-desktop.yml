@@ -8,10 +8,11 @@ on:
   issue_comment:
     types: [created]
 
-# permissions needed for reacting to IssueOps commands on issues and PRs
+# permissions needed for reacting to IssueOps commands on PRs
 permissions:
   pull-requests: write
   checks: read
+  # issues: write
 
 name: Workflow to Bundle Desktop App
 
