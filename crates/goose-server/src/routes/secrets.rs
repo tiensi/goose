@@ -1,15 +1,12 @@
-use axum::{
-    extract::State,
-    routing::post,
-    routing::delete,
-    Json, Router,
+use crate::state::AppState;
+use axum::{extract::State, routing::delete, routing::post, Json, Router};
+use goose::key_manager::{
+    delete_from_keyring, get_keyring_secret, save_to_keyring, KeyRetrievalStrategy,
 };
+use http::{HeaderMap, StatusCode};
 use once_cell::sync::Lazy;  // TODO: investigate if we need
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::state::AppState;
-use http::{HeaderMap, StatusCode};
-use goose::key_manager::{save_to_keyring, get_keyring_secret, delete_from_keyring, KeyRetrievalStrategy};
 
 #[derive(Serialize)]
 struct SecretResponse {
@@ -109,21 +106,27 @@ async fn check_provider_secrets(
                 );
             }
 
-            response.insert(provider_name, ProviderResponse {
-                supported: true,
-                name: Some(provider_config.name.clone()),
-                description: Some(provider_config.description.clone()),
-                models: Some(provider_config.models.clone()),
-                secret_status,
-            });
+            response.insert(
+                provider_name,
+                ProviderResponse {
+                    supported: true,
+                    name: Some(provider_config.name.clone()),
+                    description: Some(provider_config.description.clone()),
+                    models: Some(provider_config.models.clone()),
+                    secret_status,
+                },
+            );
         } else {
-            response.insert(provider_name, ProviderResponse {
-                supported: false,
-                name: None,
-                description: None,
-                models: None,
-                secret_status: HashMap::new(),
-            });
+            response.insert(
+                provider_name,
+                ProviderResponse {
+                    supported: false,
+                    name: None,
+                    description: None,
+                    models: None,
+                    secret_status: HashMap::new(),
+                },
+            );
         }
     }
 
@@ -183,7 +186,9 @@ mod tests {
         assert!(result.is_ok());
         let Json(response) = result.unwrap();
 
-        let provider_status = response.get("unsupported_provider").expect("Provider should exist");
+        let provider_status = response
+            .get("unsupported_provider")
+            .expect("Provider should exist");
         assert!(!provider_status.supported);
         assert!(provider_status.secret_status.is_empty());
     }

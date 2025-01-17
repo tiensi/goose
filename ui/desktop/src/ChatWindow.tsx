@@ -399,8 +399,7 @@ export default function ChatWindow() {
   useEffect(() => {
     // Check if we already have a provider set
     const config = window.electron.getConfig();
-    const storedProvider =
-      config.GOOSE_PROVIDER || localStorage.getItem("GOOSE_PROVIDER");
+    const storedProvider = getStoredProvider(config)
 
     if (storedProvider) {
       setShowWelcomeModal(false);

@@ -40,13 +40,13 @@ struct ProviderDetails {
     name: String,
     description: String,
     models: Vec<String>,
-    required_keys: Vec<String>
+    required_keys: Vec<String>,
 }
 
 #[derive(Serialize)]
 struct ProviderList {
     id: String,
-    details: ProviderDetails
+    details: ProviderDetails,
 }
 
 async fn get_versions() -> Json<VersionsResponse> {

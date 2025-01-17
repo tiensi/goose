@@ -15,6 +15,8 @@ export const OPENAI_DEFAULT_MODEL = "gpt-4"
 export const ANTHROPIC_DEFAULT_MODEL = "claude-3-sonnet"
 
 export function getStoredProvider(config: any): string | null {
+  console.log("config goose provider", config.GOOSE_PROVIDER)
+  console.log("local storage goose provider", localStorage.getItem("GOOSE_PROVIDER"))
   return config.GOOSE_PROVIDER || localStorage.getItem("GOOSE_PROVIDER");
 }
 
