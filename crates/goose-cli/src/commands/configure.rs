@@ -1,6 +1,6 @@
 use cliclack::spinner;
 use console::style;
-use goose::agents::{SystemConfig, system::Envs};
+use goose::agents::{system::Envs, SystemConfig};
 use goose::key_manager::{get_keyring_secret, save_to_keyring, KeyRetrievalStrategy};
 use goose::message::Message;
 use goose::providers::anthropic::ANTHROPIC_DEFAULT_MODEL;
@@ -25,23 +25,48 @@ pub async fn handle_configure(
     if !config_exists {
         // First time setup flow
         println!("");
-        println!("{}", style("Welcome to goose! Let's get you set up with a provider.").dim());
-        println!("{}", style("  you can rerun this command later to update your configuration").dim());
+        println!(
+            "{}",
+            style("Welcome to goose! Let's get you set up with a provider.").dim()
+        );
+        println!(
+            "{}",
+            style("  you can rerun this command later to update your configuration").dim()
+        );
         println!("");
         cliclack::intro(style(" goose-configure ").on_cyan().black())?;
         configure_provider_dialog(provided_provider, provided_model).await?;
-        println!("\n  {}: Run '{}' again to adjust your config or add systems", style("Tip").green().italic(), style("goose configure").cyan());
+        println!(
+            "\n  {}: Run '{}' again to adjust your config or add systems",
+            style("Tip").green().italic(),
+            style("goose configure").cyan()
+        );
         Ok(())
     } else {
         println!("");
-        println!("{}", style("This will update your existing config file").dim());
-        println!("{} {}", style("  if you prefer, you can edit it directly at").dim(), Config::config_path()?.display());
+        println!(
+            "{}",
+            style("This will update your existing config file").dim()
+        );
+        println!(
+            "{} {}",
+            style("  if you prefer, you can edit it directly at").dim(),
+            Config::config_path()?.display()
+        );
         println!("");
 
         cliclack::intro(style(" goose-configure ").on_cyan().black())?;
         let action = cliclack::select("What would you like to configure?")
-            .item("providers", "Configure Providers", "Change provider or update credentials")
-            .item("toggle", "Toggle Systems", "Enable or disable connected systems")
+            .item(
+                "providers",
+                "Configure Providers",
+                "Change provider or update credentials",
+            )
+            .item(
+                "toggle",
+                "Toggle Systems",
+                "Enable or disable connected systems",
+            )
             .item("add", "Add System", "Connect to a new system")
             .interact()?;
 
@@ -49,7 +74,7 @@ pub async fn handle_configure(
             "toggle" => toggle_systems_dialog(),
             "add" => configure_systems_dialog(),
             "providers" => configure_provider_dialog(provided_provider, provided_model).await,
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 }
@@ -157,7 +182,7 @@ pub async fn configure_provider_dialog(
                 Ok(()) => {
                     let msg = format!("Configuration saved to: {:?}", Config::config_path()?);
                     cliclack::outro(msg)
-                },
+                }
                 Err(e) => cliclack::outro(format!("Failed to save configuration: {}", e)),
             };
         }
@@ -200,9 +225,11 @@ pub fn get_required_keys(provider_name: &str) -> Vec<&'static str> {
 pub fn toggle_systems_dialog() -> Result<(), Box<dyn Error>> {
     // Load existing config
     let mut config = Config::load().unwrap_or_default();
-    
+
     if config.systems.is_empty() {
-        let _ = cliclack::outro("No systems configured yet. Run configure and add some systems first.")?;
+        let _ = cliclack::outro(
+            "No systems configured yet. Run configure and add some systems first.",
+        )?;
         return Ok(());
     }
 
@@ -211,18 +238,25 @@ pub fn toggle_systems_dialog() -> Result<(), Box<dyn Error>> {
     for (name, entry) in config.systems.iter() {
         system_status.push((name.clone(), entry.enabled));
     }
-    
+
     // Get currently enabled systems for the selection
-    let enabled_systems: Vec<&String> = system_status.iter()
+    let enabled_systems: Vec<&String> = system_status
+        .iter()
         .filter(|(_, enabled)| *enabled)
         .map(|(name, _)| name)
         .collect();
 
     // Let user toggle systems
-    let selected = cliclack::multiselect("enable systems: (use \"space\" to toggle and \"enter\" to submit)")
-        .items(&system_status.iter().map(|(name, _)| (name, name.as_str(), "")).collect::<Vec<_>>())
-        .initial_values(enabled_systems)
-        .interact()?;
+    let selected =
+        cliclack::multiselect("enable systems: (use \"space\" to toggle and \"enter\" to submit)")
+            .items(
+                &system_status
+                    .iter()
+                    .map(|(name, _)| (name, name.as_str(), ""))
+                    .collect::<Vec<_>>(),
+            )
+            .initial_values(enabled_systems)
+            .interact()?;
 
     // Update the config with new enabled/disabled status
     for (name, _) in system_status.iter() {
@@ -238,8 +272,14 @@ pub fn toggle_systems_dialog() -> Result<(), Box<dyn Error>> {
 
 pub fn configure_systems_dialog() -> Result<(), Box<dyn Error>> {
     println!("");
-    println!("{}", style("Configure will help you add systems that goose can use").dim());
-    println!("{}", style("  systems provide tools and capabilities to the AI agent").dim());
+    println!(
+        "{}",
+        style("Configure will help you add systems that goose can use").dim()
+    );
+    println!(
+        "{}",
+        style("  systems provide tools and capabilities to the AI agent").dim()
+    );
     println!("");
 
     cliclack::intro(style(" goose-configure-systems ").on_cyan().black())?;
@@ -248,27 +288,43 @@ pub fn configure_systems_dialog() -> Result<(), Box<dyn Error>> {
     let mut config = Config::load().unwrap_or_default();
 
     let system_type = cliclack::select("What type of system would you like to add?")
-        .item("built-in", "Built-in System", "Use a system that comes with Goose")
-        .item("stdio", "Command-line System", "Run a local command or script")
+        .item(
+            "built-in",
+            "Built-in System",
+            "Use a system that comes with Goose",
+        )
+        .item(
+            "stdio",
+            "Command-line System",
+            "Run a local command or script",
+        )
         .item("sse", "Remote System", "Connect to a remote system via SSE")
         .interact()?;
 
     match system_type {
         "built-in" => {
             let system = cliclack::select("Which built-in system would you like to enable?")
-                .item("developer2", "Developer Tools", "Code editing and shell access")
-                .item("nondeveloper", "Non Developer", "AI driven scripting for non developers")
+                .item(
+                    "developer2",
+                    "Developer Tools",
+                    "Code editing and shell access",
+                )
+                .item(
+                    "nondeveloper",
+                    "Non Developer",
+                    "AI driven scripting for non developers",
+                )
                 .item("jetbrains", "JetBrains", "Connect to jetbrains IDEs")
                 .interact()?;
-            
+
             config.systems.insert(
                 system.to_string(),
                 SystemEntry {
                     enabled: true,
                     config: SystemConfig::Builtin {
                         name: system.to_string(),
-                    }
-                }
+                    },
+                },
             );
 
             let _ = cliclack::outro(format!("Enabled {} system", style(system).green()))?;
@@ -304,8 +360,8 @@ pub fn configure_systems_dialog() -> Result<(), Box<dyn Error>> {
             let cmd = parts.next().unwrap_or("").to_string();
             let args: Vec<String> = parts.map(String::from).collect();
 
-            let add_env = cliclack::confirm("Would you like to add environment variables?")
-                .interact()?;
+            let add_env =
+                cliclack::confirm("Would you like to add environment variables?").interact()?;
 
             let mut envs = HashMap::new();
             while add_env {
@@ -332,8 +388,8 @@ pub fn configure_systems_dialog() -> Result<(), Box<dyn Error>> {
                         cmd,
                         args,
                         envs: Envs::new(envs),
-                    }
-                }
+                    },
+                },
             );
 
             let _ = cliclack::outro(format!("Added {} system", style(name).green()))?;
@@ -366,8 +422,8 @@ pub fn configure_systems_dialog() -> Result<(), Box<dyn Error>> {
                 })
                 .interact()?;
 
-            let add_env = cliclack::confirm("Would you like to add environment variables?")
-                .interact()?;
+            let add_env =
+                cliclack::confirm("Would you like to add environment variables?").interact()?;
 
             let mut envs = HashMap::new();
             while add_env {
@@ -393,13 +449,13 @@ pub fn configure_systems_dialog() -> Result<(), Box<dyn Error>> {
                     config: SystemConfig::Sse {
                         uri,
                         envs: Envs::new(envs),
-                    }
-                }
+                    },
+                },
             );
 
             let _ = cliclack::outro(format!("Added {} system", style(name).green()))?;
         }
-        _ => unreachable!()
+        _ => unreachable!(),
     };
 
     config.save()?;

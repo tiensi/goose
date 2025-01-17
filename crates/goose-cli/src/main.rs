@@ -1,5 +1,5 @@
 use anyhow::Result;
-use clap::{Parser, Subcommand, CommandFactory};
+use clap::{CommandFactory, Parser, Subcommand};
 use goose::agents::AgentFactory;
 
 mod commands;
@@ -14,9 +14,9 @@ use commands::configure::handle_configure;
 use commands::mcp::run_server;
 use commands::session::build_session;
 use commands::version::print_version;
-use logging::setup_logging;
 use config::Config;
 use console::style;
+use logging::setup_logging;
 use std::io::{self, Read};
 
 #[cfg(test)]
@@ -202,10 +202,7 @@ async fn main() -> Result<()> {
     }
 
     match cli.command {
-        Some(Command::Configure {
-            provider,
-            model,
-        }) => {
+        Some(Command::Configure { provider, model }) => {
             let _ = handle_configure(provider, model).await;
             return Ok(());
         }
@@ -288,7 +285,11 @@ async fn main() -> Result<()> {
             Cli::command().print_help()?;
             println!();
             if Config::load().is_err() {
-                println!("\n  {}: Run '{}' to setup goose for the first time", style("Tip").green().italic(), style("goose configure").cyan());
+                println!(
+                    "\n  {}: Run '{}' to setup goose for the first time",
+                    style("Tip").green().italic(),
+                    style("goose configure").cyan()
+                );
             }
         }
     }

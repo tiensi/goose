@@ -113,7 +113,11 @@ impl Capabilities {
                     .to_str()
                     .expect("should resolve executable to string path")
                     .to_string();
-                let transport = StdioTransport::new(&cmd, vec!["mcp".to_string(), name.clone()], HashMap::new());
+                let transport = StdioTransport::new(
+                    &cmd,
+                    vec!["mcp".to_string(), name.clone()],
+                    HashMap::new(),
+                );
                 let handle = transport.start().await?;
                 let service = McpService::with_timeout(handle, Duration::from_secs(100));
                 Box::new(McpClient::new(service))

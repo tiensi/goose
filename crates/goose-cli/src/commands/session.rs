@@ -90,12 +90,7 @@ pub async fn build_session<'a>(
         Err(_) => Box::new(RustylinePrompt::new()),
     };
 
-    display_session_info(
-        resume,
-        provider_name,
-        model_name,
-        session_file.as_path(),
-    );
+    display_session_info(resume, provider_name, model_name, session_file.as_path());
     Box::new(Session::new(agent, prompt, session_file))
 }
 

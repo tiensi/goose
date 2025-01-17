@@ -71,18 +71,17 @@ impl Default for Config {
             default_provider: "".to_string(),
             default_model: "".to_string(),
             systems: HashMap::from([(
-                DEFAULT_SYSTEM.to_string(), 
+                DEFAULT_SYSTEM.to_string(),
                 SystemEntry {
                     enabled: true,
                     config: SystemConfig::Builtin {
                         name: DEFAULT_SYSTEM.to_string(),
                     },
-                }
+                },
             )]),
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -141,11 +140,11 @@ systems:
     envs: {}
 "#;
         let config: Config = serde_yaml::from_str(yaml).unwrap();
-        
+
         // Check core settings
         assert_eq!(config.default_provider, "openai");
         assert_eq!(config.default_model, "gpt-4");
-        
+
         // Check builtin enabled system
         match &config.systems.get("developer").unwrap().config {
             SystemConfig::Builtin { name } => assert_eq!(name, "developer"),
@@ -166,7 +165,10 @@ systems:
         match &python.config {
             SystemConfig::Stdio { cmd, args, envs } => {
                 assert_eq!(cmd, "python3");
-                assert_eq!(args, vec!["-m", "goose.systems.python"]);
+                assert_eq!(
+                    args,
+                    &vec!["-m".to_string(), "goose.systems.python".to_string()]
+                );
                 let env = envs.get_env();
                 assert_eq!(env.get("PYTHONPATH").unwrap(), "/path/to/python");
                 assert_eq!(env.get("DEBUG").unwrap(), "true");

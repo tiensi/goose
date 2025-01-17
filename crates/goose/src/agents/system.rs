@@ -65,9 +65,7 @@ pub enum SystemConfig {
     },
     /// Built-in system that is part of the goose binary
     #[serde(rename = "builtin")]
-    Builtin {
-        name: String,
-    },
+    Builtin { name: String },
 }
 
 impl SystemConfig {
