@@ -61,7 +61,15 @@ pub struct ProviderStatus {
     pub secret_status: HashMap<String, SecretStatus>,
 }
 
-static PROVIDER_ENV_REQUIREMENTS: Lazy<HashMap<String, Vec<String>>> = Lazy::new(|| {
+#[derive(Debug, Serialize, Deserialize)]
+struct ProviderConfig {
+    name: String,
+    description: String,
+    models: Vec<String>,
+    required_keys: Vec<String>,
+}
+
+static PROVIDER_ENV_REQUIREMENTS: Lazy<HashMap<String, ProviderConfig>> = Lazy::new(|| {
     let contents = include_str!("providers_and_keys.json");
     serde_json::from_str(contents).expect("Failed to parse providers_and_keys.json")
 });
@@ -84,10 +92,10 @@ async fn check_provider_secrets(
     let mut response = HashMap::new();
 
     for provider_name in request.providers {
-        if let Some(keys) = PROVIDER_ENV_REQUIREMENTS.get(&provider_name) {
+        if let Some(provider_config) = PROVIDER_ENV_REQUIREMENTS.get(&provider_name) {
             let mut secret_status = HashMap::new();
 
-            for key in keys {
+            for key in &provider_config.required_keys {
                 let (key_set, key_location) = check_key_status(key);
                 secret_status.insert(
                     key.to_string(),

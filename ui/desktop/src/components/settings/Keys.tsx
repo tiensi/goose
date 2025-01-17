@@ -67,7 +67,7 @@ export default function Keys() {
             'X-Secret-Key': getSecretKey(),
           },
           body: JSON.stringify({
-            providers: ["OpenAI", "Anthropic", "MyProvider", "Databricks"]
+            providers: ["openai", "anthropic", "myprovider", "databricks"]
           })
         });
 

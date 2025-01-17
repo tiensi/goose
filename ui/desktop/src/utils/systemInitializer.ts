@@ -1,5 +1,5 @@
 import { ProviderOption } from './providerUtils';
-import { getApiUrl, getSecretKey } from '../config';
+import { getApiUrl, getSecretKey, addMCP, addMCPSystem } from '../config';
 
 export const addAgent = async (provider: ProviderOption) => {
   const response = await fetch(getApiUrl("/agent"), {
@@ -45,6 +45,12 @@ export const initializeSystem = async (provider: ProviderOption) => {
   try {
     await addAgent(provider);
     await addSystemConfig("developer2");
+
+    // Handle deep link if present
+    const deepLink = window.appConfig.get('DEEP_LINK');
+    if (deepLink) {
+      await addMCPSystem(deepLink);
+    }
   } catch (error) {
     console.error("Failed to initialize system:", error);
     throw error;

@@ -28,9 +28,8 @@ export const providers: ProviderOption[] = [
   }
 ];
 
-export const getCurrentProvider = (): string => {
-  const provider = localStorage.getItem(SELECTED_PROVIDER_KEY);
-  console.log('Getting current provider:', provider || 'none');
-  return provider || 'openai'; // default to OpenAI if none selected
-};
+export function getStoredProvider(config: any): string | null {
+  return config.GOOSE_PROVIDER || localStorage.getItem("GOOSE_PROVIDER");
+}
+
 
