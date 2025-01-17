@@ -490,4 +490,4 @@ export default function ChatWindow() {
         )}
       </ChatLayout>
   );
-};
+}

@@ -65,4 +65,4 @@ export function transformSecrets(data: Record<string, ProviderResponse>): Transf
                 is_set: rawStatus.is_set,            // Renamed from `is_set` to `isSet`
             }))
         );
-};
+}

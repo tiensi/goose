@@ -51,7 +51,7 @@ export async function getProvidersList(): Promise<Provider[]> {
   }));
 }
 
-const addAgent = async (provider: String) => {
+const addAgent = async (provider: string) => {
   const response = await fetch(getApiUrl("/agent"), {
     method: "POST",
     headers: {
@@ -72,7 +72,7 @@ const addSystemConfig = async (system: string) => {
   await addMCP("goosed", ["mcp", system]);
 };
 
-export const initializeSystem = async (provider: String) => {
+export const initializeSystem = async (provider: string) => {
   try {
     console.log("initializing with provider", provider)
     await addAgent(provider);

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, SVGProps } from 'react';
 import { getApiUrl, getSecretKey } from '../../config';
 
 interface SecretSource {
