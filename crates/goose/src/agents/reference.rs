@@ -80,11 +80,6 @@ impl Agent for ReferenceAgent {
                 files, database schemas, or application-specific information. This tool searches for the
                 resource URI in the provided system, and reads in the resource content. If no system
                 is provided, the tool will search all systems for the resource.
-
-                The read_resource tool is typically used with a search query (can be before or after). Here are two examples:
-                1. Search for files in Google Drive MCP Server, then call read_resource(gdrive:///<file_id>) to read the Google Drive file.
-                2. You need to gather schema information about a Postgres table before creating a query. So you call read_resource(postgres://<host>/<table>/schema)
-                    to get the schema information for a table and then use to construct your query.
             "#}.to_string(),
             json!({
                 "type": "object",
@@ -105,11 +100,6 @@ impl Agent for ReferenceAgent {
                 files, database schemas, or application-specific information. This tool lists resources
                 in the provided system, and returns a list for the user to browse. If no system
                 is provided, the tool will search all systems for the resource.
-
-                The list_resources tool is typically used before a read_resource tool call. Here are two examples:
-                1. List files in Google Drive MCP Server, then call read_resource(gdrive:///<file_id>) to read the Google Drive file.
-                2. You want to see what tables exist in Postgre so you can find schema information about that table before creating a query. So you call list_resources to see whats available then you call read_resource(postgres://<host>/<table>/schema)
-                    to get the schema information for a table and then use to construct your query.
             "#}.to_string(),
             json!({
                 "type": "object",

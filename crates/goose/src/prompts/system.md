@@ -10,12 +10,6 @@ to interactions with sytems that are not currently active. The currently
 active systems are below. Each of these systems provides tools that are
 in your tool specification.
 
-When a system is added that supports Resources,, we add two tools,
-one called "platform__list_resources" which can be used to list
-resources with URIs from all or from a specific system by name
-and one called "platform__read_resource", which can
-be used to read a resource URI from a system.
-
 # Systems:
 {% for system in systems %}
 

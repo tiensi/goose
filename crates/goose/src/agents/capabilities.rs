@@ -153,7 +153,7 @@ impl Capabilities {
         // if the server is capable if resources we track it
         if init_result.capabilities.resources.is_some() {
             self.resource_capable_systems
-                .insert(init_result.server_info.name.clone());
+                .insert(sanitize(init_result.server_info.name.clone()));
         }
 
         // Store the client
@@ -339,7 +339,7 @@ impl Capabilities {
         // Loop through each system and try to read the resource, don't raise an error if the resource is not found
         // TODO: do we want to find if a provided uri is in multiple systems?
         // currently it will reutrn the first match and skip any systems
-        for system_name in self.clients.keys() {
+        for system_name in self.resource_capable_systems.iter() {
             let result = self.read_resource_from_system(uri, system_name).await;
             match result {
                 Ok(result) => return Ok(result),
@@ -423,7 +423,7 @@ impl Capabilities {
                 let resource_list = lr
                     .resources
                     .into_iter()
-                    .map(|r| format!("{}, uri: ({})", r.name, r.uri))
+                    .map(|r| format!("{} - {}, uri: ({})", system_name, r.name, r.uri))
                     .collect::<Vec<String>>()
                     .join("\n");
 
@@ -443,18 +443,9 @@ impl Capabilities {
                 // Handle all systems case using FuturesUnordered
                 let mut futures = FuturesUnordered::new();
 
-                // Create futures for each system
-                for (system_name, client) in &self.clients {
-                    let client = Arc::clone(client);
-
-                    futures.push(async move {
-                        let guard = client.lock().await;
-                        guard
-                            .list_resources(None)
-                            .await
-                            .map(|r| (system_name.clone(), r))
-                            .map_err(|e| (system_name.clone(), e))
-                    });
+                // Create futures for each resource_capable_system
+                for system_name in &self.resource_capable_systems {
+                    futures.push(async move { self.list_resources_from_system(system_name).await });
                 }
 
                 let mut all_resources = Vec::new();
@@ -463,13 +454,11 @@ impl Capabilities {
                 // Process results as they complete
                 while let Some(result) = futures.next().await {
                     match result {
-                        Ok((system_name, resource_list)) => {
-                            all_resources.extend(resource_list.resources.into_iter().map(|r| {
-                                format!("{} - {}, uri: ({})", system_name, r.name, r.uri)
-                            }));
+                        Ok(content) => {
+                            all_resources.extend(content);
                         }
-                        Err((system_name, e)) => {
-                            errors.push((system_name, e));
+                        Err(tool_error) => {
+                            errors.push(tool_error);
                         }
                     }
                 }
@@ -479,16 +468,13 @@ impl Capabilities {
                     tracing::error!(
                         errors = ?errors
                             .into_iter()
-                            .map(|(sys, e)| format!("{}: {:?}", sys, e))
+                            .map(|e| format!("{:?}", e))
                             .collect::<Vec<_>>(),
                         "errors from listing resources"
                     );
                 }
 
-                // Sort resources for consistent output
-                all_resources.sort();
-
-                Ok(vec![Content::text(all_resources.join("\n"))])
+                Ok(all_resources)
             }
         }
     }
