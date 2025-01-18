@@ -1,0 +1,69 @@
+#!/bin/bash
+
+# Enable strict mode to exit on errors and unset variables
+set -euo pipefail
+
+# Set log file
+LOG_FILE="/tmp/mcp.log"
+
+# Clear the log file at the start
+> "$LOG_FILE"
+
+# Function for logging
+log() {
+    local MESSAGE="$1"
+    echo "$(date +'%Y-%m-%d %H:%M:%S') - $MESSAGE" | tee -a "$LOG_FILE"
+}
+
+# Trap errors and log them before exiting
+trap 'log "An error occurred. Exiting with status $?."' ERR
+
+# Set HERMIT_BIN variable
+HERMIT_BIN="/Users/micn/Documents/code/goose-ui/ui/desktop/src/bin/hermit"
+
+log "Starting npx setup script."
+
+# Ensure ~/.goose/mcp-hermit/bin exists
+log "Creating directory ~/.goose/mcp-hermit/bin if it does not exist."
+mkdir -p ~/.goose/mcp-hermit/bin
+
+# Change to the ~/.goose/mcp-hermit directory
+log "Changing to directory ~/.goose/mcp-hermit."
+cd ~/.goose/mcp-hermit
+
+# Copy HERMIT_BIN to the bin directory
+log "Copying HERMIT_BIN from $HERMIT_BIN to ~/.goose/mcp-hermit/bin."
+cp "$HERMIT_BIN" ~/.goose/mcp-hermit/bin
+
+# Update PATH
+export PATH=~/.goose/mcp-hermit/bin:$PATH
+log "Updated PATH to include ~/.goose/mcp-hermit/bin."
+
+# Log current environment details
+log "Environment details:"
+log "PATH: $PATH"
+log "HERMIT_BIN: $HERMIT_BIN"
+
+# Verify HERMIT_BIN installation
+log "Checking for hermit in PATH."
+which hermit >> "$LOG_FILE"
+
+# Initialize hermit
+log "Initializing hermit."
+hermit init >> "$LOG_FILE"
+
+# Install Node.js using hermit
+log "Installing Node.js with hermit."
+hermit install node >> "$LOG_FILE"
+
+# Verify installations
+log "Verifying installation locations:"
+log "hermit: $(which hermit)"
+log "node: $(which node)"
+log "npx: $(which npx)"
+
+# Final step: Execute npx with passed arguments
+log "Executing 'npx' command with arguments: $*"
+npx "$@" || log "Failed to execute 'npx' with arguments: $*"
+
+log "npx setup script completed successfully."

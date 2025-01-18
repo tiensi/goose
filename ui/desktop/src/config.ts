@@ -62,7 +62,8 @@ export const addMCP = async (system: string, args: string[], envs?: Record<strin
   }
 
   if (system === 'npx') {
-    system = "/Users/micn/Documents/code/hermit-goose/npx";
+    // use our special npx shim which uses hermit.
+    system = await window.electron.getBinaryPath('npx');
   }
 
   const systemConfig = {
