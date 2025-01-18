@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { ChatContent } from "../../ChatWindow"
 import Settings  from "../settings/Settings"
 import Keys from "../settings/Keys"
+import MoreModelsSettings from "../settings/models/MoreModels";
 
 export const ChatRoutes = ({
                         chats,
@@ -17,7 +18,6 @@ export const ChatRoutes = ({
             path="/chat/:id"
             element={
                 <ChatContent
-                    key={selectedChatId}
                     chats={chats}
                     setChats={setChats}
                     selectedChatId={selectedChatId}
@@ -29,6 +29,7 @@ export const ChatRoutes = ({
             }
         />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/settings/more-models" element={<MoreModelsSettings />} />
         <Route path="/keys" element={<Keys />} />
         <Route path="*" element={<Navigate to="/chat/1" replace />} />
     </Routes>

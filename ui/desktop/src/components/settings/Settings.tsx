@@ -214,15 +214,15 @@ export default function Settings() {
                     <div className="flex justify-between items-center mb-4">
                       <h2 className="text-2xl font-semibold">Models</h2>
                       <button
-                          onClick={() => setAddModelOpen(true)}
+                          onClick={() => navigate("/settings/more-models")}
                           className="text-indigo-500 hover:text-indigo-600 font-medium"
                       >
-                        Add Models
+                        More Models
                       </button>
-                    </div>
-                    {settings.models.map((model) => (
-                        <ToggleableItem
-                            key={model.id}
+                </div>
+                {settings.models.map((model) => (
+                    <ToggleableItem
+                        key={model.id}
                             {...model}
                             onToggle={handleModelToggle}
                         />
