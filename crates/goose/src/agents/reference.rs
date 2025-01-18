@@ -5,7 +5,7 @@ use futures::stream::BoxStream;
 use tokio::sync::Mutex;
 use tracing::{debug, instrument};
 
-use super::{capabilities, Agent};
+use super::Agent;
 use crate::agents::capabilities::Capabilities;
 use crate::agents::system::{SystemConfig, SystemResult};
 use crate::message::{Message, ToolRequest};

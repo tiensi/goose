@@ -2,7 +2,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use futures::stream::{FuturesUnordered, StreamExt};
 use mcp_client::McpService;
 use rust_decimal_macros::dec;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::sync::LazyLock;
 use std::time::Duration;
@@ -26,7 +26,7 @@ static DEFAULT_TIMESTAMP: LazyLock<DateTime<Utc>> =
 pub struct Capabilities {
     clients: HashMap<String, Arc<Mutex<Box<dyn McpClientTrait>>>>,
     instructions: HashMap<String, String>,
-    resource_capable_systems: Vec<String>,
+    resource_capable_systems: HashSet<String>,
     provider: Box<dyn Provider>,
     provider_usage: Mutex<Vec<ProviderUsage>>,
 }
@@ -84,7 +84,7 @@ impl Capabilities {
         Self {
             clients: HashMap::new(),
             instructions: HashMap::new(),
-            resource_capable_systems: Vec::new(),
+            resource_capable_systems: HashSet::new(),
             provider,
             provider_usage: Mutex::new(Vec::new()),
         }
@@ -153,7 +153,7 @@ impl Capabilities {
         // if the server is capable if resources we track it
         if init_result.capabilities.resources.is_some() {
             self.resource_capable_systems
-                .push(init_result.server_info.name.clone());
+                .insert(init_result.server_info.name.clone());
         }
 
         // Store the client
