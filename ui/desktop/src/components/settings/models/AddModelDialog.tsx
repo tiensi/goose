@@ -19,6 +19,7 @@ import {
 } from "../../ui/select"
 import { Input } from "../../ui/input"
 import { Label } from "../../ui/label"
+import { Plus } from 'lucide-react'
 
 export function AddModelDialog() {
     const [selectedValue, setSelectedValue] = useState<string | null>(null);
@@ -26,8 +27,8 @@ export function AddModelDialog() {
     return (
         <Modal>
             <ModalTrigger asChild>
-                <Button className="bg-blue-500 hover:bg-blue-600 text-white">
-                    Add Model
+                <Button className="bg-black hover:bg-black/90 text-white">
+                    <Plus className="w-4 h-4 mr-2" /> Add Model
                 </Button>
             </ModalTrigger>
             <ModalContent className="sm:max-w-[425px]">

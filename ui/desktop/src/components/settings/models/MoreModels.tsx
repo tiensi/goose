@@ -5,20 +5,29 @@ import { Input } from "../../ui/input"
 import { ModelList } from "./ModelList"
 import { ProviderButtons } from "./ProviderButtons"
 import { AddModelDialog } from "./AddModelDialog"
+import BackButton from "../../ui/BackButton";
 
 export default function MoreModelsPage() {
     return (
         <div className="min-h-screen bg-background text-foreground">
+
+            {/*Lefthand side exit button*/}
+            <div className="w-48 border-r border-gray-100 dark:border-gray-700 px-2 pt-2">
+                <div className="sticky top-8">
+                    <BackButton/>
+                </div>
+            </div>
+
             <div className="container max-w-6xl mx-auto p-6">
                 <div className="flex items-center justify-between mb-8">
                     <h1 className="text-2xl font-semibold">More Models</h1>
-                    <AddModelDialog />
+                    <AddModelDialog/>
                 </div>
 
                 <div className="space-y-8">
                     {/* Search section */}
                     <div className="relative">
-                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground"/>
                         <Input
                             placeholder="Search models..."
                             className="pl-10 bg-background border-muted-foreground/20"
@@ -28,7 +37,7 @@ export default function MoreModelsPage() {
                     {/* Provider buttons */}
                     <div className="space-y-4">
                         <h2 className="text-lg font-medium">Browse by Provider</h2>
-                        <ProviderButtons />
+                        <ProviderButtons/>
                     </div>
 
                     {/* Recent models */}
@@ -39,7 +48,7 @@ export default function MoreModelsPage() {
                                 View all
                             </Button>
                         </div>
-                        <ModelList />
+                        <ModelList/>
                     </div>
                 </div>
             </div>

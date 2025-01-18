@@ -10,7 +10,7 @@ import { Modal, ModalContent, ModalHeader, ModalTitle } from "../ui/modal";
 import { Button } from "../ui/button";
 import { RevealKeysDialog } from "./modals/RevealKeysDialog";
 import { showToast } from "../ui/toast";
-import { Back } from "../icons";
+import BackButton from "../ui/BackButton";
 
 const EXTENSIONS_DESCRIPTION =
     "The Model Context Protocol (MCP) is a system that allows AI models to securely connect with local or remote resources using standard server setups. It works like a client-server setup and expands AI capabilities using three main components: Prompts, Resources, and Tools.";
@@ -183,14 +183,12 @@ export default function Settings() {
               {/* Left Navigation */}
               <div className="w-48 border-r border-gray-100 dark:border-gray-700 px-2 pt-2">
                 <div className="sticky top-8">
-                  <button
-                      onClick={handleExit}
-                      className="flex items-center gap-2 text-gray-600 hover:text-gray-800
-                                            dark:text-gray-400 dark:hover:text-gray-200 mb-16 mt-4"
-                  >
-                    <Back className="w-4 h-4" />
-                    <span>Back</span>
-                  </button>
+                  <BackButton
+                      onClick={() => {
+                        handleExit();
+                      }}
+                      className="mb-4"
+                  />
                   <div className="space-y-2">
                     {["Models", "Extensions", "Keys"].map((section) => (
                         <button
