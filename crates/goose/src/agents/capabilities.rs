@@ -26,6 +26,7 @@ static DEFAULT_TIMESTAMP: LazyLock<DateTime<Utc>> =
 pub struct Capabilities {
     clients: HashMap<String, Arc<Mutex<Box<dyn McpClientTrait>>>>,
     instructions: HashMap<String, String>,
+    resource_capable_systems: Vec<String>,
     provider: Box<dyn Provider>,
     provider_usage: Mutex<Vec<ProviderUsage>>,
 }
@@ -83,9 +84,14 @@ impl Capabilities {
         Self {
             clients: HashMap::new(),
             instructions: HashMap::new(),
+            resource_capable_systems: Vec::new(),
             provider,
             provider_usage: Mutex::new(Vec::new()),
         }
+    }
+
+    pub fn supports_resources(&self) -> bool {
+        !self.resource_capable_systems.is_empty()
     }
 
     /// Add a new MCP system based on the provided client type
@@ -142,6 +148,12 @@ impl Capabilities {
         if let Some(instructions) = init_result.instructions {
             self.instructions
                 .insert(init_result.server_info.name.clone(), instructions);
+        }
+
+        // if the server is capable if resources we track it
+        if init_result.capabilities.resources.is_some() {
+            self.resource_capable_systems
+                .push(init_result.server_info.name.clone());
         }
 
         // Store the client
@@ -286,7 +298,8 @@ impl Capabilities {
             .keys()
             .map(|name| {
                 let instructions = self.instructions.get(name).cloned().unwrap_or_default();
-                SystemInfo::new(name, "", &instructions)
+                let has_resources = self.resource_capable_systems.contains(name);
+                SystemInfo::new(name, "", &instructions, has_resources)
             })
             .collect();
 

@@ -5,7 +5,7 @@ use futures::stream::BoxStream;
 use tokio::sync::Mutex;
 use tracing::{debug, instrument};
 
-use super::Agent;
+use super::{capabilities, Agent};
 use crate::agents::capabilities::Capabilities;
 use crate::agents::system::{SystemConfig, SystemResult};
 use crate::message::{Message, ToolRequest};
@@ -119,8 +119,10 @@ impl Agent for ReferenceAgent {
             }),
         );
 
-        tools.push(read_resource_tool);
-        tools.push(list_resources_tool);
+        if capabilities.supports_resources() {
+            tools.push(read_resource_tool);
+            tools.push(list_resources_tool);
+        }
 
         let system_prompt = capabilities.get_system_prompt().await;
         let _estimated_limit = capabilities

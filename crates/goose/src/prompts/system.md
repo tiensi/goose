@@ -10,12 +10,10 @@ to interactions with sytems that are not currently active. The currently
 active systems are below. Each of these systems provides tools that are
 in your tool specification.
 
-The format of a tool is "{system_name}__{tool_name}", i.e. the system
-name followed by the tool name with '__' as the separator.
-
-By default, we add two tools, one called "platform__list_resources"
-which can be used to list resources with URIs from all or from a specific
-system by name and one called "platform__read_resource", which can
+When a system is added that supports Resources,, we add two tools,
+one called "platform__list_resources" which can be used to list
+resources with URIs from all or from a specific system by name
+and one called "platform__read_resource", which can
 be used to read a resource URI from a system.
 
 # Systems:
@@ -23,7 +21,10 @@ be used to read a resource URI from a system.
 
 ## {{system.name}}
 {{system.description}}
-
+{% if system.has_resources %}
+{{system.name}} supports resources, you can use platform__read_resource,
+and platform__list_resources on this system.
+{% endif %}
 {% if system.instructions %}### Instructions
 {{system.instructions}}{% endif %}
 {% endfor %}
