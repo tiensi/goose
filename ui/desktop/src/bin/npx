@@ -18,9 +18,6 @@ log() {
 # Trap errors and log them before exiting
 trap 'log "An error occurred. Exiting with status $?."' ERR
 
-# Set HERMIT_BIN variable
-HERMIT_BIN="/Users/micn/Documents/code/goose-ui/ui/desktop/src/bin/hermit"
-
 log "Starting npx setup script."
 
 # Ensure ~/.goose/mcp-hermit/bin exists
@@ -31,20 +28,22 @@ mkdir -p ~/.goose/mcp-hermit/bin
 log "Changing to directory ~/.goose/mcp-hermit."
 cd ~/.goose/mcp-hermit
 
-# Copy HERMIT_BIN to the bin directory
-log "Copying HERMIT_BIN from $HERMIT_BIN to ~/.goose/mcp-hermit/bin."
-cp "$HERMIT_BIN" ~/.goose/mcp-hermit/bin
+# Check if hermit binary exists and download if not
+if [ ! -f ~/.goose/mcp-hermit/bin/hermit ]; then
+    log "Hermit binary not found. Downloading hermit binary."
+    curl -fsSL "https://github.com/cashapp/hermit/releases/download/stable/hermit-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/').gz" \
+        | gzip -dc > ~/.goose/mcp-hermit/bin/hermit && chmod +x ~/.goose/mcp-hermit/bin/hermit
+    log "Hermit binary downloaded and made executable."
+else
+    log "Hermit binary already exists. Skipping download."
+fi
 
 # Update PATH
 export PATH=~/.goose/mcp-hermit/bin:$PATH
 log "Updated PATH to include ~/.goose/mcp-hermit/bin."
 
-# Log current environment details
-log "Environment details:"
-log "PATH: $PATH"
-log "HERMIT_BIN: $HERMIT_BIN"
 
-# Verify HERMIT_BIN installation
+# Verify hermit installation
 log "Checking for hermit in PATH."
 which hermit >> "$LOG_FILE"
 
