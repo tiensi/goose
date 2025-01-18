@@ -337,6 +337,8 @@ impl Capabilities {
 
         // If system name is not provided, we need to search for the resource across all systems
         // Loop through each system and try to read the resource, don't raise an error if the resource is not found
+        // TODO: do we want to find if a provided uri is in multiple systems?
+        // currently it will reutrn the first match and skip any systems
         for system_name in self.clients.keys() {
             let result = self.read_resource_from_system(uri, system_name).await;
             match result {
