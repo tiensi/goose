@@ -18,5 +18,4 @@ pub mod openrouter;
 
 pub use factory::get_provider;
 
-#[cfg(test)]
-pub mod mock_server;
+

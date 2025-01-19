@@ -4,8 +4,7 @@ use reqwest::Client;
 use serde_json::Value;
 use std::time::Duration;
 
-use super::base::{Moderation, ModerationResult, ProviderUsage};
-use super::base::{Provider, Usage};
+use super::base::{Provider, ProviderUsage, Usage};
 use super::configs::ModelConfig;
 use super::model_pricing::cost;
 use super::model_pricing::model_pricing_for;
@@ -16,10 +15,9 @@ use crate::providers::openai_utils::{
     openai_response_to_message,
 };
 use mcp_core::tool::Tool;
-use serde::Serialize;
+
 
 pub const OPEN_AI_DEFAULT_MODEL: &str = "gpt-4o";
-pub const OPEN_AI_MODERATION_MODEL: &str = "omni-moderation-latest";
 
 #[derive(Debug, serde::Serialize)]
 pub struct OpenAiProvider {
@@ -28,18 +26,6 @@ pub struct OpenAiProvider {
     host: String,
     api_key: String,
     model: ModelConfig,
-}
-
-#[derive(Serialize)]
-struct OpenAiModerationRequest {
-    input: String,
-    model: String,
-}
-
-impl OpenAiModerationRequest {
-    pub fn new(input: String, model: String) -> Self {
-        Self { input, model }
-    }
 }
 
 impl OpenAiProvider {
@@ -95,7 +81,7 @@ impl Provider for OpenAiProvider {
             cost
         )
     )]
-    async fn complete_internal(
+    async fn complete(
         &self,
         system: &str,
         messages: &[Message],
@@ -129,141 +115,163 @@ impl Provider for OpenAiProvider {
     }
 }
 
-#[async_trait]
-impl Moderation for OpenAiProvider {
-    async fn moderate_content_internal(&self, content: &str) -> Result<ModerationResult> {
-        let url = format!("{}/v1/moderations", self.host.trim_end_matches('/'));
-
-        let request =
-            OpenAiModerationRequest::new(content.to_string(), OPEN_AI_MODERATION_MODEL.to_string());
-
-        let response = self
-            .client
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .json(&request)
-            .send()
-            .await?;
-
-        let response_json = handle_response(serde_json::to_value(&request)?, response).await?;
-
-        let flagged = response_json["results"][0]["flagged"]
-            .as_bool()
-            .unwrap_or(false);
-        if flagged {
-            let categories = response_json["results"][0]["categories"]
-                .as_object()
-                .unwrap();
-            let category_scores = response_json["results"][0]["category_scores"].clone();
-            return Ok(ModerationResult::new(
-                flagged,
-                Some(
-                    categories
-                        .iter()
-                        .filter(|(_, value)| value.as_bool().unwrap_or(false))
-                        .map(|(key, _)| key.to_string())
-                        .collect(),
-                ),
-                Some(category_scores),
-            ));
-        } else {
-            return Ok(ModerationResult::new(flagged, None, None));
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::message::MessageContent;
-    use crate::providers::mock_server::{
-        create_mock_open_ai_response, create_mock_open_ai_response_with_tools, create_test_tool,
-        get_expected_function_call_arguments, setup_mock_server, TEST_INPUT_TOKENS,
-        TEST_OUTPUT_TOKENS, TEST_TOOL_FUNCTION_NAME, TEST_TOTAL_TOKENS,
-    };
-    use rust_decimal_macros::dec;
-    use wiremock::MockServer;
+    use mcp_core::tool::Tool;
+    use serde_json::json;
 
-    async fn _setup_mock_response(response_body: Value) -> (MockServer, OpenAiProvider) {
-        let mock_server = setup_mock_server("/v1/chat/completions", response_body).await;
-
-        // Create the OpenAiProvider with the mock server's URL as the host
-        let provider = OpenAiProvider {
-            client: Client::builder().build().unwrap(),
-            host: mock_server.uri(),
-            api_key: "test_api_key".to_string(),
-            model: ModelConfig::new("gpt-4o".to_string()).with_temperature(Some(0.7)),
-        };
-
-        (mock_server, provider)
+    fn create_test_tool() -> Tool {
+        Tool::new(
+            "get_weather",
+            "Gets the current weather for a location",
+            json!({
+                "type": "object",
+                "properties": {
+                    "location": {
+                        "type": "string",
+                        "description": "The city and state, e.g. New York, NY"
+                    }
+                },
+                "required": ["location"]
+            }),
+        )
     }
 
-    #[tokio::test]
-    async fn test_complete_basic() -> Result<()> {
-        let model_name = "gpt-4o";
-        // Mock response for normal completion
-        let response_body =
-            create_mock_open_ai_response(model_name, "Hello! How can I assist you today?");
-
-        let (mock_server, provider) = _setup_mock_response(response_body).await;
-
-        // Prepare input messages
+    #[test]
+    fn test_request_payload_construction() -> Result<()> {
+        let model = ModelConfig::new("gpt-4o".to_string()).with_temperature(Some(0.7));
         let messages = vec![Message::user().with_text("Hello?")];
+        let system = "You are a helpful assistant.";
+        let tools = vec![create_test_tool()];
 
-        // Call the complete method
-        let (message, usage) = provider
-            .complete_internal("You are a helpful assistant.", &messages, &[])
-            .await?;
+        let payload = create_openai_request_payload(&model, system, &messages, &tools)?;
 
-        // Assert the response
+        // Verify payload structure
+        assert_eq!(payload["model"], "gpt-4o");
+        assert!(payload["temperature"].as_f64().unwrap() - 0.7 < 0.0001); // Compare with tolerance for float precision
+        
+        let messages = payload["messages"].as_array().unwrap();
+        assert_eq!(messages.len(), 2); // System + user message
+        assert_eq!(messages[0]["role"], "system");
+        assert_eq!(messages[0]["content"], system);
+        assert_eq!(messages[1]["role"], "user");
+        assert_eq!(messages[1]["content"], "Hello?");
+
+        let tools = payload["tools"].as_array().unwrap();
+        assert_eq!(tools.len(), 1);
+        assert_eq!(tools[0]["type"], "function");
+        assert_eq!(tools[0]["function"]["name"], "get_weather");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_response_parsing_basic() -> Result<()> {
+        let response = json!({
+            "id": "chatcmpl-123",
+            "object": "chat.completion",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "Hello! How can I assist you today?",
+                    "tool_calls": null
+                },
+                "finish_reason": "stop"
+            }],
+            "usage": {
+                "prompt_tokens": 12,
+                "completion_tokens": 15,
+                "total_tokens": 27
+            },
+            "model": "gpt-4o"
+        });
+
+        let message = openai_response_to_message(response.clone())?;
+        let usage = get_openai_usage(&response)?;
+
+        // Verify message parsing
         if let MessageContent::Text(text) = &message.content[0] {
             assert_eq!(text.text, "Hello! How can I assist you today?");
         } else {
             panic!("Expected Text content");
         }
-        assert_eq!(usage.usage.input_tokens, Some(TEST_INPUT_TOKENS));
-        assert_eq!(usage.usage.output_tokens, Some(TEST_OUTPUT_TOKENS));
-        assert_eq!(usage.usage.total_tokens, Some(TEST_TOTAL_TOKENS));
-        assert_eq!(usage.model, model_name);
-        assert_eq!(usage.cost, Some(dec!(0.00018)));
 
-        mock_server.verify().await;
+        // Verify usage parsing
+        assert_eq!(usage.input_tokens, Some(12));
+        assert_eq!(usage.output_tokens, Some(15));
+        assert_eq!(usage.total_tokens, Some(27));
+
         Ok(())
     }
 
-    #[tokio::test]
-    async fn test_complete_tool_request() -> Result<()> {
-        // Mock response for tool calling
-        let response_body = create_mock_open_ai_response_with_tools("gpt-4o");
+    #[test]
+    fn test_response_parsing_tool_calls() -> Result<()> {
+        let response = json!({
+            "id": "chatcmpl-123",
+            "object": "chat.completion",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": null,
+                    "tool_calls": [{
+                        "id": "call_123",
+                        "type": "function",
+                        "function": {
+                            "name": "get_weather",
+                            "arguments": "{\"location\":\"San Francisco, CA\"}"
+                        }
+                    }]
+                },
+                "finish_reason": "stop"
+            }],
+            "usage": {
+                "prompt_tokens": 12,
+                "completion_tokens": 15,
+                "total_tokens": 27
+            },
+            "model": "gpt-4o"
+        });
 
-        let (mock_server, provider) = _setup_mock_response(response_body).await;
+        let message = openai_response_to_message(response.clone())?;
+        let usage = get_openai_usage(&response)?;
 
-        // Input messages
-        let messages = vec![Message::user().with_text("What's the weather in San Francisco?")];
-
-        // Call the complete method
-        let (message, usage) = provider
-            .complete_internal(
-                "You are a helpful assistant.",
-                &messages,
-                &[create_test_tool()],
-            )
-            .await?;
-
-        // Assert the response
+        // Verify tool call parsing
         if let MessageContent::ToolRequest(tool_request) = &message.content[0] {
             let tool_call = tool_request.tool_call.as_ref().unwrap();
-            assert_eq!(tool_call.name, TEST_TOOL_FUNCTION_NAME);
-            assert_eq!(tool_call.arguments, get_expected_function_call_arguments());
+            assert_eq!(tool_call.name, "get_weather");
+            assert_eq!(
+                tool_call.arguments,
+                json!({"location": "San Francisco, CA"})
+            );
         } else {
-            panic!("Expected ToolCall content");
+            panic!("Expected ToolRequest content");
         }
 
-        assert_eq!(usage.usage.input_tokens, Some(TEST_INPUT_TOKENS));
-        assert_eq!(usage.usage.output_tokens, Some(TEST_OUTPUT_TOKENS));
-        assert_eq!(usage.usage.total_tokens, Some(TEST_TOTAL_TOKENS));
+        // Verify usage parsing
+        assert_eq!(usage.input_tokens, Some(12));
+        assert_eq!(usage.output_tokens, Some(15));
+        assert_eq!(usage.total_tokens, Some(27));
 
-        mock_server.verify().await;
+        Ok(())
+    }
+
+    #[test]
+    fn test_error_response_parsing() -> Result<()> {
+        let error_response = json!({
+            "error": {
+                "message": "This model's maximum context length is 4097 tokens.",
+                "type": "invalid_request_error",
+                "code": "context_length_exceeded"
+            }
+        });
+
+        let err = check_openai_context_length_error(&error_response["error"]);
+        assert!(err.is_some());
+        
         Ok(())
     }
 }

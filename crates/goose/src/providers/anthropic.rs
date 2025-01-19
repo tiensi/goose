@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::time::Duration;
 
-use super::base::{Moderation, ModerationResult, Provider, ProviderUsage, Usage};
+use super::base::{Provider, ProviderUsage, Usage};
 use super::configs::ModelConfig;
 use super::model_pricing::cost;
 use super::model_pricing::model_pricing_for;
@@ -258,7 +258,7 @@ impl Provider for AnthropicProvider {
             cost
         )
     )]
-    async fn complete_internal(
+    async fn complete(
         &self,
         system: &str,
         messages: &[Message],
@@ -339,45 +339,25 @@ impl Provider for AnthropicProvider {
     }
 }
 
-#[async_trait]
-impl Moderation for AnthropicProvider {
-    async fn moderate_content(&self, _content: &str) -> Result<ModerationResult> {
-        Ok(ModerationResult::new(false, None, None))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rust_decimal_macros::dec;
     use serde_json::json;
-    use wiremock::matchers::{header, method, path};
-    use wiremock::{Mock, MockServer, ResponseTemplate};
 
-    async fn setup_mock_server(response_body: Value) -> (MockServer, AnthropicProvider) {
-        let mock_server = MockServer::start().await;
-        Mock::given(method("POST"))
-            .and(path("/v1/messages"))
-            .and(header("x-api-key", "test_api_key"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(response_body))
-            .mount(&mock_server)
-            .await;
-
-        let provider = AnthropicProvider {
+    fn create_provider() -> AnthropicProvider {
+        AnthropicProvider {
             client: Client::builder().build().unwrap(),
-            host: mock_server.uri(),
+            host: "https://api.anthropic.com".to_string(),
             api_key: "test_api_key".to_string(),
             model: ModelConfig::new("claude-3-sonnet-20241022".to_string())
                 .with_temperature(Some(0.7))
                 .with_context_limit(Some(200_000)),
-        };
-
-        (mock_server, provider)
+        }
     }
 
-    #[tokio::test]
-    async fn test_complete_basic() -> Result<()> {
-        let response_body = json!({
+    #[test]
+    fn test_parse_text_response() -> Result<()> {
+        let response = json!({
             "id": "msg_123",
             "type": "message",
             "role": "assistant",
@@ -396,13 +376,8 @@ mod tests {
             }
         });
 
-        let (_, provider) = setup_mock_server(response_body).await;
-
-        let messages = vec![Message::user().with_text("Hello?")];
-
-        let (message, usage) = provider
-            .complete_internal("You are a helpful assistant.", &messages, &[])
-            .await?;
+        let message = AnthropicProvider::parse_anthropic_response(response.clone())?;
+        let usage = create_provider().get_usage(&response)?;
 
         if let MessageContent::Text(text) = &message.content[0] {
             assert_eq!(text.text, "Hello! How can I assist you today?");
@@ -410,18 +385,16 @@ mod tests {
             panic!("Expected Text content");
         }
 
-        assert_eq!(usage.usage.input_tokens, Some(12));
-        assert_eq!(usage.usage.output_tokens, Some(15));
-        assert_eq!(usage.usage.total_tokens, Some(27));
-        assert_eq!(usage.model, "claude-3-5-sonnet-latest");
-        assert_eq!(usage.cost, Some(dec!(0.000261)));
+        assert_eq!(usage.input_tokens, Some(12));
+        assert_eq!(usage.output_tokens, Some(15));
+        assert_eq!(usage.total_tokens, Some(27));
 
         Ok(())
     }
 
-    #[tokio::test]
-    async fn test_complete_with_tools() -> Result<()> {
-        let response_body = json!({
+    #[test]
+    fn test_parse_tool_response() -> Result<()> {
+        let response = json!({
             "id": "msg_123",
             "type": "message",
             "role": "assistant",
@@ -444,26 +417,8 @@ mod tests {
             }
         });
 
-        let (_, provider) = setup_mock_server(response_body).await;
-
-        let messages = vec![Message::user().with_text("What is 2 + 2?")];
-        let tool = Tool::new(
-            "calculator",
-            "Calculate mathematical expressions",
-            json!({
-                "type": "object",
-                "properties": {
-                    "expression": {
-                        "type": "string",
-                        "description": "The mathematical expression to evaluate"
-                    }
-                }
-            }),
-        );
-
-        let (message, usage) = provider
-            .complete_internal("You are a helpful assistant.", &messages, &[tool])
-            .await?;
+        let message = AnthropicProvider::parse_anthropic_response(response.clone())?;
+        let usage = create_provider().get_usage(&response)?;
 
         if let MessageContent::ToolRequest(tool_request) = &message.content[0] {
             let tool_call = tool_request.tool_call.as_ref().unwrap();
@@ -473,50 +428,86 @@ mod tests {
             panic!("Expected ToolRequest content");
         }
 
-        assert_eq!(usage.usage.input_tokens, Some(15));
-        assert_eq!(usage.usage.output_tokens, Some(20));
-        assert_eq!(usage.usage.total_tokens, Some(35));
+        assert_eq!(usage.input_tokens, Some(15));
+        assert_eq!(usage.output_tokens, Some(20));
+        assert_eq!(usage.total_tokens, Some(35));
 
         Ok(())
     }
 
-    #[tokio::test]
-    async fn test_empty_messages() -> Result<()> {
-        let response_body = json!({
-            "id": "msg_123",
-            "type": "message",
-            "role": "assistant",
-            "content": [{
-                "type": "text",
-                "text": "Hello!"
-            }],
-            "model": "claude-3-sonnet-20240229",
-            "stop_reason": "end_turn",
-            "stop_sequence": null,
-            "usage": {
-                "input_tokens": 12,
-                "output_tokens": 15
-            }
-        });
-
-        let (_, provider) = setup_mock_server(response_body).await;
-
-        // Create a message with empty content
+    #[test]
+    fn test_message_to_anthropic_spec() {
         let messages = vec![
-            Message::user().with_text(""),
             Message::user().with_text("Hello"),
+            Message::assistant().with_text("Hi there"),
+            Message::user().with_text("How are you?"),
         ];
 
-        let (message, _) = provider
-            .complete("You are a helpful assistant.", &messages, &[])
-            .await?;
+        let spec = AnthropicProvider::messages_to_anthropic_spec(&messages);
 
-        if let MessageContent::Text(text) = &message.content[0] {
-            assert_eq!(text.text, "Hello!");
-        } else {
-            panic!("Expected Text content");
-        }
+        assert_eq!(spec.len(), 3);
+        assert_eq!(spec[0]["role"], "user");
+        assert_eq!(spec[0]["content"][0]["type"], "text");
+        assert_eq!(spec[0]["content"][0]["text"], "Hello");
+        assert_eq!(spec[1]["role"], "assistant");
+        assert_eq!(spec[1]["content"][0]["text"], "Hi there");
+        assert_eq!(spec[2]["role"], "user");
+        assert_eq!(spec[2]["content"][0]["text"], "How are you?");
+    }
 
-        Ok(())
+    #[test]
+    fn test_tools_to_anthropic_spec() {
+        let tools = vec![
+            Tool::new(
+                "calculator",
+                "Calculate mathematical expressions",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "expression": {
+                            "type": "string",
+                            "description": "The mathematical expression to evaluate"
+                        }
+                    }
+                }),
+            ),
+            Tool::new(
+                "weather",
+                "Get weather information",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string",
+                            "description": "The location to get weather for"
+                        }
+                    }
+                }),
+            ),
+        ];
+
+        let spec = AnthropicProvider::tools_to_anthropic_spec(&tools);
+
+        assert_eq!(spec.len(), 2);
+        assert_eq!(spec[0]["name"], "calculator");
+        assert_eq!(spec[0]["description"], "Calculate mathematical expressions");
+        assert_eq!(spec[1]["name"], "weather");
+        assert_eq!(spec[1]["description"], "Get weather information");
+        
+        // Verify cache control is added to last tool
+        assert!(spec[1].get("cache_control").is_some());
+    }
+
+    #[test]
+    fn test_system_to_anthropic_spec() {
+        let system = "You are a helpful assistant.";
+        let spec = AnthropicProvider::system_to_anthropic_spec(system);
+
+        assert!(spec.is_array());
+        let spec_array = spec.as_array().unwrap();
+        assert_eq!(spec_array.len(), 1);
+        assert_eq!(spec_array[0]["type"], "text");
+        assert_eq!(spec_array[0]["text"], system);
+        assert!(spec_array[0].get("cache_control").is_some());
     }
 }

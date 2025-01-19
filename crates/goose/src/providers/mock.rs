@@ -1,6 +1,5 @@
-use super::base::{Moderation, ModerationResult, ProviderUsage};
+use super::base::{Provider, ProviderUsage, Usage};
 use crate::message::Message;
-use crate::providers::base::{Provider, Usage};
 use crate::providers::configs::ModelConfig;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -40,7 +39,7 @@ impl Provider for MockProvider {
         &self.model_config
     }
 
-    async fn complete_internal(
+    async fn complete(
         &self,
         _system_prompt: &str,
         _messages: &[Message],
@@ -67,9 +66,4 @@ impl Provider for MockProvider {
     }
 }
 
-#[async_trait]
-impl Moderation for MockProvider {
-    async fn moderate_content(&self, _content: &str) -> Result<ModerationResult> {
-        Ok(ModerationResult::new(false, None, None))
-    }
-}
+

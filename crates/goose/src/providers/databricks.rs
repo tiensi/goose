@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::time::Duration;
 
-use super::base::{Moderation, ModerationResult, Provider, ProviderUsage, Usage};
+use super::base::{Provider, ProviderUsage, Usage};
 use super::configs::ModelConfig;
 use super::model_pricing::{cost, model_pricing_for};
 use super::oauth;
@@ -21,7 +21,6 @@ const DEFAULT_CLIENT_ID: &str = "databricks-cli";
 const DEFAULT_REDIRECT_URL: &str = "http://localhost:8020";
 const DEFAULT_SCOPES: &[&str] = &["all-apis"];
 pub const DATABRICKS_DEFAULT_MODEL: &str = "claude-3-5-sonnet-2";
-pub const INPUT_GUARDRAIL: &str = "input_guardrail";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DatabricksAuth {
@@ -127,35 +126,6 @@ impl DatabricksProvider {
 
         handle_response(payload, response).await
     }
-
-    async fn handle_moderation_response(&self, response: reqwest::Response) -> Result<Value> {
-        match response.status() {
-            reqwest::StatusCode::OK => {
-                let payload = response.json().await?;
-                Ok(payload)
-            }
-            reqwest::StatusCode::BAD_REQUEST => {
-                let error_body: Value = response.json().await?;
-
-                // Check if this is a moderation error
-                if let Some(finish_reason) = error_body.get("finishReason") {
-                    if finish_reason == "input_guardrail_triggered" {
-                        return Ok(error_body);
-                    }
-                }
-                // Not a moderation error, return the original error
-                Err(anyhow::anyhow!("Bad request: {}", error_body))
-            }
-            status => {
-                let error_body: Value = response.json().await?;
-                Err(anyhow::anyhow!(
-                    "Moderation request failed with status: {}\nPayload {}",
-                    status,
-                    error_body
-                ))
-            }
-        }
-    }
 }
 
 #[async_trait]
@@ -176,7 +146,7 @@ impl Provider for DatabricksProvider {
             cost
         )
     )]
-    async fn complete_internal(
+    async fn complete(
         &self,
         system: &str,
         messages: &[Message],
@@ -248,289 +218,186 @@ impl Provider for DatabricksProvider {
     }
 }
 
-#[async_trait]
-impl Moderation for DatabricksProvider {
-    async fn moderate_content_internal(&self, content: &str) -> Result<ModerationResult> {
-        let url = format!(
-            "{}/serving-endpoints/moderation/invocations",
-            self.host.trim_end_matches('/')
-        );
-
-        let auth_header = self.ensure_auth_header().await?;
-        let payload = json!({
-            "messages": [
-                {
-                    "role": "user",
-                    "content": content
-                }
-            ]
-        });
-
-        let response = self
-            .client
-            .post(&url)
-            .header("Authorization", auth_header)
-            .json(&payload)
-            .send()
-            .await?;
-
-        // let response: Value = response.json().await?;
-        // let response = handle_response(payload, response).await??;
-        let response = self.handle_moderation_response(response).await?;
-
-        // Check if we got a moderation result
-        if let Some(input_guardrail) = response.get(INPUT_GUARDRAIL) {
-            if let Some(first_result) = input_guardrail.as_array().and_then(|arr| arr.first()) {
-                if let Some(flagged) = first_result.get("flagged").and_then(|f| f.as_bool()) {
-                    // Extract categories if they exist and if content is flagged
-                    let categories = if flagged {
-                        first_result
-                            .get("categories")
-                            .and_then(|cats| cats.as_object())
-                            .map(|cats| {
-                                cats.iter()
-                                    .filter(|(_, v)| v.as_bool().unwrap_or(false))
-                                    .map(|(k, _)| k.to_string())
-                                    .collect::<Vec<_>>()
-                            })
-                    } else {
-                        None
-                    };
-
-                    return Ok(ModerationResult::new(flagged, categories, None));
-                }
-            }
-        }
-
-        // If we get here, there was no moderation result, so the content is considered safe
-        Ok(ModerationResult::new(false, None, None))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::message::MessageContent;
-    use crate::providers::mock_server::{
-        create_mock_open_ai_response, TEST_INPUT_TOKENS, TEST_OUTPUT_TOKENS, TEST_TOTAL_TOKENS,
-    };
-
+    use mcp_core::Tool;
     use serde_json::json;
-    use wiremock::matchers::{body_json, header, method, path};
-    use wiremock::{Mock, MockServer, ResponseTemplate};
 
-    fn create_test_provider(mock_server: &MockServer) -> DatabricksProvider {
-        DatabricksProvider {
-            client: Client::builder().build().unwrap(),
-            host: mock_server.uri(),
-            auth: DatabricksAuth::Token("test_token".to_string()),
-            model: ModelConfig::new("my-databricks-model".to_string()),
-            image_format: ImageFormat::Anthropic,
-        }
-    }
-
-    #[tokio::test]
-    async fn test_moderation_flagged_content() -> Result<()> {
-        // Start a mock server
-        let mock_server = MockServer::start().await;
-
-        // Mock response for moderation with flagged content
-        let mock_response = json!({
-            "usage": {
-                "prompt_tokens": 199,
-                "total_tokens": 199
-            },
-            "input_guardrail": [{
-                "flagged": true,
-                "categories": {
-                    "violent-crimes": false,
-                    "non-violent-crimes": true,
-                    "sex-crimes": false,
-                    "child-exploitation": false,
-                    "specialized-advice": false,
-                    "privacy": false,
-                    "intellectual-property": false,
-                    "indiscriminate-weapons": false,
-                    "hate": false,
-                    "self-harm": false,
-                    "sexual-content": false
-                }
-            }],
-            "finishReason": "input_guardrail_triggered"
-        });
-
-        // Set up the mock
-        Mock::given(method("POST"))
-            .and(path("/serving-endpoints/moderation/invocations"))
-            .and(header("Authorization", "Bearer test_token"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(mock_response))
-            .expect(1)
-            .mount(&mock_server)
-            .await;
-
-        let provider = create_test_provider(&mock_server);
-
-        // Test moderation
-        let result = provider.moderate_content("test content").await?;
-
-        assert!(result.flagged);
-        assert_eq!(result.categories.unwrap(), vec!["non-violent-crimes"]);
-        assert!(result.category_scores.is_none());
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_moderation_safe_content() -> Result<()> {
-        // Start a mock server
-        let mock_server = MockServer::start().await;
-
-        // Mock response for safe content (regular chat response)
-        let mock_response = json!({
-            "usage": {
-                "prompt_tokens": 10,
-                "completion_tokens": 20,
-                "total_tokens": 30
-            },
-            "choices": [{
-                "message": {
-                    "role": "assistant",
-                    "content": "This is a safe response"
+    fn create_test_tool() -> Tool {
+        Tool::new(
+            "get_weather",
+            "Gets the current weather for a location",
+            json!({
+                "type": "object",
+                "properties": {
+                    "location": {
+                        "type": "string",
+                        "description": "The city and state, e.g. New York, NY"
+                    }
                 },
-                "finish_reason": "stop"
-            }]
-        });
-
-        // Set up the mock
-        Mock::given(method("POST"))
-            .and(path("/serving-endpoints/moderation/invocations"))
-            .and(header("Authorization", "Bearer test_token"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(mock_response))
-            .expect(1)
-            .mount(&mock_server)
-            .await;
-
-        let provider = create_test_provider(&mock_server);
-
-        // Test moderation
-        let result = provider.moderate_content("safe content").await?;
-
-        assert!(!result.flagged);
-        assert!(result.categories.is_none());
-        assert!(result.category_scores.is_none());
-
-        Ok(())
+                "required": ["location"]
+            }),
+        )
     }
 
-    #[tokio::test]
-    async fn test_moderation_explicit_safe() -> Result<()> {
-        // Start a mock server
-        let mock_server = MockServer::start().await;
-
-        // Mock response for explicitly safe content
-        let mock_response = json!({
-            "usage": {
-                "prompt_tokens": 199,
-                "total_tokens": 199
-            },
-            "input_guardrail": [{
-                "flagged": false,
-                "categories": {
-                    "violent-crimes": false,
-                    "non-violent-crimes": false,
-                    "sex-crimes": false,
-                    "child-exploitation": false,
-                    "specialized-advice": false,
-                    "privacy": false,
-                    "intellectual-property": false,
-                    "indiscriminate-weapons": false,
-                    "hate": false,
-                    "self-harm": false,
-                    "sexual-content": false
-                }
-            }]
-        });
-
-        // Set up the mock
-        Mock::given(method("POST"))
-            .and(path("/serving-endpoints/moderation/invocations"))
-            .and(header("Authorization", "Bearer test_token"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(mock_response))
-            .expect(1)
-            .mount(&mock_server)
-            .await;
-
-        let provider = create_test_provider(&mock_server);
-
-        // Test moderation
-        let result = provider.moderate_content("explicitly safe content").await?;
-
-        assert!(!result.flagged);
-        assert!(result.categories.is_none());
-        assert!(result.category_scores.is_none());
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_databricks_completion_with_token() -> Result<()> {
-        // Start a mock server
-        let mock_server = MockServer::start().await;
-
-        // Mock response for completion
-        let mock_response = create_mock_open_ai_response("my-databricks-model", "Hello!");
-
-        let _moderator_mock_response = json!({
-            "usage": {
-                "prompt_tokens": 10,
-                "completion_tokens": 20,
-                "total_tokens": 30
-            },
-            "choices": [{
-                "message": {
-                    "role": "assistant",
-                    "content": "This is a safe response"
-                },
-                "finish_reason": "stop"
-            }]
-        });
-
-        // Expected request body
+    #[test]
+    fn test_request_payload_construction() -> Result<()> {
+        let model = ModelConfig::new(DATABRICKS_DEFAULT_MODEL.to_string());
+        let messages = vec![Message::user().with_text("Hello?")];
         let system = "You are a helpful assistant.";
-        let expected_request_body = json!({
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": "Hello"}
-            ]
+        let tools = vec![create_test_tool()];
+
+        let mut messages_array = vec![json!({ "role": "system", "content": system })];
+        messages_array.extend(messages_to_openai_spec(
+            &messages,
+            &ImageFormat::Anthropic,
+            false,
+        ));
+
+        let mut payload = json!({
+            "messages": messages_array,
+            "temperature": model.temperature.unwrap_or(0.7)
         });
-        // Set up the mock to intercept the request and respond with the mocked response
-        Mock::given(method("POST"))
-            .and(path("/serving-endpoints/my-databricks-model/invocations"))
-            .and(header("Authorization", "Bearer test_token"))
-            .and(body_json(expected_request_body.clone()))
-            .respond_with(ResponseTemplate::new(200).set_body_json(mock_response))
-            .expect(1) // Expect exactly one matching request
-            .mount(&mock_server)
-            .await;
+        payload["tools"] = json!(tools_to_openai_spec(&tools)?);
 
-        let provider = create_test_provider(&mock_server);
+        // Verify payload structure
+        let messages = payload["messages"].as_array().unwrap();
+        assert_eq!(messages.len(), 2); // System + user message
+        assert_eq!(messages[0]["role"], "system");
+        assert_eq!(messages[0]["content"], system);
+        assert_eq!(messages[1]["role"], "user");
+        assert_eq!(messages[1]["content"], "Hello?");
 
-        // Prepare input
-        let messages = vec![Message::user().with_text("Hello")];
-        let tools = vec![]; // Empty tools list
+        let tools = payload["tools"].as_array().unwrap();
+        assert_eq!(tools.len(), 1);
+        assert_eq!(tools[0]["type"], "function");
+        assert_eq!(tools[0]["function"]["name"], "get_weather");
 
-        // Call the complete method
-        let (reply_message, reply_usage) = provider.complete(system, &messages, &tools).await?;
+        Ok(())
+    }
 
-        // Assert the response
-        if let MessageContent::Text(text) = &reply_message.content[0] {
-            assert_eq!(text.text, "Hello!");
+    #[test]
+    fn test_response_parsing_basic() -> Result<()> {
+        let response = json!({
+            "id": "chatcmpl-123",
+            "object": "chat.completion",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "Hello! How can I assist you today?",
+                    "tool_calls": null
+                },
+                "finish_reason": "stop"
+            }],
+            "usage": {
+                "prompt_tokens": 12,
+                "completion_tokens": 15,
+                "total_tokens": 27
+            },
+            "model": DATABRICKS_DEFAULT_MODEL
+        });
+
+        let message = openai_response_to_message(response.clone())?;
+        let usage = get_openai_usage(&response)?;
+
+        // Verify message parsing
+        if let MessageContent::Text(text) = &message.content[0] {
+            assert_eq!(text.text, "Hello! How can I assist you today?");
         } else {
             panic!("Expected Text content");
         }
-        assert_eq!(reply_usage.usage.input_tokens, Some(TEST_INPUT_TOKENS));
-        assert_eq!(reply_usage.usage.output_tokens, Some(TEST_OUTPUT_TOKENS));
-        assert_eq!(reply_usage.usage.total_tokens, Some(TEST_TOTAL_TOKENS));
+
+        // Verify usage parsing
+        assert_eq!(usage.input_tokens, Some(12));
+        assert_eq!(usage.output_tokens, Some(15));
+        assert_eq!(usage.total_tokens, Some(27));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_response_parsing_tool_calls() -> Result<()> {
+        let response = json!({
+            "id": "chatcmpl-123",
+            "object": "chat.completion",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": null,
+                    "tool_calls": [{
+                        "id": "call_123",
+                        "type": "function",
+                        "function": {
+                            "name": "get_weather",
+                            "arguments": "{\"location\":\"San Francisco, CA\"}"
+                        }
+                    }]
+                },
+                "finish_reason": "stop"
+            }],
+            "usage": {
+                "prompt_tokens": 12,
+                "completion_tokens": 15,
+                "total_tokens": 27
+            },
+            "model": DATABRICKS_DEFAULT_MODEL
+        });
+
+        let message = openai_response_to_message(response.clone())?;
+        let usage = get_openai_usage(&response)?;
+
+        // Verify tool call parsing
+        if let MessageContent::ToolRequest(tool_request) = &message.content[0] {
+            let tool_call = tool_request.tool_call.as_ref().unwrap();
+            assert_eq!(tool_call.name, "get_weather");
+            assert_eq!(
+                tool_call.arguments,
+                json!({"location": "San Francisco, CA"})
+            );
+        } else {
+            panic!("Expected ToolRequest content");
+        }
+
+        // Verify usage parsing
+        assert_eq!(usage.input_tokens, Some(12));
+        assert_eq!(usage.output_tokens, Some(15));
+        assert_eq!(usage.total_tokens, Some(27));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_error_response_parsing() -> Result<()> {
+        let error_response = json!({
+            "error": {
+                "message": "This model's maximum context length is 4097 tokens.",
+                "type": "invalid_request_error",
+                "code": "context_length_exceeded"
+            }
+        });
+
+        let err = check_openai_context_length_error(&error_response["error"]);
+        assert!(err.is_some());
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_auth_token_construction() -> Result<()> {
+        let provider = DatabricksProvider {
+            client: Client::builder().build().unwrap(),
+            host: "https://example.com".to_string(),
+            auth: DatabricksAuth::Token("test-token".to_string()),
+            model: ModelConfig::new(DATABRICKS_DEFAULT_MODEL.to_string()),
+            image_format: ImageFormat::Anthropic,
+        };
+
+        let auth_header = tokio::runtime::Runtime::new()?.block_on(provider.ensure_auth_header())?;
+        assert_eq!(auth_header, "Bearer test-token");
 
         Ok(())
     }
