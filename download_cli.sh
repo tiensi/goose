@@ -127,7 +127,7 @@ if [[ ":$PATH:" != *":$GOOSE_BIN_DIR:"* ]]; then
 fi
 
 # --- 8) Auto-configure Goose (Optional) ---
-CONFIG_ARGS=""
+CONFIG_ARGS="-n default"
 if [ -n "${GOOSE_PROVIDER:-}" ]; then
   CONFIG_ARGS="$CONFIG_ARGS -p $GOOSE_PROVIDER"
 fi
@@ -135,20 +135,11 @@ if [ -n "${GOOSE_MODEL:-}" ]; then
   CONFIG_ARGS="$CONFIG_ARGS -m $GOOSE_MODEL"
 fi
 
-# --- 8) Auto-configure Goose (Optional) ---
-CONFIG_ARGS=""
-[ -n "${GOOSE_PROVIDER:-}" ] && CONFIG_ARGS="$CONFIG_ARGS -p $GOOSE_PROVIDER"
-[ -n "${GOOSE_MODEL:-}" ] && CONFIG_ARGS="$CONFIG_ARGS -m $GOOSE_MODEL"
+echo ""
+echo "Configuring Goose with: '$CONFIG_ARGS'"
+echo ""
+"$GOOSE_BIN_DIR/$OUT_FILE" configure $CONFIG_ARGS
 
-if [ -n "${GOOSE_PROVIDER:-}" ] || [ -n "${GOOSE_MODEL:-}" ]; then
-  echo ""
-  echo "Configuring Goose with: '$CONFIG_ARGS'"
-  echo ""
-  "$GOOSE_BIN_DIR/$OUT_FILE" configure $CONFIG_ARGS
-  echo ""
-  echo "Goose installed successfully! Run '$OUT_FILE session' to get started."
-else
-  echo ""
-  echo "Goose installed successfully! Run '$OUT_FILE configure' to configure Goose and then run '$OUT_FILE session' to get started."
-fi
+echo ""
+echo "Goose installed successfully! Run '$OUT_FILE session' to get started."
 echo ""
