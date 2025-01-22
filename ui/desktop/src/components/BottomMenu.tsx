@@ -50,7 +50,7 @@ export default function BottomMenu({ hasMessages }) {
     <div className="flex justify-between relative border-t dark:border-gray-700 text-bottom-menu dark:text-bottom-menu-dark pl-[15px] text-[10px] h-[30px] leading-[30px] align-middle bg-bottom-menu-background dark:bg-bottom-menu-background-dark rounded-b-2xl">
       {/* Directory Chooser - Always visible */}
       <span
-        className="cursor-pointer"
+        className="cursor-pointer flex items-center"
         onClick={async () => {
           console.log("Opening directory chooser");
           if (hasMessages) {
@@ -61,6 +61,7 @@ export default function BottomMenu({ hasMessages }) {
         }}
       >
         Working in {window.appConfig.get("GOOSE_WORKING_DIR")}
+        <ChevronDown className="w-4 h-4 ml-1" />
       </span>
 
       {/* Model Selector Dropdown - Only in development */}
