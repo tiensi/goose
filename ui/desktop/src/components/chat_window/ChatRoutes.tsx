@@ -1,9 +1,9 @@
-import React from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
-import { ChatContent } from "../../ChatWindow"
-import Settings  from "../settings/Settings"
-import MoreModelsSettings from "../settings/models/MoreModels";
-import ConfigureProviders from "../settings/providers/ConfigureProviders";
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { ChatContent } from '../../ChatWindow';
+import Settings from '../settings/Settings';
+import MoreModelsSettings from '../settings/models/MoreModels';
+import ConfigureProviders from '../settings/providers/ConfigureProviders';
 
 export const ChatRoutes = ({
   chats,
