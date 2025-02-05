@@ -5,7 +5,7 @@
 <meta name="generator" content="Docusaurus v3.7.0">
 <title data-rh="true">Goose Architecture | codename goose</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:image" content="https://block.github.io/goose/img/home-banner.png"><meta data-rh="true" name="twitter:image" content="https://block.github.io/goose/img/home-banner.png"><meta data-rh="true" property="og:url" content="https://block.github.io/goose/docs/goose-architecture/"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="Goose Architecture | codename goose"><meta data-rh="true" name="description" content="Goose, an open source AI Agent, builds upon the basic interaction framework of Large Language Models (LLMs), which primarily functions as a text-based conversational interface. It processes text input and generates text output. This &quot;text in, text out&quot; approach is enhanced with tool integrations, which allows the AI agent to complete tasks, creating Goose."><meta data-rh="true" property="og:description" content="Goose, an open source AI Agent, builds upon the basic interaction framework of Large Language Models (LLMs), which primarily functions as a text-based conversational interface. It processes text input and generates text output. This &quot;text in, text out&quot; approach is enhanced with tool integrations, which allows the AI agent to complete tasks, creating Goose."><link data-rh="true" rel="icon" href="/goose/img/favicon.ico"><link data-rh="true" rel="canonical" href="https://block.github.io/goose/docs/goose-architecture/"><link data-rh="true" rel="alternate" href="https://block.github.io/goose/docs/goose-architecture/" hreflang="en"><link data-rh="true" rel="alternate" href="https://block.github.io/goose/docs/goose-architecture/" hreflang="x-default"><link rel="alternate" type="application/rss+xml" href="/goose/blog/rss.xml" title="codename goose RSS Feed">
 <link rel="alternate" type="application/atom+xml" href="/goose/blog/atom.xml" title="codename goose Atom Feed"><link rel="stylesheet" href="/goose/assets/css/styles.e2351e3a.css">
-<script src="/goose/assets/js/runtime~main.fe6f15a9.js" defer="defer"></script>
+<script src="/goose/assets/js/runtime~main.e9260dab.js" defer="defer"></script>
 <script src="/goose/assets/js/main.0445fd13.js" defer="defer"></script>
 </head>
 <body class="navigation-with-keyboard">
@@ -13,11 +13,17 @@
 <p>Goose, an open source AI Agent, builds upon the basic interaction framework of Large Language Models (LLMs), which primarily functions as a text-based conversational interface. It processes text input and generates text output. This &quot;text in, text out&quot; approach is enhanced with tool integrations, which allows the AI agent to complete tasks, creating Goose.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="goose-components">Goose Components<a href="#goose-components" class="hash-link" aria-label="Direct link to Goose Components" title="Direct link to Goose Components">​</a></h2>
 <p>Goose operates using three main components, the <strong>interface</strong>, the <strong>agent</strong>, and the <strong>connected <a href="/goose/docs/getting-started/using-extensions">extensions</a></strong>.</p>
-<ol>
-<li><strong>Interface</strong>: This is the desktop application or CLI that the user is using to run Goose. It collects input from the user and displays outputs to the user</li>
-<li><strong>Agent</strong>: The agent runs Goose&#x27;s core logic, managing the interactive loop.</li>
-<li><strong>Extensions</strong>: Extensions are components that provide specific tools and capabilities for the agent to use. These tools enable Goose to perform actions such as running commands and managing files.</li>
-</ol>
+<ul>
+<li>
+<p><strong>Interface</strong>: This is the desktop application or CLI that the user is using to run Goose. It collects input from the user and displays outputs to the user</p>
+</li>
+<li>
+<p><strong>Agent</strong>: The agent runs Goose&#x27;s core logic, managing the interactive loop.</p>
+</li>
+<li>
+<p><strong>Extensions</strong>: Extensions are components that provide specific tools and capabilities for the agent to use. These tools enable Goose to perform actions such as running commands and managing files.</p>
+</li>
+</ul>
 <p>In a typical session, the interface spins up an instance of the agent, which then connects to one or more extensions simultaneously. The interface can also create multiple agents to handle different tasks concurrently. Extensions and the interactive loop are important parts of Goose&#x27;s functionality. The next sections will explain how Goose connects to extensions and processes user requests.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="interoperability-with-extensions">Interoperability with Extensions<a href="#interoperability-with-extensions" class="hash-link" aria-label="Direct link to Interoperability with Extensions" title="Direct link to Interoperability with Extensions">​</a></h2>
 <p><a href="https://modelcontextprotocol.io/" target="_blank" rel="noopener noreferrer">Model Context Protocol (MCP)</a> is an open standard that allows for interoperability between data sources and AI agents. Goose utilizes MCP to connect to <a href="https://github.com/modelcontextprotocol/servers?tab=readme-ov-file#model-context-protocol-servers" target="_blank" rel="noopener noreferrer">MCP systems/servers</a>. In Goose, these systems/servers are referred to as extensions.</p>
@@ -29,28 +35,22 @@
 <p>Let&#x27;s take a closer look at the interactive loop shown above.</p>
 <ol>
 <li>
-<p><strong>Human Request</strong>
-The process begins and ends with you. Once you give Goose a request, question, command, or problem to solve, the flow begins.</p>
+<p><strong>Human Request</strong>: The process begins and ends with you. Once you give Goose a request, question, command, or problem to solve, the flow begins.</p>
 </li>
 <li>
-<p><strong>Provider Chat</strong>
-Goose sends your request along with a list of available tools to the <a href="/goose/docs/getting-started/providers">LLM provider</a> you&#x27;ve connected. The provider processes it, and if necessary, creates a tool call as part of its response.</p>
+<p><strong>Provider Chat</strong>: Goose sends your request along with a list of available tools to the <a href="/goose/docs/getting-started/providers">LLM provider</a> you&#x27;ve connected. The provider processes it, and if necessary, creates a tool call as part of its response.</p>
 </li>
 <li>
-<p><strong>Model Extension Call</strong>
-The LLM is capable of creating a tool call request but not able to execute it, that&#x27;s when Goose steps in. Goose takes the tool call which is formatted in JSON, runs it, and gathers the results.</p>
+<p><strong>Model Extension Call</strong>: The LLM is capable of creating a tool call request but not able to execute it, that&#x27;s when Goose steps in. Goose takes the tool call which is formatted in JSON, runs it, and gathers the results.</p>
 </li>
 <li>
-<p><strong>Response to Model</strong>
-After executing the tool call, Goose sends the results back to the model. If more extensions are needed, those steps will repeat.</p>
+<p><strong>Response to Model</strong>: After executing the tool call, Goose sends the results back to the model. If more extensions are needed, those steps will repeat.</p>
 </li>
 <li>
-<p><strong>Context Revision</strong>
-Goose will remove any old or irrelevant information, ensuring the LLM focuses solely on the information that matters the most. This helps with token management.</p>
+<p><strong>Context Revision</strong>: Goose will remove any old or irrelevant information, ensuring the LLM focuses solely on the information that matters the most. This helps with token management.</p>
 </li>
 <li>
-<p><strong>Model Response</strong>
-Once all the tool calls are done, the LLM sends a final response back to you and restarts the loop once you respond.</p>
+<p><strong>Model Response</strong>: Once all the tool calls are done, the LLM sends a final response back to you and restarts the loop once you respond.</p>
 </li>
 </ol>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="error-handling-in-goose">Error Handling in Goose<a href="#error-handling-in-goose" class="hash-link" aria-label="Direct link to Error Handling in Goose" title="Direct link to Error Handling in Goose">​</a></h2>
