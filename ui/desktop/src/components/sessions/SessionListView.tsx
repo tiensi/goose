@@ -155,9 +155,10 @@ interface SearchContainerElement extends HTMLDivElement {
 interface SessionListViewProps {
   setView: (view: View, viewOptions?: ViewOptions) => void;
   onSelectSession: (sessionId: string) => void;
+  selectedSessionId?: string | null;
 }
 
-const SessionListView: React.FC<SessionListViewProps> = React.memo(({ onSelectSession }) => {
+const SessionListView: React.FC<SessionListViewProps> = React.memo(({ onSelectSession, selectedSessionId }) => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [filteredSessions, setFilteredSessions] = useState<Session[]>([]);
   const [dateGroups, setDateGroups] = useState<DateGroup[]>([]);
@@ -239,6 +240,32 @@ const SessionListView: React.FC<SessionListViewProps> = React.memo(({ onSelectSe
       setDateGroups(memoizedDateGroups);
     });
   }, [memoizedDateGroups]);
+
+  // Scroll to the selected session when returning from session history view
+  useEffect(() => {
+    if (selectedSessionId && showContent && !isLoading) {
+      const observer = new MutationObserver(() => {
+        const sessionCard = containerRef.current?.querySelector(
+            `[session-item-id="${selectedSessionId}"]`
+        );
+
+        if (sessionCard) {
+          observer.disconnect();
+          sessionCard.scrollIntoView({
+            block:"center"
+          });
+        }
+      });
+
+      // Start observing
+      if (containerRef.current) {
+        observer.observe(containerRef.current, {
+          childList: true,
+          subtree: true
+        });
+      }
+    }
+  }, [selectedSessionId, showContent, isLoading]);
 
   // Debounced search effect - performs actual filtering
   useEffect(() => {
@@ -350,6 +377,7 @@ const SessionListView: React.FC<SessionListViewProps> = React.memo(({ onSelectSe
       <Card
         onClick={handleCardClick}
         className="session-item h-full py-3 px-4 hover:shadow-default cursor-pointer transition-all duration-150 flex flex-col justify-between relative group"
+        session-item-id={session.id}
       >
         <button
           onClick={handleEditClick}
