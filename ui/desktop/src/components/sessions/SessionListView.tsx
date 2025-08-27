@@ -183,6 +183,16 @@ const SessionListView: React.FC<SessionListViewProps> = React.memo(({ onSelectSe
 
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Track session to element ref
+  const sessionRefs = useRef<Record<string, HTMLElement>>({});
+  const setSessionRefs = (itemId: string, element: HTMLDivElement | null) => {
+    if (element) {
+      sessionRefs.current[itemId] = element;
+    } else {
+      delete sessionRefs.current[itemId];
+    }
+  };
+
   const loadSessions = useCallback(async () => {
     setIsLoading(true);
     setShowSkeleton(true);
@@ -243,29 +253,15 @@ const SessionListView: React.FC<SessionListViewProps> = React.memo(({ onSelectSe
 
   // Scroll to the selected session when returning from session history view
   useEffect(() => {
-    if (selectedSessionId && showContent && !isLoading) {
-      const observer = new MutationObserver(() => {
-        const sessionCard = containerRef.current?.querySelector(
-            `[session-item-id="${selectedSessionId}"]`
-        );
-
-        if (sessionCard) {
-          observer.disconnect();
-          sessionCard.scrollIntoView({
-            block:"center"
-          });
-        }
-      });
-
-      // Start observing
-      if (containerRef.current) {
-        observer.observe(containerRef.current, {
-          childList: true,
-          subtree: true
+    if (selectedSessionId) {
+      const element = sessionRefs.current[selectedSessionId];
+      if (element) {
+        element.scrollIntoView({
+          block: "center"
         });
       }
     }
-  }, [selectedSessionId, showContent, isLoading]);
+  }, [selectedSessionId, sessions]);
 
   // Debounced search effect - performs actual filtering
   useEffect(() => {
@@ -377,7 +373,7 @@ const SessionListView: React.FC<SessionListViewProps> = React.memo(({ onSelectSe
       <Card
         onClick={handleCardClick}
         className="session-item h-full py-3 px-4 hover:shadow-default cursor-pointer transition-all duration-150 flex flex-col justify-between relative group"
-        session-item-id={session.id}
+        ref={(el) => setSessionRefs(session.id, el)}
       >
         <button
           onClick={handleEditClick}
