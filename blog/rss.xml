@@ -4,10 +4,144 @@
         <title>codename goose Blog</title>
         <link>https://block.github.io/goose/blog</link>
         <description>codename goose Blog</description>
-        <lastBuildDate>Mon, 25 Aug 2025 00:00:00 GMT</lastBuildDate>
+        <lastBuildDate>Thu, 28 Aug 2025 00:00:00 GMT</lastBuildDate>
         <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
         <generator>https://github.com/jpmonette/feed</generator>
         <language>en</language>
+        <item>
+            <title><![CDATA[When AI Becomes Your New Team Member: The Story of Goose Janitor]]></title>
+            <link>https://block.github.io/goose/blog/2025/08/28/ai-teammate</link>
+            <guid>https://block.github.io/goose/blog/2025/08/28/ai-teammate</guid>
+            <pubDate>Thu, 28 Aug 2025 00:00:00 GMT</pubDate>
+            <description><![CDATA[How an engineering team is trialling autonomous AI-powered technical debt cleanup]]></description>
+            <content:encoded><![CDATA[<p><img decoding="async" loading="lazy" alt="blog banner" src="https://block.github.io/goose/assets/images/goose-janitor-129889884d9265d001fe12cbfde03d57.png" width="1200" height="630" class="img_ev3q"></p>
+<p>Over the years, Block's iOS engineers have felt the pain of technical debt accumulating. Feature flags are a specific example of this. Even when successfully rolled out, they tend to linger in the codebase, each one a small weight slowing down development.</p>
+<p>In the early stages of 2025, with a renewed focus on developer acceleration, the Foundation iOS team decided to organize 'Feature Flag Removal Month' - an opportunity for teams in the large iOS monorepo to come together and delete <em>possibly hundreds of thousands of lines of dead code</em>.</p>
+<p>With the serendipitous launch of Goose recipes around the same time, the team wondered could a dedicated recipe aid this effort? <a href="https://www.linkedin.com/in/gemmakbarlow/" target="_blank" rel="noopener noreferrer">Gemma Barlow</a>, a newer iOS engineer on the team, wanted to find out.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="phase-1-making-knowledge-ai-accessible">Phase 1: Making Knowledge AI-Accessible<a href="https://block.github.io/goose/blog/2025/08/28/ai-teammate#phase-1-making-knowledge-ai-accessible" class="hash-link" aria-label="Direct link to Phase 1: Making Knowledge AI-Accessible" title="Direct link to Phase 1: Making Knowledge AI-Accessible">​</a></h2>
+<p>Gemma's first move was to utilize an existing system of <code>.mdc</code>, <code>.goosehints</code> and other symlinked context documents to capture how to safely remove feature flags from the repository.</p>
+<p>She added documentation that allows AI agents to glean enough context to perform their removal work accurately.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="phase-2-validation-across-generations">Phase 2: Validation Across Generations<a href="https://block.github.io/goose/blog/2025/08/28/ai-teammate#phase-2-validation-across-generations" class="hash-link" aria-label="Direct link to Phase 2: Validation Across Generations" title="Direct link to Phase 2: Validation Across Generations">​</a></h2>
+<p>Given AI documentation is designed to work with a variety of tools in use at Block, further iteration and validation was needed. Several weeks of tests and trials later, it was confirmed the approach was accurate enough to be useful <em>and</em> it could handle the three different generations of feature flag implementations that had accumulated:</p>
+<ul>
+<li>super legacy flags the team used way back yonder</li>
+<li>legacy flags that were newer but are now old</li>
+<li>current implementation of feature flags</li>
+</ul>
+<p>This documentation alone would help teams clean up faster. But now, AI could also understand and safely navigate the complexity of real world legacy systems in most scenarios, a win for developer velocity! 🎉</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="phase-3-building-an-ai-team-member">Phase 3: Building an AI Team Member<a href="https://block.github.io/goose/blog/2025/08/28/ai-teammate#phase-3-building-an-ai-team-member" class="hash-link" aria-label="Direct link to Phase 3: Building an AI Team Member" title="Direct link to Phase 3: Building an AI Team Member">​</a></h2>
+<p>This was great progress. Gemma could have stopped here.</p>
+<p>But instead, she utilized Goose recipes to create <strong>Goose Janitor</strong>.</p>
+<p>Goose Janitor acts as new AI team member whose responsibility is to tidy up the code after we're done experimenting. It was heavily inspired by existing <a href="https://block.github.io/goose/recipes/detail/?id=clean-up-feature-flag">Goose recipes</a> and internal discussions and experimentation occurring elsewhere in Block. Here's how it is run:</p>
+<div class="language-bash codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_biex"><pre tabindex="0" class="prism-code language-bash codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><span class="token-line" style="color:#393A34"><span class="token plain">goose run \</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">--recipe .goose/recipes/goose-janitor-flag-removal.yaml \</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">--params feature_flag_key=log-observer-is-enabled \</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">--params variant_to_remain=true \</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">--params create_pr=false</span><br></span></code></pre><div class="buttonGroup__atx"><button type="button" aria-label="Copy code to clipboard" title="Copy" class="clean-btn"><span class="copyButtonIcons_eSgA" aria-hidden="true"><svg viewBox="0 0 24 24" class="copyButtonIcon_y97N"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"></path></svg><svg viewBox="0 0 24 24" class="copyButtonSuccessIcon_LjdS"><path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"></path></svg></span></button></div></div></div>
+<p>The recipe:</p>
+<ul>
+<li>Runs completely autonomously (no human intervention needed)</li>
+<li>Handles different flag implementations, ranging in complexity</li>
+<li>Attempts refactoring for outdated code paths</li>
+<li>Can automatically create draft pull requests, via the Github CLI</li>
+<li>Integrates with <a href="https://github.com/block/xcode-index-mcp" target="_blank" rel="noopener noreferrer">Xcode Index MCP</a> for deep iOS project understanding</li>
+<li>Plans, implements, builds and tests locally to improve the accuracy of the flag removal result</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="the-bigger-picture-ai-first-development">The Bigger Picture: AI-First Development<a href="https://block.github.io/goose/blog/2025/08/28/ai-teammate#the-bigger-picture-ai-first-development" class="hash-link" aria-label="Direct link to The Bigger Picture: AI-First Development" title="Direct link to The Bigger Picture: AI-First Development">​</a></h2>
+<p>Recipes like Goose Janitor represent a fundamental shift in how we think about AI in software development. They can be deployed to:</p>
+<ul>
+<li>Understand complex legacy codebases</li>
+<li>Make safe refactoring decisions</li>
+<li>Integrate seamlessly with existing development workflows</li>
+<li>Provide developer velocity improvements</li>
+<li>Scale across large codebases</li>
+</ul>
+<p>Teams at Block are confident that Goose Janitor will be of assistance in production scale cleanup work.</p>
+<p>This is exactly the kind of work AI should handle: tedious, repetitive, but requiring deep codebase knowledge. By automating portions of their work, developers can focus on what they do best, which is building new features and solving novel problems while AI keeps the codebase clean and maintainable.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="the-ai-first-mindset">The AI-First Mindset<a href="https://block.github.io/goose/blog/2025/08/28/ai-teammate#the-ai-first-mindset" class="hash-link" aria-label="Direct link to The AI-First Mindset" title="Direct link to The AI-First Mindset">​</a></h2>
+<p>This story illustrates what an AI-first approach to legacy codebases looks like in practice.</p>
+<p>Start by making tribal knowledge AI-accessible. Test and validate that AI can actually handle the complexity with enough accuracy to prove useful. Even if manual intervention is required for complex cases, a first pass performed by AI can be a useful boost to productivity. Build automation that scales across teams and focus human energy on high value creative work.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="whats-next">What's Next?<a href="https://block.github.io/goose/blog/2025/08/28/ai-teammate#whats-next" class="hash-link" aria-label="Direct link to What's Next?" title="Direct link to What's Next?">​</a></h2>
+<p>The success of Goose Janitor opens up fascinating possibilities. What other forms of technical debt could benefit from this approach? What other "AI team members" could we build to handle routine but knowledge intensive work?</p>
+<p>As we move toward an AI-first future, stories like Gemma's show us the path. Not just using AI tools, but thinking systematically about how to make our codebases and processes AI-ready.</p>
+<p>The future of software development is mixed teams where AI agents are autonomous contributors, handling the maintenance work that keeps our systems healthy while humans focus on building the future.</p>
+<hr>
+<p>Want the tweak the base recipe for your own needs? Check out <a href="https://block.github.io/goose/recipes/detail/?id=clean-up-feature-flag">Clean up feature flag</a> in our Recipe Cookbook!</p>
+]]></content:encoded>
+        </item>
+        <item>
+            <title><![CDATA[Auto Visualiser with MCP-UI]]></title>
+            <link>https://block.github.io/goose/blog/2025/08/27/autovisualiser-with-mcp-ui</link>
+            <guid>https://block.github.io/goose/blog/2025/08/27/autovisualiser-with-mcp-ui</guid>
+            <pubDate>Wed, 27 Aug 2025 00:00:00 GMT</pubDate>
+            <description><![CDATA[Automatically show renders visual representations of data as you interact with it, powered by MCP-UI]]></description>
+            <content:encoded><![CDATA[<p><img decoding="async" loading="lazy" alt="blog banner" src="https://block.github.io/goose/assets/images/autovis-banner-c6e34e561b2fad329ea00024c301e910.png" width="1130" height="917" class="img_ev3q"></p>
+<p>Data visualization just got a major upgrade in Goose. With the new MCP-UI auto visualiser feature, you no longer need to manually request charts, graphs, or visual representations of your data. Goose now automatically detects when data would benefit from visualization and renders interactive visual components directly in your conversation.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="what-is-auto-visualiser">What is Auto Visualiser?<a href="https://block.github.io/goose/blog/2025/08/27/autovisualiser-with-mcp-ui#what-is-auto-visualiser" class="hash-link" aria-label="Direct link to What is Auto Visualiser?" title="Direct link to What is Auto Visualiser?">​</a></h2>
+<p><a href="https://block.github.io/goose/docs/mcp/autovisualiser-mcp">Auto Visualiser</a> is a built-in extension that integrates with <a href="https://block.github.io/goose/docs/guides/interactive-chat/">Goose's MCP-UI system</a> to automatically generate visual representations of data as you work.</p>
+<p><img decoding="async" loading="lazy" alt="switch" src="data:image/png;base64,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FRUVRvVrr70mCxcuzCiaTNLbEOpik8s9yQhR76b1VRulZWV5prd/677JkyfLEUccYVwqep/ddtstEWbevHny+uuvS+/evRPnsOCaN28uK1askKlTpxprhR5v7dq10rNnT2N2z5w501yj8mzatEl22WWXxP133HGHeas5YaZPny6rVq2SXXfdVfj/xBNPCL17mzZtEhUQN+GZZ54x1tY777xj9Hfp0kXef//9wPhfeOEFqaqqkm7dupk4ydO0adPM/Z988omJu337r94IT9zE+9RTT8miRYukhfemc4gdoQcnjwcccIDRBw6HHXaYfPjhh0bX/vvvb8Lxxb0PPPCA7LfffrXe9r5u3Tqh9yb+jz/+2MTdoUMHcx/uCb06VuQbb7xh8O/atWtC56effmry9/TTT8vSpUulY8eOBvdEAO+AawsWLDC42/NYyq+++qrsscceoWVB/u6991458MAD7a0yY8YMwZrp3r27rFy50limpBd8+N+jR49EWA7o/KgD5IH07uS9Bf6DDz4w9alRo0ambIPwTVZ2ycrajdSma++995amTZvK5s2b5fbbbzd1rLy83AwxjBs3TihjMH7yySeFsiKv4Ig1RgdOPccNpFx33nlnefzxx2XOnDnmfuoX6beSLL3U+2bNmsn8+fNN3UU/dZd0IP66+NJLL8ljjz1m4gE76ih5iFNS4ZOwMEVjmdFLURn23HNP6du3r1iysOBu3LhRIANXIC0qXefOnaVPnz7m0lFHHSVULoSKT8U+5phjZMiQIfLWW2/J7NmzzTW+6OFo3DSMfv36yXvvvSe33HKLaSwDBw408aHDCg2edKKLOGjApCFZ/LgUpBshnffff78hpWHDhplGSqWlQuMKPfLII4ZERo4cacjTjdfG7/+FmCGCJUuWJC5RqSHBkpLa73eGyMrKymT06NGyzz77mIZFhUcgAfIFdocffrhx18EKgWQffPBB0yBPPvlk02D4b8fwTCDvC/KjYbrjNhAjjRMJKwt0rV692oSzX3QC1dXV5i8NneuPPvqolJaW1uqQCIDLTZrAkTRCgK57H4ZvsrJLVtY2ffy2bdvWdJDUMQTyJZ1gieBhQHiQv80DY2OHHnqoIVvqHZjTcVmhU6X+77777obQ6ZxcSZZewtiOiLpLuVG3rbh1kY6UTpl6fOKJJxqcMSTqutSu8THmhoKwPVyv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" width="307" height="147" class="img_ev3q"></p>
+<p>Once turned on, a smorgasboard of visualisation tools are made available as tools which will be automatically invoked if and when it makes sense to, for example, show things as a radar diagram, or a "sankey" diagram:</p>
+<p><img decoding="async" loading="lazy" alt="sankey" src="https://block.github.io/goose/assets/images/sankey-10b4c1db30fdcaec0b1c538211385e47.png" width="1377" height="845" class="img_ev3q"></p>
+<p>You can also explicitly ask for a visualisation, even specifying what style you want, and Goose will try to shape your data and then render it inline. This is powered by the <a href="https://mcpui.dev/" target="_blank" rel="noopener noreferrer">MCP-UI</a> emerging standard, which lets the MCP server formulate a visualisation (in this case using libraries like d3.js) and render it inline.</p>
+<p>The autovisualiser analyzes data patterns and automatically suggests the most appropriate visualization type. My favourite is the treemap which is a great way to see relative sizes of things in a way that pie charts can mislead. It is also interactive in that you can drill down.</p>
+<p><img decoding="async" loading="lazy" alt="tree map" src="https://block.github.io/goose/assets/images/treemap-fe432c41535964ba410c31915cb526fe.png" width="794" height="511" class="img_ev3q"></p>
+<p>Of course, if you want you can resort to the "last refuge of the unimaginative" and graph the weather:</p>
+<p><img decoding="async" loading="lazy" alt="weather" src="https://block.github.io/goose/assets/images/weather-a3fbaf6e35e2793b986b8dcc4804620b.png" width="1006" height="658" class="img_ev3q"></p>
+<p>Note this is an early feature, and functionality may change and vary a lot (as with MCP-UI). This is an early example of what is emerging as generative UI, although in this case the templates are pre-generated and the data is dynamically matched to the session and then displayed (from local resources).</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="types-of-visualizations">Types of Visualizations<a href="https://block.github.io/goose/blog/2025/08/27/autovisualiser-with-mcp-ui#types-of-visualizations" class="hash-link" aria-label="Direct link to Types of Visualizations" title="Direct link to Types of Visualizations">​</a></h2>
+<p>There are currently several families of things it can show:</p>
+<ul>
+<li>sankey diagrams</li>
+<li>radar charts</li>
+<li>chord diagrams</li>
+<li>donut/pie charts</li>
+<li>bar graphs and general charts</li>
+<li>treemap visualisations (tiles)</li>
+<li>maps (place things on geographic maps)</li>
+</ul>
+<hr>
+<p><em>Ready to see your data? <a href="https://block.github.io/goose/docs/mcp/autovisualiser-mcp#configuration">Enable the Auto Visualiser extension</a> in Goose.</em></p>
+]]></content:encoded>
+        </item>
+        <item>
+            <title><![CDATA[Your First Goose Experience Is On Us]]></title>
+            <link>https://block.github.io/goose/blog/2025/08/27/get-started-for-free-with-tetrate</link>
+            <guid>https://block.github.io/goose/blog/2025/08/27/get-started-for-free-with-tetrate</guid>
+            <pubDate>Wed, 27 Aug 2025 00:00:00 GMT</pubDate>
+            <description><![CDATA[New Goose users receive $10 in Tetrate Agent Router credits for instant access to multiple models including GPT-5 and Sonnet-4.]]></description>
+            <content:encoded><![CDATA[<p><img decoding="async" loading="lazy" src="https://block.github.io/goose/assets/images/tetrate-header-9e2afbf5d1ce961d5f25547a7439c65f.png" width="1600" height="840" class="img_ev3q"></p>
+<p>You shouldn’t need a credit card to vibe code with Goose. While Goose is completely free to use, the reality is that most performant LLMs aren't. You want to experience Goose in action without breaking the bank or jumping through hoops. We've been thinking about how to make that first step easier for newcomers to Goose.</p>
+<p>That's why we're thrilled about our newest provider integration: <a href="https://router.tetrate.ai/" target="_blank" rel="noopener noreferrer">Tetrate's Agent Router Service</a>. From August 27th through October 2nd, new Goose users can get $10 in credits to use Goose with any model on the Tetrate platform.</p>
+<p>We've upgraded the onboarding flow. Tetrate Agent Router now appears as a <a href="https://block.github.io/goose/docs/getting-started/installation#set-llm-provider">recommended setup option</a> for new users. Selecting Tetrate takes you through OAuth account creation, then drops you back into Goose with your $10 credits ready to go.</p>
+<p><img decoding="async" loading="lazy" alt="fresh install" src="https://block.github.io/goose/assets/images/welcome-759e755b4c027705f64202aad2ae75b6.png" width="955" height="1072" class="img_ev3q"></p>
+<p>This integration gives Goose users:</p>
+<ul>
+<li><strong>Instant access</strong> to models without manual setup</li>
+<li><strong>$10 in credits</strong> to start building without a paywall</li>
+<li><strong>A unified model layer</strong> powered by Tetrate</li>
+<li><strong>Stable routing</strong> built on <a href="https://www.envoyproxy.io/" target="_blank" rel="noopener noreferrer">Envoy</a>, an open source proxy for high-scale systems</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="tetrates-agent-router-service">Tetrate's Agent Router Service<a href="https://block.github.io/goose/blog/2025/08/27/get-started-for-free-with-tetrate#tetrates-agent-router-service" class="hash-link" aria-label="Direct link to Tetrate's Agent Router Service" title="Direct link to Tetrate's Agent Router Service">​</a></h2>
+<p>Tetrate's Agent Router Service provides unified access to a comprehensive collection of AI models including open source options to cutting-edge frontier models like GPT-5, Sonnet-4, and Grok-4.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="from-cloud-infrastructure-to-ai-model-routing">From Cloud Infrastructure to AI Model Routing<a href="https://block.github.io/goose/blog/2025/08/27/get-started-for-free-with-tetrate#from-cloud-infrastructure-to-ai-model-routing" class="hash-link" aria-label="Direct link to From Cloud Infrastructure to AI Model Routing" title="Direct link to From Cloud Infrastructure to AI Model Routing">​</a></h3>
+<p>Tetrate brings years of expertise in routing and infrastructure to the AI space. As major contributors to open source projects like Istio and Envoy, they understand how to build reliable, scalable routing systems. Now they're applying this same expertise to LLM traffic management.</p>
+<p>LLM requests are inherently stateless, making them ideal for intelligent routing across multiple providers and models. This allows you to optimize for cost, speed, availability, or quality, or even use multiple models to cross-check results. Terminology in this space is still settling. Goose refers to Tetrate as a “provider” for consistency, though under the hood it is a router service that connects to other providers. That layer abstracts away model selection, auth, and host config, keeping your setup clean.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="why-this-collaboration-matters">Why This Collaboration Matters<a href="https://block.github.io/goose/blog/2025/08/27/get-started-for-free-with-tetrate#why-this-collaboration-matters" class="hash-link" aria-label="Direct link to Why This Collaboration Matters" title="Direct link to Why This Collaboration Matters">​</a></h2>
+<p>Our goal is simple: make Goose accessible to everyone, immediately. That means removing barriers to getting started. Tetrate's generous credit offering and seamless integration help us achieve exactly that.</p>
+<p>It also reflects Tetrate's ongoing commitment to open source and making AI development more accessible to developers worldwide.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="explore-the-full-model-catalog">Explore the Full Model Catalog<a href="https://block.github.io/goose/blog/2025/08/27/get-started-for-free-with-tetrate#explore-the-full-model-catalog" class="hash-link" aria-label="Direct link to Explore the Full Model Catalog" title="Direct link to Explore the Full Model Catalog">​</a></h2>
+<p>While Goose auto-configures with Sonnet-4 by default, you have access to Tetrate's entire model catalog through the interface:</p>
+<p><img decoding="async" loading="lazy" alt="providers" src="https://block.github.io/goose/assets/images/providers-6844e6c8b32483ebd1ad41b09d121274.png" width="596" height="381" class="img_ev3q">
+<img decoding="async" loading="lazy" alt="gpt5" src="https://block.github.io/goose/assets/images/gpt5-d26792af57990f0add1edec491b11827.png" width="933" height="717" class="img_ev3q"></p>
+<p>Browse and select from a wide range of options, including:</p>
+<ul>
+<li><strong>Open-weight models</strong> (like Kimi/K2) hosted and ready to use</li>
+<li><strong>Frontier models</strong> from various providers</li>
+<li><strong>Specialized models</strong> optimized for different use cases</li>
+</ul>
+<div class="theme-admonition theme-admonition-tip admonition_xJq3 alert alert--success"><div class="admonitionHeading_Gvgb"><span class="admonitionIcon_Rf37"><svg viewBox="0 0 12 16"><path fill-rule="evenodd" d="M6.5 0C3.48 0 1 2.19 1 5c0 .92.55 2.25 1 3 1.34 2.25 1.78 2.78 2 4v1h5v-1c.22-1.22.66-1.75 2-4 .45-.75 1-2.08 1-3 0-2.81-2.48-5-5.5-5zm3.64 7.48c-.25.44-.47.8-.67 1.11-.86 1.41-1.25 2.06-1.45 3.23-.02.05-.02.11-.02.17H5c0-.06 0-.13-.02-.17-.2-1.17-.59-1.83-1.45-3.23-.2-.31-.42-.67-.67-1.11C2.44 6.78 2 5.65 2 5c0-2.2 2.02-4 4.5-4 1.22 0 2.36.42 3.22 1.19C10.55 2.94 11 3.94 11 5c0 .66-.44 1.78-.86 2.48zM4 14h5c-.23 1.14-1.3 2-2.5 2s-2.27-.86-2.5-2z"></path></svg></span>Protip</div><div class="admonitionContent_BuS1"><p>Want the best of both worlds? Use Goose’s <a href="https://block.github.io/goose/docs/tutorials/lead-worker">Lead/Worker configuration</a> to combine a powerful frontier model with a faster open-weight model. Let your Lead handle the high-level thinking while Workers take care of the repetitive tasks—saving you both time and credits.</p></div></div>
+<hr>
+<p>Thank you to Tetrate for supporting open source and making AI development more accessible!</p>
+<p><strong>What are you waiting for?</strong> <a href="https://block.github.io/goose/">Get started with Goose</a></p>
+<p><em>Got questions?</em> Explore our <a href="https://block.github.io/goose/docs/category/guides">docs</a>, browse the <a href="https://block.github.io/goose/blog">blog</a>, or join the conversation in our <a href="https://discord.gg/block-opensource" target="_blank" rel="noopener noreferrer">Discord</a> and <a href="https://github.com/block/goose/discussions" target="_blank" rel="noopener noreferrer">GitHub Discussions</a>. We’d love to have you.</p>
+]]></content:encoded>
+        </item>
         <item>
             <title><![CDATA[I had Goose Build its Own Secure Recipe Scanner]]></title>
             <link>https://block.github.io/goose/blog/2025/08/25/goose-became-its-own-watchdog</link>
@@ -1674,214 +1808,6 @@ I handled the restructure manually (it was delicate so I wanted to do it myself)
 <p>Most AI posts show off what's possible. I'm focused on what was promised.
 The whole point was to offload the tedious stuff so we could focus on the work that actually matters, and that's exactly what I'm using AI for.</p>
 <p>What everyday tasks are you delegating to AI agents? Let us know in <a href="https://discord.gg/block-opensource" target="_blank" rel="noopener noreferrer">Discord</a>.</p>
-]]></content:encoded>
-        </item>
-        <item>
-            <title><![CDATA[Isolated Dev Environments in Goose with container-use]]></title>
-            <link>https://block.github.io/goose/blog/2025/06/19/isolated-development-environments</link>
-            <guid>https://block.github.io/goose/blog/2025/06/19/isolated-development-environments</guid>
-            <pubDate>Thu, 19 Jun 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[Never worry about breaking your development setup again with containerized, git-branch-isolated development environments powered by container-use]]></description>
-            <content:encoded><![CDATA[<p><img decoding="async" loading="lazy" alt="blog cover" src="https://block.github.io/goose/assets/images/sandbox-0b0f5e6f871cbf48ea1a0be243440aa1.png" width="2240" height="1260" class="img_ev3q"></p>
-<p>Over ten years ago, Docker came onto the scene and introduced developers en masse to the concept and practice of containers. These containers helped solve deployment and build-time problems, and in some cases, issues with development environments. They quickly became mainstream. The technology underlying containers included copy-on-write filesystems and lightweight, virtual-machine-like environments that helped isolate processes and simplify cleanup.</p>
-<p>Dagger, the project and company founded by Docker’s creator <a href="https://www.linkedin.com/in/solomonhykes" target="_blank" rel="noopener noreferrer">Solomon Hykes</a>, has furthered the reach of containers for developers.</p>
-<p>One project that emerged from this work is <a href="https://github.com/dagger/container-use" target="_blank" rel="noopener noreferrer">Container Use</a>, an MCP server that gives agents an interface for working in isolated containers and git branches. It supports clear lifecycles, easy rollbacks, and safer experimentation, without sacrificing the ergonomics developers expect from local agents.</p>
-<p>Container Use brings containerized, git-branch-isolated development directly into your <a href="https://block.github.io/goose/">Goose</a> workflow. While still early in its development, it's evolving quickly and already offers helpful tools for lightweight, branch-specific isolation when you need it.</p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="the-problem-with-local-only-development">The Problem with Local-Only Development<a href="https://block.github.io/goose/blog/2025/06/19/isolated-development-environments#the-problem-with-local-only-development" class="hash-link" aria-label="Direct link to The Problem with Local-Only Development" title="Direct link to The Problem with Local-Only Development">​</a></h2>
-<p>Traditionally, developers build directly on their local machines, but that approach carries risks such as:</p>
-<ul>
-<li>Dependencies can conflict between projects</li>
-<li>System changes might break other tools</li>
-<li>Experimental code risks your stable codebase</li>
-<li>Cleanup after failed experiments is tedious</li>
-<li>Processes are left running, resources consumed that aren't freed</li>
-<li>Changes are made which can't easily be undone</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="a-safer-alternative-isolated-development-environments">A Safer Alternative: Isolated Development Environments<a href="https://block.github.io/goose/blog/2025/06/19/isolated-development-environments#a-safer-alternative-isolated-development-environments" class="hash-link" aria-label="Direct link to A Safer Alternative: Isolated Development Environments" title="Direct link to A Safer Alternative: Isolated Development Environments">​</a></h2>
-<p>Container Use solves these problems by giving Goose the ability to work in completely isolated environments. Every experiment gets its own sandbox where nothing can affect your main development setup.</p>
-<ul>
-<li><strong>Git branch isolation</strong>:  Each experiment automatically gets its own git branch, keeping code changes separate from your main codebase.</li>
-<li><strong>Container isolation</strong>:  Your code runs in clean, reproducible containers with exactly the dependencies it needs—nothing more, nothing less.</li>
-<li><strong>Easy reset</strong>: When you're done experimenting, simply exit the environment. No cleanup required, no residual changes to worry about.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="getting-started">Getting Started<a href="https://block.github.io/goose/blog/2025/06/19/isolated-development-environments#getting-started" class="hash-link" aria-label="Direct link to Getting Started" title="Direct link to Getting Started">​</a></h2>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="1-install-container-use">1. Install Container Use<a href="https://block.github.io/goose/blog/2025/06/19/isolated-development-environments#1-install-container-use" class="hash-link" aria-label="Direct link to 1. Install Container Use" title="Direct link to 1. Install Container Use">​</a></h3>
-<p><strong>macOS (recommended):</strong></p>
-<div class="language-bash codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_biex"><pre tabindex="0" class="prism-code language-bash codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><span class="token-line" style="color:#393A34"><span class="token plain">brew install dagger/tap/container-use</span><br></span></code></pre><div class="buttonGroup__atx"><button type="button" aria-label="Copy code to clipboard" title="Copy" class="clean-btn"><span class="copyButtonIcons_eSgA" aria-hidden="true"><svg viewBox="0 0 24 24" class="copyButtonIcon_y97N"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"></path></svg><svg viewBox="0 0 24 24" class="copyButtonSuccessIcon_LjdS"><path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"></path></svg></span></button></div></div></div>
-<p><strong>All platforms:</strong></p>
-<div class="language-bash codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_biex"><pre tabindex="0" class="prism-code language-bash codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><span class="token-line" style="color:#393A34"><span class="token plain">curl -fsSL https://raw.githubusercontent.com/dagger/container-use/main/install.sh | bash</span><br></span></code></pre><div class="buttonGroup__atx"><button type="button" aria-label="Copy code to clipboard" title="Copy" class="clean-btn"><span class="copyButtonIcons_eSgA" aria-hidden="true"><svg viewBox="0 0 24 24" class="copyButtonIcon_y97N"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"></path></svg><svg viewBox="0 0 24 24" class="copyButtonSuccessIcon_LjdS"><path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"></path></svg></span></button></div></div></div>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="2-add-to-goose">2. Add to Goose<a href="https://block.github.io/goose/blog/2025/06/19/isolated-development-environments#2-add-to-goose" class="hash-link" aria-label="Direct link to 2. Add to Goose" title="Direct link to 2. Add to Goose">​</a></h3>
-<p>Click this link to automatically add the extension:</p>
-<p><strong><a href="goose://extension?cmd=cu&amp;arg=stdio&amp;id=container-use&amp;name=container%20use&amp;description=use%20containers%20with%20dagger%20and%20git%20for%20isolated%20environments" target="_blank" rel="noopener noreferrer">🚀 Add Container Use to Goose</a></strong></p>
-<p>Or manually add to <code>~/.config/goose/config.yaml</code>:</p>
-<div class="language-yaml codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_biex"><pre tabindex="0" class="prism-code language-yaml codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><span class="token-line" style="color:#393A34"><span class="token key atrule" style="color:#00a4db">extensions</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"></span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">  </span><span class="token key atrule" style="color:#00a4db">container-use</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"></span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">    </span><span class="token key atrule" style="color:#00a4db">name</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"> container</span><span class="token punctuation" style="color:#393A34">-</span><span class="token plain">use</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">    </span><span class="token key atrule" style="color:#00a4db">type</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"> stdio</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">    </span><span class="token key atrule" style="color:#00a4db">enabled</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"> </span><span class="token boolean important" style="color:#36acaa">true</span><span class="token plain"></span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">    </span><span class="token key atrule" style="color:#00a4db">cmd</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"> cu</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">    </span><span class="token key atrule" style="color:#00a4db">args</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"></span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">    </span><span class="token punctuation" style="color:#393A34">-</span><span class="token plain"> stdio</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">    </span><span class="token key atrule" style="color:#00a4db">envs</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"> </span><span class="token punctuation" style="color:#393A34">{</span><span class="token punctuation" style="color:#393A34">}</span><br></span></code></pre><div class="buttonGroup__atx"><button type="button" aria-label="Copy code to clipboard" title="Copy" class="clean-btn"><span class="copyButtonIcons_eSgA" aria-hidden="true"><svg viewBox="0 0 24 24" class="copyButtonIcon_y97N"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"></path></svg><svg viewBox="0 0 24 24" class="copyButtonSuccessIcon_LjdS"><path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"></path></svg></span></button></div></div></div>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="real-world-use-cases">Real-World Use Cases<a href="https://block.github.io/goose/blog/2025/06/19/isolated-development-environments#real-world-use-cases" class="hash-link" aria-label="Direct link to Real-World Use Cases" title="Direct link to Real-World Use Cases">​</a></h2>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="experimenting-with-new-dependencies">Experimenting with New Dependencies<a href="https://block.github.io/goose/blog/2025/06/19/isolated-development-environments#experimenting-with-new-dependencies" class="hash-link" aria-label="Direct link to Experimenting with New Dependencies" title="Direct link to Experimenting with New Dependencies">​</a></h3>
-<ul>
-<li>
-<p><strong>Prompt</strong>: "I want to try adding Redis to this project, but I'm not sure if it's the right fit. Can you set up an isolated environment?"</p>
-</li>
-<li>
-<p><strong>Result</strong>: Goose creates a new git branch, spins up a container with Redis, and lets you experiment. If it doesn't work out, simply exit—no cleanup needed.</p>
-</li>
-</ul>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="risky-refactors">Risky Refactors<a href="https://block.github.io/goose/blog/2025/06/19/isolated-development-environments#risky-refactors" class="hash-link" aria-label="Direct link to Risky Refactors" title="Direct link to Risky Refactors">​</a></h3>
-<ul>
-<li>
-<p><strong>Prompt</strong>: "I want to completely restructure this codebase, but I need to be able to roll back easily."</p>
-</li>
-<li>
-<p><strong>Result</strong>:  Work in an isolated branch and container where you can make sweeping changes without fear. Test your new architecture thoroughly. If the refactor succeeds, merge it back to main. If it fails, delete the branch and container.</p>
-</li>
-</ul>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="learning-new-technologies">Learning New Technologies<a href="https://block.github.io/goose/blog/2025/06/19/isolated-development-environments#learning-new-technologies" class="hash-link" aria-label="Direct link to Learning New Technologies" title="Direct link to Learning New Technologies">​</a></h3>
-<ul>
-<li>
-<p><strong>Prompt</strong>: "I want to try this new framework without installing dependencies on my main system."</p>
-</li>
-<li>
-<p><strong>Result</strong>: Experiment in a pre-configured container with all the tools you need. Learn at your own pace without cluttering your host system or worrying about version conflicts.</p>
-</li>
-</ul>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="split-testing-features">Split Testing Features<a href="https://block.github.io/goose/blog/2025/06/19/isolated-development-environments#split-testing-features" class="hash-link" aria-label="Direct link to Split Testing Features" title="Direct link to Split Testing Features">​</a></h3>
-<ul>
-<li>
-<p><strong>Prompt</strong>: "I want to test two different approaches to this feature - one using a REST API and another with GraphQL. Can you run both experiments simultaneously?"</p>
-</li>
-<li>
-<p><strong>Result</strong>: Goose spins up two isolated environments, each with its own git branch and container. One agent works on the REST implementation while another tackles GraphQL, both running in parallel without interfering with each other or your main codebase. Compare results and merge the winner.</p>
-</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="guide">Guide<a href="https://block.github.io/goose/blog/2025/06/19/isolated-development-environments#guide" class="hash-link" aria-label="Direct link to Guide" title="Direct link to Guide">​</a></h2>
-<p><strong><a href="https://block.github.io/goose/docs/tutorials/isolated-development-environments">Get started with the full guide →</a></strong></p>
-<hr>
-<p><em>Questions? Join our <a href="https://github.com/block/goose" target="_blank" rel="noopener noreferrer">GitHub discussions</a> or <a href="https://discord.gg/block-opensource" target="_blank" rel="noopener noreferrer">Discord</a>. Learn more about Dagger at <a href="https://dagger.io/" target="_blank" rel="noopener noreferrer">dagger.io</a>.</em></p>
-<!-- -->
-<div style="width:100%;max-width:800px;margin:0 auto"><iframe width="560" height="315" src="https://www.youtube.com/embed/pGce9T4E5Yw?si=1D3Aoa6oiFgJ0E5w" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen=""></iframe></div>
-]]></content:encoded>
-        </item>
-        <item>
-            <title><![CDATA[Why I Used Goose to Build a Chaotic Emotion Detection App]]></title>
-            <link>https://block.github.io/goose/blog/2025/06/17/goose-emotion-detection-app</link>
-            <guid>https://block.github.io/goose/blog/2025/06/17/goose-emotion-detection-app</guid>
-            <pubDate>Tue, 17 Jun 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[The joys of experimenting with computer vision using Goose, an MCP host]]></description>
-            <content:encoded><![CDATA[<p><img decoding="async" loading="lazy" alt="blog cover" src="https://block.github.io/goose/assets/images/emotion-powered-ui-83b0e779f22a3a060eef7bb29e04090d.png" width="2240" height="1260" class="img_ev3q"></p>
-<p>Developers deserve to have fun. There was a time when the internet felt magical. I remember going to the library just to create a character on The Doll Palace. At home, I'd spend hours changing fonts with WordArt. But as I grew up, the industry did too. We've shifted away from marquees and glittery cursors. Grown-up me started using ones and zeros to build reliable systems for insurance, banking, and healthcare companies. There's pride in that, but it's harder to justify doing something just because it's fun.</p>
-<p>That's why I tapped into my inner child and used <a href="https://block.github.io/goose/">Goose</a> to <a href="https://chaotic-emotion-detector-production.up.railway.app/" target="_blank" rel="noopener noreferrer">build a UI that reacts to users' emotions</a>.</p>
-<p>Sometimes I want to write every line of code. Other times, I just want a quick dopamine hit from seeing my idea go from vision to execution in minutes. Other developers may relate to this feeling, and it's partly why AI agents and vibe coding have become so popular. They've rekindled that sense of playful experimentation that motivates our minds to solve problems more creatively.</p>
-<p>In an <a href="https://www.oreilly.com/radar/takeaways-from-coding-with-ai/" target="_blank" rel="noopener noreferrer">article</a> by Tim O’Reilly on AI-assisted coding, Kent Beck and Nikola Balic share their enthusiasm:</p>
-<blockquote>
-<p>"This is the most fun I've ever had." - Beck</p>
-</blockquote>
-<blockquote>
-<p>"It brought back the joy of programming." - Balic</p>
-</blockquote>
-<p>Playing with code and experimenting with technology motivates our minds to solve problems more creatively.</p>
-<p>To celebrate the return of joyful programming, I started a livestream series called <a href="https://www.youtube.com/watch?v=wS5-4hXcnL4&amp;list=PLyMFt_U2IX4v-yCUa11zgRGDgJbUUWKan" target="_blank" rel="noopener noreferrer"><strong>The Great Goose Off</strong></a>, where two people compete to prompt Goose, an open source AI agent, to create the silliest, most chaotic apps possible.</p>
-<p>Participants face challenges like building:</p>
-<ul>
-<li>A login form you can't log into</li>
-<li>Error messages that are sassy</li>
-<li>Buttons that run away from your cursor</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="my-strategy">My Strategy<a href="https://block.github.io/goose/blog/2025/06/17/goose-emotion-detection-app#my-strategy" class="hash-link" aria-label="Direct link to My Strategy" title="Direct link to My Strategy">​</a></h2>
-<p>Hosting The Great Goose Off gave me a new perspective on Goose. It is good at writing code, but it is even better at being silly. That inspired me to build a computer vision app that not only detects emotion but responds to it. I used Goose as my creative partner to shape how the interface would behave.</p>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="let-the-agent-lead">Let the Agent Lead<a href="https://block.github.io/goose/blog/2025/06/17/goose-emotion-detection-app#let-the-agent-lead" class="hash-link" aria-label="Direct link to Let the Agent Lead" title="Direct link to Let the Agent Lead">​</a></h3>
-<p>I observed that participants (of The Great Goose Off) who were not engineers often created the most imaginative applications. They gave Goose room to interpret prompts without narrowing its scope too early. This resulted in outputs that felt fresh and unpredictable. I took a similar approach. I gave high-level instructions and allowed the agent to explore how to implement them.</p>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="choosing-a-performant-model">Choosing a Performant Model<a href="https://block.github.io/goose/blog/2025/06/17/goose-emotion-detection-app#choosing-a-performant-model" class="hash-link" aria-label="Direct link to Choosing a Performant Model" title="Direct link to Choosing a Performant Model">​</a></h3>
-<p>As my manager Angie Jones says, Claude Sonnet 4 was “born to code.” I chose it because it helps Goose pivot quickly when something breaks. It’s also great at documenting code and anticipating next steps. That came in handy when the face-api CDN failed to load. Goose immediately switched to downloading the models locally instead.</p>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="prompt-chaining">Prompt Chaining<a href="https://block.github.io/goose/blog/2025/06/17/goose-emotion-detection-app#prompt-chaining" class="hash-link" aria-label="Direct link to Prompt Chaining" title="Direct link to Prompt Chaining">​</a></h3>
-<p>Instead of trying to build everything in one huge prompt like "Create a face detection app that uses webcam input to detect emotions and makes the UI react chaotically with color changes, screen shakes, and spinning elements," I broke the complex task down into smaller, sequential subtasks:</p>
-<ul>
-<li><strong>First prompt</strong>: "Create a webcam application in JavaScript"</li>
-<li><strong>Second prompt</strong>: "Enable a face detection mode using face-api.js"</li>
-<li><strong>Third prompt</strong>: "Enable an emotion detection mode"</li>
-<li><strong>Fourth prompt</strong>: "Can we add a 'Chaotic Mode' toggle to the app? When enabled, the UI should react in silly ways when an emotion is detected from the webcam. Some fun ideas for chaotic reactions (based on emotion changes):<!-- -->
-<ul>
-<li>Change the background color</li>
-<li>Randomly reposition or rotate buttons</li>
-<li>Add screen shake or CSS filters (like invert or hue-rotate)</li>
-<li>Trigger emoji overlays"</li>
-</ul>
-</li>
-</ul>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="version-control">Version Control<a href="https://block.github.io/goose/blog/2025/06/17/goose-emotion-detection-app#version-control" class="hash-link" aria-label="Direct link to Version Control" title="Direct link to Version Control">​</a></h3>
-<p>After each step, I committed changes to GitHub to enable easy rollbacks if needed. This iterative approach allowed me to test functionality incrementally and refine the application's behavior.</p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="the-result">The Result<a href="https://block.github.io/goose/blog/2025/06/17/goose-emotion-detection-app#the-result" class="hash-link" aria-label="Direct link to The Result" title="Direct link to The Result">​</a></h2>
-<p>In the end, Goose and I built a delightfully chaotic application where the interface responds to my facial expressions. For example:</p>
-<ul>
-<li>If I make an angry face, the screen turns red and starts to shake</li>
-<li>If I smile, multiple colorful hues appear across the interface</li>
-<li>If I look disgusted, the entire layout spins around</li>
-</ul>
-<!-- -->
-<div style="width:100%;max-width:800px;margin:0 auto"><iframe width="560" height="315" src="https://www.youtube.com/embed/ieniCTqbnV0?autoplay=1&amp;mute=1&amp;loop=1&amp;playlist=ieniCTqbnV0" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="its-okay-to-have-fun">It’s Okay to Have Fun<a href="https://block.github.io/goose/blog/2025/06/17/goose-emotion-detection-app#its-okay-to-have-fun" class="hash-link" aria-label="Direct link to It’s Okay to Have Fun" title="Direct link to It’s Okay to Have Fun">​</a></h2>
-<p>It's okay to not build for utility sometimes. In fact, our industry needs more delightful chaos. I believe that maintaining a sense of wonder and fun keeps us passionate about what we do.</p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="try-it-out">Try it Out<a href="https://block.github.io/goose/blog/2025/06/17/goose-emotion-detection-app#try-it-out" class="hash-link" aria-label="Direct link to Try it Out" title="Direct link to Try it Out">​</a></h2>
-<ul>
-<li>Use the <a href="https://chaotic-emotion-detector-production.up.railway.app/" target="_blank" rel="noopener noreferrer">app</a></li>
-<li>Fork the <a href="https://github.com/blackgirlbytes/chaotic-emotion-detector" target="_blank" rel="noopener noreferrer">GitHub Repository</a></li>
-<li>Use the <a href="goose://recipe?config=eyJpZCI6InVudGl0bGVkIiwibmFtZSI6IlVudGl0bGVkIFJlY2lwZSIsImRlc2NyaXB0aW9uIjoiTWFrZSB5b3VyIFVJIHJlYWN0IHRvIHlvdXIgZW1vdGlvbnMiLCJpbnN0cnVjdGlvbnMiOiJJIGhlbHAgYnVpbGQgaW50ZXJhY3RpdmUgd2ViIGFwcGxpY2F0aW9ucyB1c2luZyB2YW5pbGxhIEphdmFTY3JpcHQsIEhUTUwsIGFuZCBDU1MuIEkgY3JlYXRlIGNvbXBsZXRlLCBmdW5jdGlvbmFsIGFwcGxpY2F0aW9ucyB3aXRoIG1vZGVybiBVSSBkZXNpZ24sIHJlYWwtdGltZSBmZWF0dXJlcywgYW5kIGVuZ2FnaW5nIHVzZXIgaW50ZXJhY3Rpb25zLiBXaGVuIGJ1aWxkaW5nIHdlYmNhbSBvciBjYW1lcmEtYmFzZWQgYXBwbGljYXRpb25zLCBJIGludGVncmF0ZSBhZHZhbmNlZCBmZWF0dXJlcyBsaWtlIGZhY2UgZGV0ZWN0aW9uIHVzaW5nIEZhY2UtQVBJLmpzIGxpYnJhcnksIGVtb3Rpb24gcmVjb2duaXRpb24sIGFuZCBjcmVhdGl2ZSBVSSByZXNwb25zZXMuIEkgcHJvdmlkZSBhbGwgbmVjZXNzYXJ5IGZpbGVzIGluY2x1ZGluZyBIVE1MIHN0cnVjdHVyZSwgQ1NTIHN0eWxpbmcsIEphdmFTY3JpcHQgZnVuY3Rpb25hbGl0eSwgYW5kIGEgc2ltcGxlIE5vZGUuanMgc2VydmVyLiBJIGFsc28gZG93bmxvYWQgYW5kIHNlcnZlIHJlcXVpcmVkIG1vZGVsIGZpbGVzIGxvY2FsbHkgZm9yIGJldHRlciBwZXJmb3JtYW5jZSBhbmQgcmVsaWFiaWxpdHkuIFRoZSBhcHBsaWNhdGlvbnMgYXJlIGRlc2lnbmVkIHRvIGJlIHByaXZhY3ktZm9jdXNlZCB3aXRoIGxvY2FsIHN0b3JhZ2UgYW5kIHByb2Nlc3NpbmcuIiwiYWN0aXZpdGllcyI6WyJCdWlsZCB3ZWJjYW0gYXBwcyIsIkFkZCBmYWNlIGRldGVjdGlvbiIsIkNyZWF0ZSBlbW90aW9uIHJlY29nbml0aW9uIiwiRGVzaWduIGNoYW90aWMgVUkgZWZmZWN0cyIsIkltcGxlbWVudCBsb2NhbCBmaWxlIHNlcnZlcnMiXSwicHJvbXB0IjoiIiwidGl0bGUiOiJDaGFvdGljIEVtb3Rpb24gRGV0ZWN0b3IiLCJleHRlbnNpb25zIjpbXX0=" target="_blank" rel="noopener noreferrer">recipe</a> to build your own. Please note, that you must install <a href="https://block.github.io/goose/docs/getting-started/installation">Goose</a> to use the recipe.</li>
-</ul>
-<p>Happy experimenting!</p>
-]]></content:encoded>
-        </item>
-        <item>
-            <title><![CDATA[Treating LLMs Like Tools in a Toolbox: A Multi-Model Approach to Smarter AI Agents]]></title>
-            <link>https://block.github.io/goose/blog/2025/06/16/multi-model-in-goose</link>
-            <guid>https://block.github.io/goose/blog/2025/06/16/multi-model-in-goose</guid>
-            <pubDate>Mon, 16 Jun 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[How Goose uses multiple LLMs within a single task, optimizing for speed, cost, and reliability in AI agent workflows]]></description>
-            <content:encoded><![CDATA[<p><img decoding="async" loading="lazy" alt="blog cover" src="https://block.github.io/goose/assets/images/multi-model-ai-agent-d408feaeba3e13cafdbfe9377980bc3d.png" width="1200" height="630" class="img_ev3q"></p>
-<p>Not every task needs a genius. And not every step should cost a fortune.</p>
-<p>That's something we've learned while scaling Goose, our open source AI agent. The same model that's great at unpacking a planning request might totally fumble a basic shell command, or worse - it might burn through your token budget doing it.</p>
-<p>So we asked ourselves: what if we could mix and match models in a single session?</p>
-<p>Not just switching based on user commands, but building Goose with an actual system for routing tasks between different models, each playing to their strengths.</p>
-<p>This is the gap the lead/worker model is designed to fill.</p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="the-problem-with-single-model-sessions">The Problem with Single-Model Sessions<a href="https://block.github.io/goose/blog/2025/06/16/multi-model-in-goose#the-problem-with-single-model-sessions" class="hash-link" aria-label="Direct link to The Problem with Single-Model Sessions" title="Direct link to The Problem with Single-Model Sessions">​</a></h2>
-<p>Originally, every Goose session used a single model from start to finish. That worked fine for short tasks, but longer sessions were harder to tune:</p>
-<ul>
-<li>Go too cheap, and the model might miss nuance or break tools.</li>
-<li>Go too premium, and your cost graph starts looking like a ski slope.</li>
-</ul>
-<p>There was no built-in way to adapt on the fly.</p>
-<p>We saw this tension in real usage where agents would start strong, then stall out when the model struggled to follow through. Sometimes users would manually switch models mid-session. But that's not scalable, and definitely not agent like.</p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="designing-the-leadworker-system">Designing the Lead/Worker System<a href="https://block.github.io/goose/blog/2025/06/16/multi-model-in-goose#designing-the-leadworker-system" class="hash-link" aria-label="Direct link to Designing the Lead/Worker System" title="Direct link to Designing the Lead/Worker System">​</a></h2>
-<p>The core idea is simple:</p>
-<ul>
-<li>Start the session with a lead model that's strong at reasoning and planning.</li>
-<li>After a few back and forths between you and the model (what we call "turns"), hand off to a worker model that's faster and cheaper, but still capable.</li>
-<li>If the worker gets stuck, Goose can detect the failure and temporarily bring the lead back in.</li>
-</ul>
-<p>You can configure how many turns the lead handles upfront (<code>GOOSE_LEAD_TURNS</code>), how many consecutive failures trigger fallback (<code>GOOSE_LEAD_FAILURE_THRESHOLD</code>), and how long the fallback lasts before Goose retries the worker.</p>
-<p>This gives you a flexible, resilient setup where each model gets used where it shines.</p>
-<p>One of the trickiest parts of this feature was defining what failure looks like.</p>
-<p>We didn't want Goose to swap models just because an API timed out. Instead, we focused on real task failures:</p>
-<ul>
-<li>Tool execution errors</li>
-<li>Syntax mistakes in generated code</li>
-<li>File not found or permission errors</li>
-<li>User corrections like "that's wrong" or "try again"</li>
-</ul>
-<p>Goose tracks these signals and knows when to escalate. And once the fallback model stabilizes things, it switches back without missing a beat.</p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="the-value-of-multi-model-design">The Value of Multi-Model Design<a href="https://block.github.io/goose/blog/2025/06/16/multi-model-in-goose#the-value-of-multi-model-design" class="hash-link" aria-label="Direct link to The Value of Multi-Model Design" title="Direct link to The Value of Multi-Model Design">​</a></h2>
-<p>Cost savings are a nice side effect, but the real value is in how this shifts the mental model: treating AI models like tools in a toolbox, each with its own role to play. Some are built for strategy. Some are built for speed. The more your agent can switch between them intelligently, the closer it gets to feeling like a true collaborator.</p>
-<p>We've found that this multi-model design unlocks new workflows:</p>
-<ul>
-<li><strong>Long dev sessions</strong> where planning and execution ebb and flow</li>
-<li><strong>Cross-provider setups</strong> (Claude for planning, OpenAI for execution)</li>
-<li><strong>Lower-friction defaults</strong> for teams worried about LLM spend</li>
-</ul>
-<p>It also opens the door for even smarter routing in the future with things like switching based on tasks, ensemble voting, or maybe even letting Goose decide which model to call based on tool context.</p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="try-it-out">Try It Out<a href="https://block.github.io/goose/blog/2025/06/16/multi-model-in-goose#try-it-out" class="hash-link" aria-label="Direct link to Try It Out" title="Direct link to Try It Out">​</a></h2>
-<p>Lead/worker mode is already available in Goose.  To enable, export these variables with two models that have already been configured in Goose:</p>
-<div class="language-bash codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_biex"><pre tabindex="0" class="prism-code language-bash codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><span class="token-line" style="color:#393A34"><span class="token plain">export GOOSE_LEAD_MODEL="gpt-4o"</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">export GOOSE_MODEL="claude-4-sonnet"</span><br></span></code></pre><div class="buttonGroup__atx"><button type="button" aria-label="Copy code to clipboard" title="Copy" class="clean-btn"><span class="copyButtonIcons_eSgA" aria-hidden="true"><svg viewBox="0 0 24 24" class="copyButtonIcon_y97N"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"></path></svg><svg viewBox="0 0 24 24" class="copyButtonSuccessIcon_LjdS"><path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"></path></svg></span></button></div></div></div>
-<p>From there, Goose takes care of the hand off, the fallback, and the recovery. You just... keep vibing.</p>
-<p>If you're curious how it all works under the hood, we've got a <a href="https://block.github.io/goose/docs/tutorials/lead-worker">full tutorial</a>.</p>
-<hr>
-<p>If you're experimenting with multi-model setups, <a href="https://discord.gg/block-opensource" target="_blank" rel="noopener noreferrer">share what's working and what isn't</a>.</p>
 ]]></content:encoded>
         </item>
     </channel>
