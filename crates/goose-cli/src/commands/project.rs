@@ -59,7 +59,7 @@ pub fn handle_project_default() -> Result<()> {
         path_str.push_str("...");
         for component in components.iter().skip(len - 2) {
             path_str.push('/');
-            path_str.push_str(component.as_os_str().to_string_lossy().as_ref());
+            path_str.push_str(component.as_os_str().display().as_ref());
         }
         path_str
     };
@@ -189,7 +189,7 @@ pub fn handle_projects_interactive() -> Result<()> {
                 path_str.push_str("...");
                 for component in components.iter().skip(len - 2) {
                     path_str.push('/');
-                    path_str.push_str(component.as_os_str().to_string_lossy().as_ref());
+                    path_str.push_str(component.as_os_str().display().as_ref());
                 }
                 path_str
             };

@@ -137,10 +137,10 @@ pub async fn handle_session_list(
     let mut sessions = SessionManager::list_sessions().await?;
 
     if let Some(ref pat) = working_dir {
-        let pat_lower = pat.to_string_lossy().to_lowercase();
+        let pat_lower = pat.display().to_lowercase();
         sessions.retain(|s| {
             s.working_dir
-                .to_string_lossy()
+                .display()
                 .to_lowercase()
                 .contains(&pat_lower)
         });
