@@ -557,7 +557,7 @@ fn list_directory_contents(path: &Path) -> Result<Vec<Content>, ErrorData> {
                 )
             })?;
 
-            let name = entry.file_name().display().to_string();
+            let name = entry.file_name().to_string_lossy().to_string();
 
             if metadata.is_dir() {
                 dirs.push(format!("{}/", name));
