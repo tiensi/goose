@@ -138,12 +138,7 @@ pub async fn handle_session_list(
 
     if let Some(ref pat) = working_dir {
         let pat_lower = pat.display().to_lowercase();
-        sessions.retain(|s| {
-            s.working_dir
-                .display()
-                .to_lowercase()
-                .contains(&pat_lower)
-        });
+        sessions.retain(|s| s.working_dir.display().to_lowercase().contains(&pat_lower));
     }
 
     if ascending {
