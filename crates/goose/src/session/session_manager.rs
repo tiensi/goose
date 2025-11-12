@@ -970,6 +970,8 @@ impl SessionStorage {
     }
 
     async fn add_message(&self, session_id: &str, message: &Message) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+
         let metadata_json = serde_json::to_string(&message.metadata)?;
 
         sqlx::query(
@@ -983,14 +985,15 @@ impl SessionStorage {
         .bind(serde_json::to_string(&message.content)?)
         .bind(message.created)
         .bind(metadata_json)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
 
         sqlx::query("UPDATE sessions SET updated_at = datetime('now') WHERE id = ?")
             .bind(session_id)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
 
+        tx.commit().await?;
         Ok(())
     }
 
@@ -1049,10 +1052,12 @@ impl SessionStorage {
     }
 
     async fn delete_session(&self, session_id: &str) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+
         let exists =
             sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM sessions WHERE id = ?)")
                 .bind(session_id)
-                .fetch_one(&self.pool)
+                .fetch_one(&mut *tx)
                 .await?;
 
         if !exists {
@@ -1061,14 +1066,15 @@ impl SessionStorage {
 
         sqlx::query("DELETE FROM messages WHERE session_id = ?")
             .bind(session_id)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
 
         sqlx::query("DELETE FROM sessions WHERE id = ?")
             .bind(session_id)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
 
+        tx.commit().await?;
         Ok(())
     }
 
@@ -1357,5 +1363,111 @@ mod tests {
         assert_eq!(imported.name, "Old format session");
         assert!(imported.user_set_name);
         assert_eq!(imported.working_dir, PathBuf::from("/tmp/test"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_session() {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test_delete.db");
+        let storage = Arc::new(SessionStorage::create(&db_path).await.unwrap());
+
+        let session = storage
+            .create_session(
+                PathBuf::from("/tmp/test"),
+                "Test session".to_string(),
+                SessionType::User,
+            )
+            .await
+            .unwrap();
+
+        storage
+            .add_message(
+                &session.id,
+                &Message {
+                    id: None,
+                    role: Role::User,
+                    created: chrono::Utc::now().timestamp_millis(),
+                    content: vec![MessageContent::text("test message")],
+                    metadata: Default::default(),
+                },
+            )
+            .await
+            .unwrap();
+
+        let retrieved = storage.get_session(&session.id, true).await.unwrap();
+        assert_eq!(retrieved.message_count, 1);
+
+        storage.delete_session(&session.id).await.unwrap();
+
+        let result = storage.get_session(&session.id, false).await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Session not found"));
+    }
+
+    #[tokio::test]
+    async fn test_add_message() {
+        const MESSAGE_COUNT: usize = 5;
+
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test_add_message.db");
+        let storage = Arc::new(SessionStorage::create(&db_path).await.unwrap());
+
+        let session = storage
+            .create_session(
+                PathBuf::from("/tmp/test"),
+                "Test session".to_string(),
+                SessionType::User,
+            )
+            .await
+            .unwrap();
+
+        // Add multiple messages with alternating roles
+        for i in 0..MESSAGE_COUNT {
+            let message = Message::new(
+                if i % 2 == 0 {
+                    Role::User
+                } else {
+                    Role::Assistant
+                },
+                chrono::Utc::now().timestamp_millis(),
+                vec![MessageContent::text(format!("message {}", i))],
+            );
+
+            storage.add_message(&session.id, &message).await.unwrap();
+        }
+
+        // Add a message with custom metadata
+        let mut message_with_metadata = Message::new(
+            Role::User,
+            chrono::Utc::now().timestamp_millis(),
+            vec![MessageContent::text("message with custom metadata")],
+        );
+        message_with_metadata.metadata.user_visible = false;
+        message_with_metadata.metadata.agent_visible = true;
+        storage
+            .add_message(&session.id, &message_with_metadata)
+            .await
+            .unwrap();
+
+        // Verify messages were added
+        let updated_session = storage.get_session(&session.id, true).await.unwrap();
+        assert_eq!(updated_session.message_count, MESSAGE_COUNT + 1);
+
+        // Verify messages and roles
+        let conversation = updated_session.conversation.unwrap();
+        assert_eq!(conversation.messages().len(), MESSAGE_COUNT + 1);
+        assert_eq!(conversation.messages()[0].role, Role::User);
+        assert_eq!(conversation.messages()[1].role, Role::Assistant);
+        assert_eq!(conversation.messages()[2].role, Role::User);
+        assert_eq!(conversation.messages()[3].role, Role::Assistant);
+        assert_eq!(conversation.messages()[4].role, Role::User);
+
+        // Verify custom metadata was preserved on the last message
+        let last_message = conversation.messages().last().unwrap();
+        assert!(!last_message.metadata.user_visible);
+        assert!(last_message.metadata.agent_visible);
     }
 }
