@@ -462,7 +462,9 @@ impl SessionStorage {
         let options = SqliteConnectOptions::new()
             .filename(db_path)
             .create_if_missing(create_if_missing)
-            .busy_timeout(std::time::Duration::from_secs(5));
+            .busy_timeout(std::time::Duration::from_secs(5))
+            .shared_cache(true)
+            .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal);
 
         sqlx::SqlitePool::connect_with(options).await.map_err(|e| {
             anyhow::anyhow!(
