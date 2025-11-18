@@ -892,8 +892,6 @@ impl SessionStorage {
         query.push_str(", ");
         query.push_str("updated_at = datetime('now') WHERE id = ?");
 
-        let mut tx = self.pool.begin().await?;
-
         let mut q = sqlx::query(&query);
 
         if let Some(name) = builder.name {
@@ -943,6 +941,7 @@ impl SessionStorage {
             q = q.bind(user_recipe_values_json);
         }
 
+        let mut tx = self.pool.begin().await?;
         q = q.bind(&builder.session_id);
         q.execute(&mut *tx).await?;
 
