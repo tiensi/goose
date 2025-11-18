@@ -807,6 +807,7 @@ impl SessionStorage {
                 .bind(&name)
                 .bind(session_type.to_string())
                 .bind(working_dir.to_string_lossy().as_ref())
+//                 .fetch_one(&self.pool) <-- this contributes to the race condition
                 .fetch_one(&mut *tx)
                 .await?;
 
@@ -1384,23 +1385,13 @@ mod tests {
     #[tokio::test]
     async fn test_wal_race_condition_create_then_get() {
         use std::time::Duration;
-        use tokio::sync::Barrier;
-
-        let temp_dir = TempDir::new().unwrap();
-        let db_path = temp_dir.path().join("test_wal_race.db");
-        let storage = Arc::new(SessionStorage::create(&db_path).await.unwrap());
 
         const NUM_TASKS: usize = 100;
-        let barrier = Arc::new(Barrier::new(NUM_TASKS));
         let mut handles = vec![];
 
         for i in 0..NUM_TASKS {
-            let storage = Arc::clone(&storage);
-            let barrier = Arc::clone(&barrier);
-
             let handle = tokio::spawn(async move {
                 // Wait for all tasks to be ready
-                barrier.wait().await;
 
                 // Simulate build_session() logic:
                 // Step 1: session_id is None, so we need to create a new session
@@ -1408,8 +1399,8 @@ mod tests {
 
                 // Step 2: Create session (like builder.rs)
                 let session_id = if session_id.is_none() {
-                    let session = storage
-                        .create_session(
+                    let session =
+                        SessionManager::create_session(
                             PathBuf::from(format!("/tmp/test_{}", i)),
                             format!("Race test session {}", i),
                             SessionType::User,
@@ -1427,8 +1418,7 @@ mod tests {
 
                 // This is the critical read that happens in CliSession::new
                 // It tries to load the conversation from the just-created session
-                let fetched = storage
-                    .get_session(&session_id, true) // include_messages=true like real code
+                let fetched = SessionManager::get_session(&session_id, true) // include_messages=true like real code
                     .await;
 
                 match fetched {
@@ -1489,7 +1479,7 @@ mod tests {
         let db_path = temp_dir.path().join("test_blocking_race.db");
         let storage = Arc::new(SessionStorage::create(&db_path).await.unwrap());
 
-        const NUM_ITERATIONS: usize = 20;
+        const NUM_ITERATIONS: usize = 100;
         let mut handles = vec![];
 
         for i in 0..NUM_ITERATIONS {
