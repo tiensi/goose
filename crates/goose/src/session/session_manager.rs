@@ -607,7 +607,7 @@ impl SessionStorage {
 
     async fn import_legacy_session(&self, session: &Session) -> Result<()> {
         let mut tx = self.pool.begin().await?;
-        
+
         let recipe_json = match &session.recipe {
             Some(recipe) => Some(serde_json::to_string(recipe)?),
             None => None,
@@ -786,7 +786,7 @@ impl SessionStorage {
         session_type: SessionType,
     ) -> Result<Session> {
         let mut tx = self.pool.begin().await?;
-        
+
         let today = chrono::Utc::now().format("%Y%m%d").to_string();
         let session = sqlx::query_as(
             r#"
@@ -813,7 +813,7 @@ impl SessionStorage {
             .bind(working_dir.to_string_lossy().as_ref())
             .fetch_one(&mut *tx)
             .await?;
-        
+
         tx.commit().await?;
         Ok(session)
     }
